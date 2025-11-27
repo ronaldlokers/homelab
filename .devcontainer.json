@@ -11,5 +11,6 @@
         "path": "/usr/bin/zsh"
       }
     }
-  }
+  },
+  "forwardPorts": [8080]
 }
