@@ -28,3 +28,9 @@ spec:
   values:
     grafana:
       adminPassword: ronald
+      ingress:
+        enabled: true
+        ingressClassName: traefik
+        hosts:
+          - grafana.ronaldlokers.nl
+        tls: []
