@@ -2,8 +2,15 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: linkding
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
 spec:
   ingressClassName: traefik
+  tls:
+    - secretName: linkding-tls
+      hosts:
+        - linkding.ronaldlokers.nl
   rules:
     - host: linkding.ronaldlokers.nl
       http:
