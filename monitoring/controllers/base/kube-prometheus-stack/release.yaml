@@ -33,4 +33,7 @@ spec:
         ingressClassName: traefik
         hosts:
           - grafana.ronaldlokers.nl
-        tls: []
+        tls:
+          - secretName: grafana-tls-secret
+            hosts:
+              - grafana.ronaldlokers.nl
