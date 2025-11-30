@@ -2,6 +2,13 @@
 
 GitOps-managed Kubernetes homelab using Flux CD.
 
+[![Flux](https://img.shields.io/badge/Flux-CD-5468ff?logo=flux&logoColor=white)](https://fluxcd.io/)
+[![k3s](https://img.shields.io/badge/k3s-FFC61C?logo=k3s&logoColor=black)](https://k3s.io/)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
+[![Renovate](https://img.shields.io/badge/Renovate-enabled-blue?logo=renovatebot&logoColor=white)](https://docs.renovatebot.com/)
+[![Grafana](https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white)](https://grafana.com/)
+[![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-CM5-A22846?logo=raspberrypi&logoColor=white)](https://www.raspberrypi.com/)
+
 ## Overview
 
 This repository contains the complete infrastructure and application configuration for a Kubernetes homelab environment. Everything is managed declaratively through Git, with Flux CD automatically reconciling the cluster state.
