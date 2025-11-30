@@ -22,12 +22,12 @@ The clusters run in a Sipeed NanoCluster, with each cluster running on:
 - **Storage**: 64GB
 
 <div align="center">
-  <img src="https://wiki.sipeed.com/hardware/zh/cluster/NanoCluster/assets/product.png" alt="Sipeed NanoCluster" width="400"/>
+  <img src="docs/images/sipeed-nanocluster.png" alt="Sipeed NanoCluster" width="400"/>
   <p><em>Sipeed NanoCluster</em></p>
 </div>
 
 <div align="center">
-  <img src="https://www.jeffgeerling.com/sites/default/files/images/cm5-angle.jpeg" alt="Raspberry Pi CM5" width="400"/>
+  <img src="docs/images/raspberry-pi-cm5.png" alt="Raspberry Pi CM5" width="400"/>
   <p><em>Raspberry Pi Compute Module 5</em></p>
 </div>
 
