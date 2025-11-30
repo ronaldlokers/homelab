@@ -6,6 +6,31 @@ GitOps-managed Kubernetes homelab using Flux CD.
 
 This repository contains the complete infrastructure and application configuration for a Kubernetes homelab environment. Everything is managed declaratively through Git, with Flux CD automatically reconciling the cluster state.
 
+## Cluster Infrastructure
+
+The homelab runs on two K3s servers with Flux CD:
+
+- **Staging**: kube-srv-1.local (10.0.40.101)
+- **Production**: kube-srv-2.local (10.0.40.102)
+
+### Hardware
+
+The clusters run in a Sipeed NanoCluster, with each cluster running on:
+
+- **Compute Module**: Raspberry Pi CM5
+- **RAM**: 16GB
+- **Storage**: 64GB
+
+<div align="center">
+  <img src="https://wiki.sipeed.com/hardware/zh/cluster/NanoCluster/assets/product.png" alt="Sipeed NanoCluster" width="400"/>
+  <p><em>Sipeed NanoCluster</em></p>
+</div>
+
+<div align="center">
+  <img src="https://www.jeffgeerling.com/sites/default/files/images/cm5-angle.jpeg" alt="Raspberry Pi CM5" width="400"/>
+  <p><em>Raspberry Pi Compute Module 5</em></p>
+</div>
+
 ## Architecture
 
 The repository follows a structured layout separating concerns by layers:
