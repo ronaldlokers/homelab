@@ -12,15 +12,17 @@ The repository follows a structured layout separating concerns by layers:
 
 ```
 .
-├── clusters/staging/          # Cluster-specific Flux configuration
+├── clusters/
+│   ├── staging/              # Staging cluster Flux configuration
+│   └── production/           # Production cluster Flux configuration
 ├── infrastructure/
-│   ├── controllers/           # Infrastructure Helm releases (cert-manager, renovate)
+│   ├── controllers/          # Infrastructure Helm releases (cert-manager, renovate)
 │   └── configs/              # Infrastructure configuration (issuers, middlewares)
 ├── apps/                     # Application deployments
 └── monitoring/               # Observability stack (kube-prometheus-stack)
 ```
 
-Each component uses Kustomize overlays with `base/` and `staging/` directories for environment-specific configuration.
+Each component uses Kustomize overlays with `base/`, `staging/`, and `production/` directories for environment-specific configuration.
 
 ## Stack
 
@@ -42,7 +44,9 @@ Each component uses Kustomize overlays with `base/` and `staging/` directories f
 
 Secrets are encrypted using [SOPS](https://github.com/getsops/sops) with [age](https://github.com/FiloSottile/age) encryption. Flux automatically decrypts secrets during deployment using the cluster's age key.
 
-Configuration: `clusters/staging/.sops.yaml`
+Each environment has its own SOPS configuration:
+- `clusters/staging/.sops.yaml`
+- `clusters/production/.sops.yaml`
 
 ### Required Secrets
 
@@ -55,13 +59,24 @@ export GITHUB_USER=ronaldlokers`
 export GITHUB_TOKEN=<personal-access-token>
 ```
 
-Bootstrap flux
+Bootstrap Flux (choose the appropriate environment):
 ```bash
+# For staging
 flux bootstrap github \
+  --context=staging \
   --owner=$GITHUB_USER \
   --repository=homelab \
   --branch=main \
   --path=./clusters/staging \
+  --personal
+
+# For production
+flux bootstrap github \
+  --context=production \
+  --owner=$GITHUB_USER \
+  --repository=homelab \
+  --branch=main \
+  --path=./clusters/production \
   --personal
 ```
 
@@ -111,7 +126,9 @@ Dependencies are enforced through Kustomization `dependsOn` fields to ensure cor
 
 All resources follow the same pattern:
 - Base configuration in `base/` directories
-- Environment-specific overlays in `staging/` directories
+- Environment-specific overlays in `staging/` and `production/` directories
 - Kustomization files reference environment-specific resources
 
-The cluster reconciles from `clusters/staging/`, which references the appropriate overlays for each component.
+Each cluster reconciles from its respective directory:
+- Staging cluster: `clusters/staging/`
+- Production cluster: `clusters/production/`
