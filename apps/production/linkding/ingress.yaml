@@ -3,16 +3,16 @@ kind: Ingress
 metadata:
   name: linkding
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-staging
+    cert-manager.io/cluster-issuer: letsencrypt-production
     traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
 spec:
   ingressClassName: traefik
   tls:
     - secretName: linkding-tls
       hosts:
-        - linkding-staging.ronaldlokers.nl
+        - linkding.ronaldlokers.nl
   rules:
-    - host: linkding-staging.ronaldlokers.nl
+    - host: linkding.ronaldlokers.nl
       http:
         paths:
           - backend:
