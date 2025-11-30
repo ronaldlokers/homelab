@@ -44,6 +44,58 @@ Secrets are encrypted using [SOPS](https://github.com/getsops/sops) with [age](h
 
 Configuration: `clusters/staging/.sops.yaml`
 
+### Required Secrets
+
+These secrets must be manually created in the cluster before deployment:
+
+#### flux-system/flux-system
+Export the required variables:
+```bash
+export GITHUB_USER=ronaldlokers`
+export GITHUB_TOKEN=<personal-access-token>
+```
+
+Bootstrap flux
+```bash
+flux bootstrap github \
+  --owner=$GITHUB_USER \
+  --repository=homelab \
+  --branch=main \
+  --path=./clusters/staging \
+  --personal
+```
+
+#### flux-system/sops-age
+Age private key for decrypting SOPS-encrypted secrets:
+
+# Download the age.key file
+This file is stored in Proton Pass
+
+# Create secret in cluster
+```bash
+cat age.key | kubectl create secret generic sops-age \
+  --namespace=flux-system \
+  --from-file=age.agekey=/dev/stdin
+```
+
+### Managed Secrets
+
+These secrets are encrypted with SOPS and stored in this repository:
+
+- `cert-manager/cloudflare-api-token` - Cloudflare DNS API token for DNS-01 challenges
+- `linkding/linkding-container-env` - Linkding application environment variables
+- `linkding/tunnel-credentials` - Cloudflare Tunnel credentials
+- `renovate/renovate-container-env` - Renovate GitHub token
+
+### Auto-Generated Secrets
+
+These secrets are automatically created by controllers:
+
+- `*-tls` - TLS certificates issued by cert-manager
+- `letsencrypt-*` - Let's Encrypt ACME account keys
+- `kube-prometheus-stack-grafana` - Grafana admin credentials
+- Prometheus and Alertmanager configuration secrets
+
 ## Deployment Flow
 
 Flux monitors this repository and automatically applies changes:
