@@ -29,6 +29,10 @@ spec:
       defaultDataPath: /var/lib/longhorn
       # Backup settings (optional, can enable later)
       backupTarget: ""
+    # Configure default StorageClass with 2 replicas
+    persistence:
+      defaultClass: true
+      defaultClassReplicaCount: 2
     # Longhorn UI ingress (optional, can access via kubectl port-forward)
     ingress:
       enabled: false
