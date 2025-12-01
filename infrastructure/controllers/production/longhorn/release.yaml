@@ -37,6 +37,8 @@ spec:
     metrics:
       serviceMonitor:
         enabled: true
+        additionalLabels:
+          release: kube-prometheus-stack
     # Longhorn UI ingress (optional, can access via kubectl port-forward)
     ingress:
       enabled: false
