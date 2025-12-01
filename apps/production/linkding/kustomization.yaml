@@ -5,3 +5,5 @@ resources:
   - ../../base/linkding/
   - linkding-container-env-secret.yaml
   - ingress.yaml
+patchesStrategicMerge:
+  - storage-patch.yaml
