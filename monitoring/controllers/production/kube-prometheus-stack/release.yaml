@@ -56,10 +56,3 @@ spec:
             editable: true
             options:
               path: /var/lib/grafana/dashboards/default
-      # Dashboards to automatically import
-      dashboards:
-        default:
-          longhorn:
-            gnetId: 13032
-            revision: 7
-            datasource: Prometheus
