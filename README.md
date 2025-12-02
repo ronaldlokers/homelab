@@ -25,8 +25,8 @@ This repository contains the complete infrastructure and application configurati
 
 | Service | Staging | Production |
 |---------|---------|------------|
-| **Linkding** | [linkding-staging.ronaldlokers.nl](https://linkding-staging.ronaldlokers.nl) | [linkding.ronaldlokers.nl](https://linkding.ronaldlokers.nl) |
-| **Grafana** | [grafana-staging.ronaldlokers.nl](https://grafana-staging.ronaldlokers.nl) | [grafana.ronaldlokers.nl](https://grafana.ronaldlokers.nl) |
+| **Linkding** | [linkding.staging.ronaldlokers.nl](https://linkding.staging.ronaldlokers.nl) | [linkding.ronaldlokers.nl](https://linkding.ronaldlokers.nl) |
+| **Grafana** | [grafana.staging.ronaldlokers.nl](https://grafana.staging.ronaldlokers.nl) | [grafana.ronaldlokers.nl](https://grafana.ronaldlokers.nl) |
 | **Longhorn** | N/A | [longhorn.ronaldlokers.nl](https://longhorn.ronaldlokers.nl) |
 
 ## Hardware

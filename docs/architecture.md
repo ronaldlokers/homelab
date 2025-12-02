@@ -133,8 +133,8 @@ All services are exposed via DNS records pointing to cluster node IPs.
 #### Staging (k3d cluster - 10.0.40.52)
 
 DNS records point to the Proxmox VM IP:
-- `linkding-staging.ronaldlokers.nl` → 10.0.40.52
-- `grafana-staging.ronaldlokers.nl` → 10.0.40.52
+- `linkding.staging.ronaldlokers.nl` → 10.0.40.52
+- `grafana.staging.ronaldlokers.nl` → 10.0.40.52
 
 The k3d load balancer distributes traffic internally to pods.
 
@@ -274,7 +274,7 @@ Both clusters include the kube-prometheus-stack:
 - Custom dashboards stored in `monitoring/dashboards/`
 
 **Access**:
-- Staging: https://grafana-staging.ronaldlokers.nl
+- Staging: https://grafana.staging.ronaldlokers.nl
 - Production: https://grafana.ronaldlokers.nl
 
 Grafana admin credentials are auto-generated and stored in the `kube-prometheus-stack-grafana` secret.
