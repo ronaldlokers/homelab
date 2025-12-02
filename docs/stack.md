@@ -185,7 +185,7 @@ Uses Cloudflare DNS API for DNS-01 challenges:
 
 ## Applications
 
-### Homepage (Staging Only)
+### Homepage
 
 [Homepage](https://gethomepage.dev/) is a modern, fully static, fast application dashboard with integrations.
 
@@ -206,7 +206,7 @@ Uses Cloudflare DNS API for DNS-01 challenges:
 
 **Access**:
 - **Staging**: https://homepage.staging.ronaldlokers.nl
-- **Production**: Not deployed
+- **Production**: https://homepage.ronaldlokers.nl
 
 **Configuration**:
 - Kubernetes cluster mode enabled for monitoring
@@ -364,7 +364,7 @@ Automatically provisioned to Grafana via ConfigMap.
 | cert-manager | ✅ | ✅ | TLS certificate management |
 | Traefik | ✅ | ✅ | Ingress controller |
 | Longhorn | ❌ | ✅ | Distributed storage |
-| Homepage | ✅ | ❌ | Application dashboard |
+| Homepage | ✅ | ✅ | Application dashboard |
 | Linkding | ✅ | ✅ | Bookmark manager |
 | kube-prometheus-stack | ✅ | ✅ | Monitoring and observability |
 

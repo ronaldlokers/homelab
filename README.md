@@ -25,7 +25,7 @@ This repository contains the complete infrastructure and application configurati
 
 | Service | Staging | Production |
 |---------|---------|------------|
-| **Homepage** | [homepage.staging.ronaldlokers.nl](https://homepage.staging.ronaldlokers.nl) | N/A |
+| **Homepage** | [homepage.staging.ronaldlokers.nl](https://homepage.staging.ronaldlokers.nl) | [homepage.ronaldlokers.nl](https://homepage.ronaldlokers.nl) |
 | **Linkding** | [linkding.staging.ronaldlokers.nl](https://linkding.staging.ronaldlokers.nl) | [linkding.ronaldlokers.nl](https://linkding.ronaldlokers.nl) |
 | **Grafana** | [grafana.staging.ronaldlokers.nl](https://grafana.staging.ronaldlokers.nl) | [grafana.ronaldlokers.nl](https://grafana.ronaldlokers.nl) |
 | **Longhorn** | N/A | [longhorn.ronaldlokers.nl](https://longhorn.ronaldlokers.nl) |
@@ -67,7 +67,7 @@ Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
 - **Storage**: [Longhorn](https://longhorn.io/) - Distributed block storage (production only)
 - **Monitoring**: [kube-prometheus-stack](https://github.com/prometheus-operator/kube-prometheus) - Prometheus & Grafana
 - **Applications**:
-  - [Homepage](https://gethomepage.dev/) - Modern application dashboard (staging only)
+  - [Homepage](https://gethomepage.dev/) - Modern application dashboard
   - [Linkding](https://github.com/sissbruecker/linkding) - Bookmark manager
 
 ## Documentation

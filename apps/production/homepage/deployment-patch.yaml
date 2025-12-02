@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homepage
+  namespace: homepage
+spec:
+  template:
+    spec:
+      containers:
+        - name: homepage
+          env:
+            - name: HOMEPAGE_ALLOWED_HOSTS
+              value: "homepage.ronaldlokers.nl"
+          envFrom:
+            - secretRef:
+                name: homepage-env

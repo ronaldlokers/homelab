@@ -145,10 +145,11 @@ Renovate GitHub token for automated dependency updates.
 
 ### homepage/homepage-env
 
-Homepage widget credentials (staging only).
+Homepage widget credentials.
 
 **Location**:
 - Staging: `apps/staging/homepage/homepage-env-secret.yaml`
+- Production: `apps/production/homepage/homepage-env-secret.yaml`
 
 **Contents**:
 - `HOMEPAGE_VAR_GRAFANA_USER`: Grafana admin username
