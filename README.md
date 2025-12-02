@@ -14,31 +14,38 @@ GitOps-managed Kubernetes homelab using Flux CD.
 
 This repository contains the complete infrastructure and application configuration for a Kubernetes homelab environment. Everything is managed declaratively through Git, with Flux CD automatically reconciling the cluster state.
 
-## Cluster Infrastructure
+## Quick Start
 
-The homelab runs two K3s clusters with Flux CD:
+| Environment | Nodes | Storage | Load Balancing | Version |
+|------------|-------|---------|----------------|---------|
+| **Staging** | 1 server + 3 agents (k3d) | local-path | k3d built-in | K3s v1.31.5 |
+| **Production** | 3 control planes (HA) | Longhorn (3-replica) | K3s ServiceLB | K3s v1.33.6 |
+
+### Services
+
+| Service | Staging | Production |
+|---------|---------|------------|
+| **Linkding** | [linkding-staging.ronaldlokers.nl](https://linkding-staging.ronaldlokers.nl) | [linkding.ronaldlokers.nl](https://linkding.ronaldlokers.nl) |
+| **Grafana** | [grafana-staging.ronaldlokers.nl](https://grafana-staging.ronaldlokers.nl) | [grafana.ronaldlokers.nl](https://grafana.ronaldlokers.nl) |
+| **Longhorn** | N/A | [longhorn.ronaldlokers.nl](https://longhorn.ronaldlokers.nl) |
+
+## Hardware
 
 ### Staging
-- **Single-node cluster**: kube-srv-1.local (10.0.40.101)
-- **Storage**: local-path (node-local storage)
+
+Runs in Proxmox VM on MS-01 mini PC:
+- **Platform**: k3d (K3s in Docker)
+- **Host**: Ubuntu Server VM with Docker
+- **IP**: 10.0.40.52
 
 ### Production
-- **Multi-node cluster**: 2 nodes (1 server + 1 agent)
-  - **kube-srv-2.local** (10.0.40.102) - Control plane + worker
-  - **kube-srv-3.local** (10.0.40.103) - Agent (worker only)
-- **Storage**: Longhorn distributed storage with 2-replica redundancy
-- **Load Balancing**: K3s ServiceLB (Klipper) distributes traffic across both nodes
-- **High Availability**: Applications can survive single node failure
-- **Capacity**: Ready for 3rd node expansion
-- **Version**: K3s v1.33.6, Flux v2.7.5
 
-### Hardware
-
-The clusters run in a Sipeed NanoCluster, with each node running on:
-
+Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
+- **3 nodes**: kube-srv-1, kube-srv-2, kube-srv-3
 - **Compute Module**: Raspberry Pi CM5
-- **RAM**: 16GB
-- **Storage**: 64GB eMMC (SSD upgrade planned)
+- **RAM**: 16GB per node
+- **Storage**: 64GB eMMC per node
+- **IPs**: 10.0.40.101, 10.0.40.102, 10.0.40.103
 
 <div align="center">
   <img src="docs/images/sipeed-nanocluster.png" alt="Sipeed NanoCluster" width="400"/>
@@ -50,196 +57,71 @@ The clusters run in a Sipeed NanoCluster, with each node running on:
   <p><em>Raspberry Pi Compute Module 5</em></p>
 </div>
 
-## Architecture
-
-The repository follows a structured layout separating concerns by layers:
-
-```
-.
-├── clusters/
-│   ├── staging/              # Staging cluster Flux configuration
-│   └── production/           # Production cluster Flux configuration
-├── infrastructure/
-│   ├── controllers/          # Infrastructure Helm releases (cert-manager, renovate)
-│   └── configs/              # Infrastructure configuration (issuers, middlewares)
-├── apps/                     # Application deployments
-└── monitoring/               # Observability stack (kube-prometheus-stack)
-```
-
-Each component uses Kustomize overlays with `base/`, `staging/`, and `production/` directories for environment-specific configuration.
-
-## Storage
-
-### Staging
-- **Storage Class**: `local-path` (default K3s storage)
-- **Type**: Node-local storage
-- **Backup**: Not replicated
-
-### Production
-- **Storage Class**: `longhorn` (default)
-- **Type**: Distributed block storage
-- **Replication**: 2 replicas across both nodes
-- **Features**:
-  - Automatic data replication for high availability
-  - Volume snapshots and backups
-  - Dynamic provisioning
-  - Survives single node failure
-- **Management**: Longhorn UI at https://longhorn.ronaldlokers.nl
-
 ## Stack
 
-**GitOps & Automation**
-- [Flux CD](https://fluxcd.io/) - GitOps continuous delivery
-  - Automatic reconciliation from Git repository
-  - Manages Helm releases and Kustomizations
-- [Renovate](https://docs.renovatebot.com/) - Automated dependency updates
-  - Runs hourly via CronJob
-  - Automatic pull requests for Helm chart and container image updates
+- **GitOps**: [Flux CD](https://fluxcd.io/) - Continuous delivery from Git
+- **Automation**: [Renovate](https://docs.renovatebot.com/) - Automated dependency updates
+- **Certificates**: [cert-manager](https://cert-manager.io/) - Automatic TLS with Let's Encrypt
+- **Ingress**: [Traefik](https://traefik.io/) - Ingress controller
+- **Storage**: [Longhorn](https://longhorn.io/) - Distributed block storage (production only)
+- **Monitoring**: [kube-prometheus-stack](https://github.com/prometheus-operator/kube-prometheus) - Prometheus & Grafana
+- **Applications**: [Linkding](https://github.com/sissbruecker/linkding) - Bookmark manager
 
-**Infrastructure**
-- [cert-manager](https://cert-manager.io/) - Automated TLS certificate management
-  - Let's Encrypt certificates using DNS-01 challenge (Cloudflare)
-  - Automatic renewal before expiration
-- [Traefik](https://traefik.io/) - Ingress controller and load balancer
-  - Automatic HTTPS redirect middleware
-  - Integrated with K3s ServiceLB for multi-node distribution
-- [Longhorn](https://longhorn.io/) - Distributed block storage with replication (production only)
-  - 2-replica redundancy across nodes
-  - Automatic data synchronization
+## Documentation
 
-**Applications**
-- [Linkding](https://github.com/sissbruecker/linkding) - Bookmark manager
-  - Staging: https://linkding-staging.ronaldlokers.nl
-  - Production: https://linkding.ronaldlokers.nl
-- [Longhorn UI](https://longhorn.io/) - Storage management dashboard (production only)
-  - Production: https://longhorn.ronaldlokers.nl
+- **[Setup Guide](docs/setup.md)** - How to set up staging and production clusters
+- **[Architecture](docs/architecture.md)** - Repository structure, deployment flow, and networking
+- **[Security](docs/security.md)** - SOPS encryption and secrets management
+- **[Stack Details](docs/stack.md)** - Detailed component information
 
-**Monitoring**
-- [kube-prometheus-stack](https://github.com/prometheus-operator/kube-prometheus) - Prometheus & Grafana
-  - Staging: https://grafana-staging.ronaldlokers.nl
-  - Production: https://grafana.ronaldlokers.nl
+## Key Features
 
-## Networking
+### High Availability (Production)
 
-### DNS Configuration
+- **Control Plane**: 3-node HA with embedded etcd (survives 1-node failure)
+- **Storage**: Longhorn with 3-replica redundancy (survives 2-node failure)
+- **Load Balancing**: K3s ServiceLB distributes traffic across all nodes
+- **Certificates**: Automatic TLS with Let's Encrypt DNS-01 challenges
 
-All services are exposed via DNS records pointing to cluster node IPs:
+### GitOps Workflow
 
-**Staging** (kube-srv-1.local - 10.0.40.101):
-- linkding-staging.ronaldlokers.nl → 10.0.40.101
-- grafana-staging.ronaldlokers.nl → 10.0.40.101
+1. Push changes to Git repository
+2. Flux detects changes within 10 minutes (or instant with manual reconciliation)
+3. Flux applies changes to the cluster
+4. Health checks ensure successful deployment
 
-**Production** (multi-node with K3s ServiceLB):
-- linkding.ronaldlokers.nl → 10.0.40.102 or 10.0.40.103
-- longhorn.ronaldlokers.nl → 10.0.40.102 or 10.0.40.103
-- grafana.ronaldlokers.nl → 10.0.40.102 or 10.0.40.103
+### Automated Updates
 
-**Note**: Production DNS can point to either node IP. K3s ServiceLB automatically distributes traffic. For better redundancy, configure DNS round-robin with both IPs.
+- Renovate scans for dependency updates hourly
+- Creates pull requests with changelogs
+- Review and merge to automatically deploy updates
 
-### TLS Certificates
+### Security
 
-All ingresses use automatic TLS certificates from Let's Encrypt:
-- **Challenge Type**: DNS-01 (Cloudflare API)
-- **Issuer**: letsencrypt-production (staging uses letsencrypt-staging)
-- **Renewal**: Automatic via cert-manager
-- **Validity**: 90 days, renewed at 30 days remaining
-
-## Security
-
-Secrets are encrypted using [SOPS](https://github.com/getsops/sops) with [age](https://github.com/FiloSottile/age) encryption. Flux automatically decrypts secrets during deployment using the cluster's age key.
-
-Each environment has its own SOPS configuration and age encryption key:
-- **Staging**: `clusters/staging/.sops.yaml` with `staging-age.key`
-- **Production**: `clusters/production/.sops.yaml` with `production-age.key`
-
-### Required Secrets
-
-These secrets must be manually created in the cluster before deployment:
-
-#### flux-system/flux-system
-Export the required variables:
-```bash
-export GITHUB_USER=ronaldlokers`
-export GITHUB_TOKEN=<personal-access-token>
-```
-
-Bootstrap Flux (choose the appropriate environment):
-```bash
-# For staging
-flux bootstrap github \
-  --context=staging \
-  --owner=$GITHUB_USER \
-  --repository=homelab \
-  --branch=main \
-  --path=./clusters/staging \
-  --personal
-
-# For production
-flux bootstrap github \
-  --context=production \
-  --owner=$GITHUB_USER \
-  --repository=homelab \
-  --branch=main \
-  --path=./clusters/production \
-  --personal
-```
-
-#### flux-system/sops-age
-Age private key for decrypting SOPS-encrypted secrets. Each environment uses its own age key:
-- **Staging**: `staging-age.key`
-- **Production**: `production-age.key`
-
-These files are stored in Proton Pass.
-
-Create the secret in the appropriate cluster:
-```bash
-# For staging
-cat staging-age.key | kubectl --context=staging create secret generic sops-age \
-  --namespace=flux-system \
-  --from-file=age.agekey=/dev/stdin
-
-# For production
-cat production-age.key | kubectl --context=production create secret generic sops-age \
-  --namespace=flux-system \
-  --from-file=age.agekey=/dev/stdin
-```
-
-### Managed Secrets
-
-These secrets are encrypted with SOPS and stored in this repository:
-
-- `cert-manager/cloudflare-api-token` - Cloudflare DNS API token for DNS-01 challenges
-- `linkding/linkding-container-env` - Linkding application environment variables
-- `linkding/tunnel-credentials` - Cloudflare Tunnel credentials
-- `renovate/renovate-container-env` - Renovate GitHub token
-
-### Auto-Generated Secrets
-
-These secrets are automatically created by controllers:
-
-- `*-tls` - TLS certificates issued by cert-manager
-- `letsencrypt-*` - Let's Encrypt ACME account keys
-- `kube-prometheus-stack-grafana` - Grafana admin credentials
-- Prometheus and Alertmanager configuration secrets
-
-## Deployment Flow
-
-Flux monitors this repository and automatically applies changes:
-
-1. **Infrastructure Controllers** - Core services deployed first (cert-manager, renovate)
-2. **Infrastructure Configs** - Configuration applied after controllers are ready (certificate issuers, middlewares)
-3. **Applications** - Apps deployed after infrastructure is ready
-4. **Monitoring** - Observability stack deployed independently
-
-Dependencies are enforced through Kustomization `dependsOn` fields to ensure correct ordering.
+- Secrets encrypted with [SOPS](https://github.com/getsops/sops) using [age](https://github.com/FiloSottile/age)
+- Separate encryption keys for staging and production
+- TLS certificates for all services
+- Private keys stored in Proton Pass (not in Git)
 
 ## Repository Structure
 
-All resources follow the same pattern:
-- Base configuration in `base/` directories
-- Environment-specific overlays in `staging/` and `production/` directories
-- Kustomization files reference environment-specific resources
+```
+.
+├── clusters/              # Flux entry points for each environment
+├── infrastructure/
+│   ├── controllers/       # Core services (cert-manager, longhorn, renovate)
+│   └── configs/          # Infrastructure configuration (issuers, middlewares)
+├── apps/                 # Applications (linkding)
+├── monitoring/           # Observability (kube-prometheus-stack, dashboards)
+└── docs/                 # Documentation
+```
 
-Each cluster reconciles from its respective directory:
-- Staging cluster: `clusters/staging/`
-- Production cluster: `clusters/production/`
+See [Architecture](docs/architecture.md) for detailed structure information.
+
+## Contributing
+
+This is a personal homelab repository, but feel free to use it as inspiration for your own setup!
+
+## License
+
+This repository is provided as-is for educational purposes.
