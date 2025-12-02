@@ -3,3 +3,4 @@ kind: Kustomization
 namespace: renovate
 resources:
   - ../../base/renovate
+  - renovate-container-env.yaml

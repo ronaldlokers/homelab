@@ -148,9 +148,9 @@ All ingresses use automatic TLS certificates from Let's Encrypt:
 
 Secrets are encrypted using [SOPS](https://github.com/getsops/sops) with [age](https://github.com/FiloSottile/age) encryption. Flux automatically decrypts secrets during deployment using the cluster's age key.
 
-Each environment has its own SOPS configuration:
-- `clusters/staging/.sops.yaml`
-- `clusters/production/.sops.yaml`
+Each environment has its own SOPS configuration and age encryption key:
+- **Staging**: `clusters/staging/.sops.yaml` with `staging-age.key`
+- **Production**: `clusters/production/.sops.yaml` with `production-age.key`
 
 ### Required Secrets
 
@@ -185,14 +185,21 @@ flux bootstrap github \
 ```
 
 #### flux-system/sops-age
-Age private key for decrypting SOPS-encrypted secrets:
+Age private key for decrypting SOPS-encrypted secrets. Each environment uses its own age key:
+- **Staging**: `staging-age.key`
+- **Production**: `production-age.key`
 
-# Download the age.key file
-This file is stored in Proton Pass
+These files are stored in Proton Pass.
 
-# Create secret in cluster
+Create the secret in the appropriate cluster:
 ```bash
-cat age.key | kubectl create secret generic sops-age \
+# For staging
+cat staging-age.key | kubectl --context=staging create secret generic sops-age \
+  --namespace=flux-system \
+  --from-file=age.agekey=/dev/stdin
+
+# For production
+cat production-age.key | kubectl --context=production create secret generic sops-age \
   --namespace=flux-system \
   --from-file=age.agekey=/dev/stdin
 ```
