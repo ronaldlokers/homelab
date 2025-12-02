@@ -1,2 +1,6 @@
 .envrc
 kubeconfig
+
+# Age encryption keys (should never be committed)
+production-age.key
+staging-age.key
