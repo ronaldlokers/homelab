@@ -19,9 +19,9 @@ spec:
   upgrade:
     crds: CreateReplace
   values:
-    # Default replica count for 2-node cluster
+    # Default replica count for 3-node HA cluster
     defaultSettings:
-      defaultReplicaCount: 2
+      defaultReplicaCount: 3
       # Minimum 50% of replicas must be healthy
       replicaSoftAntiAffinity: false
       replicaAutoBalance: "least-effort"
@@ -29,10 +29,10 @@ spec:
       defaultDataPath: /var/lib/longhorn
       # Backup settings (optional, can enable later)
       backupTarget: ""
-    # Configure default StorageClass with 2 replicas
+    # Configure default StorageClass with 3 replicas
     persistence:
       defaultClass: true
-      defaultClassReplicaCount: 2
+      defaultClassReplicaCount: 3
     # Enable Prometheus metrics
     metrics:
       serviceMonitor:
