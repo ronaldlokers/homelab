@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homepage
+  namespace: homepage
+data:
+  services.yaml: |
+    - Bookmarks:
+        - Linkding:
+            icon: linkding.png
+            href: https://linkding.staging.ronaldlokers.nl
+            description: Bookmark manager
+
+    - Monitoring:
+        - Grafana:
+            icon: grafana.png
+            href: https://grafana.staging.ronaldlokers.nl
+            description: Metrics and dashboards
+            widget:
+              type: grafana
+              url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local:80
+              username: "{{HOMEPAGE_VAR_GRAFANA_USER}}"
+              password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
+
+    - GitOps:
+        - Flux:
+            icon: flux-cd.png
+            href: https://fluxcd.io/
+            description: GitOps continuous delivery

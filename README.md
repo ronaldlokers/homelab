@@ -25,6 +25,7 @@ This repository contains the complete infrastructure and application configurati
 
 | Service | Staging | Production |
 |---------|---------|------------|
+| **Homepage** | [homepage.staging.ronaldlokers.nl](https://homepage.staging.ronaldlokers.nl) | N/A |
 | **Linkding** | [linkding.staging.ronaldlokers.nl](https://linkding.staging.ronaldlokers.nl) | [linkding.ronaldlokers.nl](https://linkding.ronaldlokers.nl) |
 | **Grafana** | [grafana.staging.ronaldlokers.nl](https://grafana.staging.ronaldlokers.nl) | [grafana.ronaldlokers.nl](https://grafana.ronaldlokers.nl) |
 | **Longhorn** | N/A | [longhorn.ronaldlokers.nl](https://longhorn.ronaldlokers.nl) |
@@ -65,7 +66,9 @@ Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
 - **Ingress**: [Traefik](https://traefik.io/) - Ingress controller
 - **Storage**: [Longhorn](https://longhorn.io/) - Distributed block storage (production only)
 - **Monitoring**: [kube-prometheus-stack](https://github.com/prometheus-operator/kube-prometheus) - Prometheus & Grafana
-- **Applications**: [Linkding](https://github.com/sissbruecker/linkding) - Bookmark manager
+- **Applications**:
+  - [Homepage](https://gethomepage.dev/) - Modern application dashboard (staging only)
+  - [Linkding](https://github.com/sissbruecker/linkding) - Bookmark manager
 
 ## Documentation
 
