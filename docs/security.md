@@ -143,6 +143,17 @@ Renovate GitHub token for automated dependency updates.
 **Contents**:
 - `RENOVATE_TOKEN`: GitHub personal access token with repository write permissions
 
+### homepage/homepage-env
+
+Homepage widget credentials (staging only).
+
+**Location**:
+- Staging: `apps/staging/homepage/homepage-env-secret.yaml`
+
+**Contents**:
+- `HOMEPAGE_VAR_GRAFANA_USER`: Grafana admin username
+- `HOMEPAGE_VAR_GRAFANA_PASSWORD`: Grafana admin password
+
 ## Auto-Generated Secrets
 
 These secrets are automatically created by controllers and should not be manually managed.
@@ -178,6 +189,8 @@ Created by kube-prometheus-stack:
 
 ## Working with SOPS Secrets
 
+**Prerequisites**: Before working with SOPS secrets, ensure you have the private age key available. The key file should be in the repository root (e.g., `staging-age.key` or `production-age.key`).
+
 ### Encrypting a New Secret
 
 1. Create the secret YAML file:
@@ -187,33 +200,36 @@ kind: Secret
 metadata:
   name: my-secret
   namespace: my-namespace
-data:
-  key: dmFsdWU=  # base64-encoded value
+type: Opaque
+stringData:
+  key: my-value  # Use stringData for plain text
 ```
 
-2. Encrypt with SOPS (from the appropriate cluster directory):
+2. Encrypt with SOPS (set environment variable and specify config):
 ```bash
 # For staging secrets
-cd clusters/staging
-sops --encrypt --in-place ../../path/to/secret.yaml
+export SOPS_AGE_KEY_FILE=/path/to/homelab/staging-age.key
+sops --encrypt --config clusters/staging/.sops.yaml path/to/secret.yaml > path/to/secret.yaml.enc
+mv path/to/secret.yaml.enc path/to/secret.yaml
 
 # For production secrets
-cd clusters/production
-sops --encrypt --in-place ../../path/to/secret.yaml
+export SOPS_AGE_KEY_FILE=/path/to/homelab/production-age.key
+sops --encrypt --config clusters/production/.sops.yaml path/to/secret.yaml > path/to/secret.yaml.enc
+mv path/to/secret.yaml.enc path/to/secret.yaml
 ```
 
-The `.sops.yaml` file in the cluster directory determines which age key to use.
+**Note**: The `--config` flag explicitly specifies which `.sops.yaml` configuration to use.
 
 ### Editing an Encrypted Secret
 
 ```bash
 # For staging
-cd clusters/staging
-sops ../../path/to/secret.yaml
+export SOPS_AGE_KEY_FILE=/path/to/homelab/staging-age.key
+sops --config clusters/staging/.sops.yaml path/to/secret.yaml
 
 # For production
-cd clusters/production
-sops ../../path/to/secret.yaml
+export SOPS_AGE_KEY_FILE=/path/to/homelab/production-age.key
+sops --config clusters/production/.sops.yaml path/to/secret.yaml
 ```
 
 SOPS will:
@@ -225,12 +241,12 @@ SOPS will:
 
 ```bash
 # For staging
-cd clusters/staging
-sops --decrypt ../../path/to/secret.yaml
+export SOPS_AGE_KEY_FILE=/path/to/homelab/staging-age.key
+sops --decrypt --config clusters/staging/.sops.yaml path/to/secret.yaml
 
 # For production
-cd clusters/production
-sops --decrypt ../../path/to/secret.yaml
+export SOPS_AGE_KEY_FILE=/path/to/homelab/production-age.key
+sops --decrypt --config clusters/production/.sops.yaml path/to/secret.yaml
 ```
 
 ### Re-encrypting Secrets with a New Key
@@ -242,14 +258,14 @@ If you need to change the encryption key:
 
 ```bash
 # For staging
-cd clusters/staging
-find ../../ -name "*.yaml" -path "*/staging/*" -exec grep -l "sops:" {} \; | \
-  xargs -I {} sops updatekeys --yes {}
+export SOPS_AGE_KEY_FILE=/path/to/homelab/staging-age.key
+find . -name "*.yaml" -path "*/staging/*" -exec grep -l "sops:" {} \; | \
+  xargs -I {} sops updatekeys --yes --config clusters/staging/.sops.yaml {}
 
 # For production
-cd clusters/production
-find ../../ -name "*.yaml" -path "*/production/*" -exec grep -l "sops:" {} \; | \
-  xargs -I {} sops updatekeys --yes {}
+export SOPS_AGE_KEY_FILE=/path/to/homelab/production-age.key
+find . -name "*.yaml" -path "*/production/*" -exec grep -l "sops:" {} \; | \
+  xargs -I {} sops updatekeys --yes --config clusters/production/.sops.yaml {}
 ```
 
 3. Update the `sops-age` secret in the cluster with the new private key
@@ -316,15 +332,15 @@ kubectl --context=production logs -n flux-system -l app=kustomize-controller
 
 If you accidentally encrypted a staging secret with the production key (or vice versa):
 
-1. Decrypt with the correct key:
+1. Decrypt with the correct key (the one it was encrypted with):
 ```bash
-cd clusters/production  # or staging
-sops --decrypt ../../path/to/secret.yaml > /tmp/secret-decrypted.yaml
+export SOPS_AGE_KEY_FILE=/path/to/homelab/production-age.key  # or staging-age.key
+sops --decrypt --config clusters/production/.sops.yaml path/to/secret.yaml > /tmp/secret-decrypted.yaml
 ```
 
-2. Re-encrypt with the correct key:
+2. Re-encrypt with the correct key (the one it should use):
 ```bash
-cd clusters/staging  # or production
-sops --encrypt /tmp/secret-decrypted.yaml > ../../path/to/secret.yaml
+export SOPS_AGE_KEY_FILE=/path/to/homelab/staging-age.key  # or production-age.key
+sops --encrypt --config clusters/staging/.sops.yaml /tmp/secret-decrypted.yaml > path/to/secret.yaml
 rm /tmp/secret-decrypted.yaml
 ```
