@@ -30,7 +30,7 @@ spec:
       adminPassword: ronald
       grafana.ini:
         server:
-          root_url: https://grafana-staging.ronaldlokers.nl
+          root_url: https://grafana.staging.ronaldlokers.nl
       ingress:
         enabled: true
         ingressClassName: traefik
@@ -38,8 +38,8 @@ spec:
           cert-manager.io/cluster-issuer: letsencrypt-production
           traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
         hosts:
-          - grafana-staging.ronaldlokers.nl
+          - grafana.staging.ronaldlokers.nl
         tls:
           - secretName: grafana-tls
             hosts:
-              - grafana-staging.ronaldlokers.nl
+              - grafana.staging.ronaldlokers.nl

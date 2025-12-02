@@ -207,7 +207,7 @@ Uses Cloudflare DNS API for DNS-01 challenges:
 - **Production**: Longhorn (replicated)
 
 **Access**:
-- **Staging**: https://linkding-staging.ronaldlokers.nl
+- **Staging**: https://linkding.staging.ronaldlokers.nl
 - **Production**: https://linkding.ronaldlokers.nl
 
 **Authentication**:
@@ -257,7 +257,7 @@ Dashboards and visualization.
 - Dashboard provisioning
 
 **Access**:
-- **Staging**: https://grafana-staging.ronaldlokers.nl
+- **Staging**: https://grafana.staging.ronaldlokers.nl
 - **Production**: https://grafana.ronaldlokers.nl
 
 **Authentication**:

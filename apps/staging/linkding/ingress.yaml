@@ -10,9 +10,9 @@ spec:
   tls:
     - secretName: linkding-tls
       hosts:
-        - linkding-staging.ronaldlokers.nl
+        - linkding.staging.ronaldlokers.nl
   rules:
-    - host: linkding-staging.ronaldlokers.nl
+    - host: linkding.staging.ronaldlokers.nl
       http:
         paths:
           - backend:

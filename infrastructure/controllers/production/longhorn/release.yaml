@@ -39,9 +39,16 @@ spec:
         enabled: true
         additionalLabels:
           release: kube-prometheus-stack
-    # Longhorn UI ingress (optional, can access via kubectl port-forward)
+    # Longhorn UI ingress
     ingress:
-      enabled: false
+      enabled: true
+      ingressClassName: traefik
+      host: longhorn.ronaldlokers.nl
+      tls: true
+      tlsSecret: longhorn-tls
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-production
+        traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
     # Resource limits for Raspberry Pi CM5
     longhornManager:
       resources:
