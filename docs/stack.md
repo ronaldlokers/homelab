@@ -328,12 +328,14 @@ kubectl get secret -n database postgres-cluster-app -o jsonpath='{.data.password
 
 **Deployment**:
 - Single replica
-- PostgreSQL database (sidecar or separate pod)
-- Persistent volume for database storage
+- PostgreSQL database via CloudNative-PG cluster
+- Connects to `postgres-cluster-rw.database.svc.cluster.local`
+- No persistent volumes required (data stored in PostgreSQL cluster)
 
-**Storage**:
-- **Staging**: local-path (node-local)
-- **Production**: Longhorn (replicated)
+**Database**:
+- Uses `linkding` database in the PostgreSQL cluster
+- Database credentials stored in SOPS-encrypted secret
+- High availability through PostgreSQL replication (3 instances)
 
 **Access**:
 - **Staging**: https://linkding.staging.ronaldlokers.nl
@@ -344,6 +346,7 @@ kubectl get secret -n database postgres-cluster-app -o jsonpath='{.data.password
 - Multi-user support
 
 **Configuration**:
+- PostgreSQL connection via environment variables
 - Environment variables via Secret
 - Ingress with TLS certificate from cert-manager
 - HTTPS redirect middleware

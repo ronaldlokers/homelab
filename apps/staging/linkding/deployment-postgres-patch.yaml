@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: linkding
+spec:
+  template:
+    spec:
+      containers:
+        - name: linkding
+          env:
+            - name: LD_DB_ENGINE
+              value: "postgres"
+            - name: LD_DB_HOST
+              value: "postgres-cluster-rw.database.svc.cluster.local"
+            - name: LD_DB_PORT
+              value: "5432"
+            - name: LD_DB_DATABASE
+              value: "linkding"
+            - name: LD_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: linkding-db-user
+                  key: username
+            - name: LD_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: linkding-db-user
+                  key: password
