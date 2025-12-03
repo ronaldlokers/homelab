@@ -134,6 +134,41 @@ Uses Cloudflare DNS API for DNS-01 challenges:
 - LoadBalancer service on ports 80 and 443
 - Dashboard not exposed (security)
 
+### MetalLB (Production Only)
+
+[MetalLB](https://metallb.universe.tf/) provides network load balancing for bare-metal Kubernetes clusters.
+
+**Version**: 0.14.9
+
+**Architecture**:
+- **metallb-controller**: Manages IP address assignment for LoadBalancer services
+- **metallb-speaker**: Announces IPs on the local network (runs as DaemonSet)
+
+**Configuration**:
+- **IPAddressPool**: Defines the pool of IP addresses MetalLB can assign (10.0.40.100/32)
+- **L2Advertisement**: Configures Layer 2 mode for IP announcement
+
+**Load Balancer IP**: 10.0.40.100
+
+**How it works**:
+1. LoadBalancer service created (e.g., Traefik)
+2. MetalLB controller assigns an IP from the pool
+3. Speaker pods announce the IP via ARP on the local network
+4. Traffic to the VIP is routed to the appropriate service
+5. Automatic failover if a node goes down
+
+**Benefits**:
+- Single stable IP address for ingress instead of round-robin DNS
+- Automatic failover between nodes
+- Standard Kubernetes LoadBalancer interface
+- No external load balancer hardware required
+
+**Layer 2 Mode**:
+- Uses ARP to announce IP addresses on the local network
+- Simple configuration, no BGP required
+- IP moves between nodes automatically on failure
+- Suitable for homelab environments
+
 ### Longhorn (Production Only)
 
 [Longhorn](https://longhorn.io/) provides distributed block storage with replication.
@@ -182,6 +217,65 @@ Uses Cloudflare DNS API for DNS-01 challenges:
 - **longhorn-manager**: 50m CPU / 128Mi memory (request), 500m CPU / 512Mi memory (limit)
 - **longhorn-driver**: 50m CPU / 64Mi memory (request), 200m CPU / 256Mi memory (limit)
 - **longhorn-ui**: 10m CPU / 64Mi memory (request), 100m CPU / 128Mi memory (limit)
+
+### CloudNative-PG
+
+[CloudNative-PG](https://cloudnative-pg.io/) is a Kubernetes operator for PostgreSQL databases.
+
+**Version**: 0.23.0
+
+**Components**:
+- **cnpg-controller-manager**: Main operator managing PostgreSQL clusters
+- **Cluster CRD**: Custom resource defining PostgreSQL cluster configuration
+
+**PostgreSQL Cluster Configuration**:
+- **Name**: postgres-cluster
+- **Namespace**: database
+- **Instances**: 3 (high availability)
+- **Storage Size**: 10Gi per instance
+- **Storage Class**:
+  - Staging: local-path
+  - Production: longhorn (replicated)
+
+**Features**:
+- Automated PostgreSQL cluster provisioning
+- Built-in high availability with automatic failover
+- Continuous backup and point-in-time recovery
+- Rolling updates with zero downtime
+- Connection pooling with PgBouncer
+- Monitoring integration with Prometheus
+
+**High Availability**:
+- Primary-replica architecture
+- Automatic failover on primary failure
+- Read replicas for scaling reads
+- Synchronous or asynchronous replication
+
+**How it works**:
+1. Cluster resource created with desired configuration
+2. Operator provisions PostgreSQL pods (1 primary + 2 replicas)
+3. Primary handles writes, replicas handle reads
+4. Automatic health monitoring and failover
+5. Continuous backup to object storage (if configured)
+
+**Access**:
+- **Service**: postgres-cluster-rw (read-write, points to primary)
+- **Service**: postgres-cluster-ro (read-only, load-balanced across replicas)
+- **Service**: postgres-cluster-r (read-only, includes primary)
+
+**Connection**:
+```bash
+# Connect to primary (read-write)
+kubectl exec -it -n database postgres-cluster-1 -- psql -U postgres
+
+# Get credentials
+kubectl get secret -n database postgres-cluster-app -o jsonpath='{.data.password}' | base64 -d
+```
+
+**Monitoring**:
+- Metrics exposed for Prometheus
+- PodMonitor for automatic scraping
+- Integration with Grafana dashboards
 
 ## Applications
 
@@ -363,7 +457,9 @@ Automatically provisioned to Grafana via ConfigMap.
 | Renovate | ✅ | ✅ | Automated dependency updates |
 | cert-manager | ✅ | ✅ | TLS certificate management |
 | Traefik | ✅ | ✅ | Ingress controller |
+| MetalLB | ❌ | ✅ | Network load balancer |
 | Longhorn | ❌ | ✅ | Distributed storage |
+| CloudNative-PG | ✅ | ✅ | PostgreSQL operator |
 | Homepage | ✅ | ✅ | Application dashboard |
 | Linkding | ✅ | ✅ | Bookmark manager |
 | kube-prometheus-stack | ✅ | ✅ | Monitoring and observability |

@@ -19,7 +19,7 @@ This repository contains the complete infrastructure and application configurati
 | Environment | Nodes | Storage | Load Balancing | Version |
 |------------|-------|---------|----------------|---------|
 | **Staging** | 1 server + 3 agents (k3d) | local-path | k3d built-in | K3s v1.31.5 |
-| **Production** | 3 control planes (HA) | Longhorn (3-replica) | K3s ServiceLB | K3s v1.33.6 |
+| **Production** | 3 control planes (HA) | Longhorn (3-replica) | MetalLB | K3s v1.33.6 |
 
 ### Services
 
@@ -64,7 +64,9 @@ Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
 - **Automation**: [Renovate](https://docs.renovatebot.com/) - Automated dependency updates
 - **Certificates**: [cert-manager](https://cert-manager.io/) - Automatic TLS with Let's Encrypt
 - **Ingress**: [Traefik](https://traefik.io/) - Ingress controller
+- **Load Balancer**: [MetalLB](https://metallb.universe.tf/) - Bare-metal load balancer (production only)
 - **Storage**: [Longhorn](https://longhorn.io/) - Distributed block storage (production only)
+- **Database**: [CloudNative-PG](https://cloudnative-pg.io/) - PostgreSQL operator for Kubernetes
 - **Monitoring**: [kube-prometheus-stack](https://github.com/prometheus-operator/kube-prometheus) - Prometheus & Grafana
 - **Applications**:
   - [Homepage](https://gethomepage.dev/) - Modern application dashboard
@@ -83,7 +85,8 @@ Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
 
 - **Control Plane**: 3-node HA with embedded etcd (survives 1-node failure)
 - **Storage**: Longhorn with 3-replica redundancy (survives 2-node failure)
-- **Load Balancing**: K3s ServiceLB distributes traffic across all nodes
+- **Load Balancing**: MetalLB provides single VIP (10.0.40.100) for ingress
+- **Database**: PostgreSQL cluster with 3 instances for redundancy
 - **Certificates**: Automatic TLS with Let's Encrypt DNS-01 challenges
 
 ### GitOps Workflow
@@ -112,9 +115,9 @@ Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
 .
 ├── clusters/              # Flux entry points for each environment
 ├── infrastructure/
-│   ├── controllers/       # Core services (cert-manager, longhorn, renovate)
-│   └── configs/          # Infrastructure configuration (issuers, middlewares)
-├── apps/                 # Applications (linkding)
+│   ├── controllers/       # Core services (cert-manager, cloudnative-pg, longhorn, metallb, renovate)
+│   └── configs/          # Infrastructure configuration (issuers, database clusters, middlewares)
+├── apps/                 # Applications (linkding, homepage)
 ├── monitoring/           # Observability (kube-prometheus-stack, dashboards)
 └── docs/                 # Documentation
 ```
