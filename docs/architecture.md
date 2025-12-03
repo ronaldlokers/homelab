@@ -264,6 +264,106 @@ Full high-availability setup:
 - 2 nodes down: Control plane and storage still work, applications may be impacted
 - 3 nodes down: Cluster offline
 
+## Backup and Disaster Recovery
+
+### PostgreSQL Backups
+
+**Backup Strategy**:
+- **Storage**: Backblaze B2 object storage
+- **Method**: Barman via CloudNative-PG operator
+- **Type**: Physical backups + WAL archiving
+- **Frequency**: Daily automated backups
+- **Retention**: 14 days (staging), 30 days (production)
+
+**Architecture**:
+```
+PostgreSQL Cluster
+    ├─ Primary Instance (read-write)
+    ├─ Replica 1 (read-only)
+    └─ Replica 2 (read-only)
+         │
+         ├─ WAL Files → Continuous archiving to B2
+         └─ Base Backup → Daily full backup to B2
+                              ↓
+                    Backblaze B2 Bucket
+                    └─ homelab-postgres-backups/
+                        ├─ staging/
+                        │   ├─ base/
+                        │   └─ wals/
+                        └─ production/
+                            ├─ base/
+                            └─ wals/
+```
+
+**What Gets Backed Up**:
+- Full database cluster (all databases, users, schemas)
+- Write-Ahead Logs (WAL) for point-in-time recovery
+- PostgreSQL configuration
+- Compressed with gzip to reduce storage costs
+
+**Recovery Capabilities**:
+- **Full Restore**: Restore entire cluster to last backup
+- **Point-in-Time Recovery (PITR)**: Restore to any moment within retention period
+- **Selective Restore**: Create new cluster from backup without affecting existing one
+- **Cross-cluster Restore**: Restore production backup to staging for testing
+
+**Disaster Recovery Scenarios**:
+
+1. **Single Database Corruption**:
+   - Restore to new cluster from latest backup
+   - Verify data integrity
+   - Switch applications to new cluster
+
+2. **Complete Cluster Failure**:
+   - Deploy new PostgreSQL cluster
+   - Bootstrap from B2 backup
+   - Automatic recovery with PITR
+   - Applications reconnect automatically
+
+3. **Accidental Data Deletion**:
+   - Use PITR to restore to moment before deletion
+   - Restore to new cluster first to verify
+   - Export/import specific data if needed
+
+4. **Regional Disaster**:
+   - Backblaze B2 data replicated across data centers
+   - Deploy new cluster in different region/environment
+   - Restore from B2 backups
+   - Update DNS/application configuration
+
+**Backup Monitoring**:
+- Kubernetes CronJob for scheduled backups
+- CloudNative-PG operator manages backup lifecycle
+- Backup status visible via `kubectl get backup`
+- Failed backups visible in pod logs
+
+**Recovery Time Objective (RTO)**:
+- New cluster deployment: ~5 minutes
+- Backup restore (10GB): ~10-15 minutes
+- Total recovery time: ~20-30 minutes
+
+**Recovery Point Objective (RPO)**:
+- Maximum data loss: Minutes (WAL archiving is continuous)
+- Practical data loss: Near-zero (WAL archived every few minutes)
+
+**Testing Strategy**:
+- Monthly backup restore tests in staging
+- Quarterly disaster recovery drills
+- Automated backup verification
+- Document all recovery procedures
+
+### Application Data Backups
+
+**Linkding**:
+- All data stored in PostgreSQL cluster
+- Backed up via PostgreSQL backup strategy
+- No additional backup needed
+
+**Storage Volumes**:
+- Longhorn provides volume snapshots (production)
+- Used for non-database persistent data
+- Local-path storage in staging (not backed up)
+
 ## Monitoring and Observability
 
 Both clusters include the kube-prometheus-stack:

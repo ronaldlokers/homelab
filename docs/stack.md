@@ -256,7 +256,7 @@ Uses Cloudflare DNS API for DNS-01 challenges:
 2. Operator provisions PostgreSQL pods (1 primary + 2 replicas)
 3. Primary handles writes, replicas handle reads
 4. Automatic health monitoring and failover
-5. Continuous backup to object storage (if configured)
+5. Continuous backup to object storage (Backblaze B2)
 
 **Access**:
 - **Service**: postgres-cluster-rw (read-write, points to primary)
@@ -272,10 +272,148 @@ kubectl exec -it -n database postgres-cluster-1 -- psql -U postgres
 kubectl get secret -n database postgres-cluster-app -o jsonpath='{.data.password}' | base64 -d
 ```
 
+**Backup and Recovery**:
+
+CloudNative-PG uses Barman for automated backups to Backblaze B2 object storage.
+
+**Backup Configuration**:
+- **Storage**: Backblaze B2 (`s3://homelab-postgres-backups/`)
+- **Schedule**:
+  - Staging: Daily at 2 AM
+  - Production: Daily at 3 AM
+- **Retention**:
+  - Staging: 14 days
+  - Production: 30 days
+- **WAL Archiving**: Continuous (enables point-in-time recovery)
+- **Compression**: gzip (both WAL and data)
+
+**How Backups Work**:
+1. Scheduled backup runs daily via CronJob
+2. Full backup of database cluster uploaded to B2
+3. WAL (Write-Ahead Log) files continuously archived
+4. Old backups automatically deleted per retention policy
+5. Backups stored in separate staging/production paths
+
+**Checking Backup Status**:
+```bash
+# List all backups
+kubectl get backup -n database
+
+# Check scheduled backup status
+kubectl get scheduledbackup -n database
+
+# View backup details
+kubectl describe backup <backup-name> -n database
+```
+
+**Manually Triggering Backup**:
+```bash
+# Create on-demand backup
+kubectl cnpg backup postgres-cluster -n database
+```
+
+**Restoring from Backup**:
+
+There are two recovery scenarios:
+
+**1. Restore to New Cluster (Safe Method)**:
+```bash
+# List available backups
+kubectl get backup -n database
+
+# Create new cluster from specific backup
+cat <<EOF | kubectl apply -f -
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgres-cluster-restore
+  namespace: database
+spec:
+  instances: 3
+  storage:
+    size: 10Gi
+    storageClass: longhorn
+  bootstrap:
+    recovery:
+      source: postgres-cluster
+      recoveryTarget:
+        targetTime: "2025-12-03 10:00:00+00:00"  # Optional: point-in-time
+  externalClusters:
+    - name: postgres-cluster
+      barmanObjectStore:
+        destinationPath: "s3://homelab-postgres-backups/production/"
+        endpointURL: "https://s3.eu-central-003.backblazeb2.com"
+        s3Credentials:
+          accessKeyId:
+            name: b2-credentials
+            key: ACCESS_KEY_ID
+          secretAccessKey:
+            name: b2-credentials
+            key: ACCESS_SECRET_KEY
+EOF
+
+# Verify recovery
+kubectl get cluster -n database
+kubectl logs -n database postgres-cluster-restore-1 -f
+
+# Once verified, update applications to use new cluster or migrate data back
+```
+
+**2. In-Place Recovery (Restore Existing Cluster)**:
+```bash
+# WARNING: This will overwrite existing data
+# Annotate cluster for recovery
+kubectl annotate cluster postgres-cluster \
+  cnpg.io/reconciliationLoop=disabled \
+  -n database
+
+# Delete existing cluster pods
+kubectl delete pod -n database -l cnpg.io/cluster=postgres-cluster
+
+# Update cluster spec to bootstrap from recovery
+kubectl edit cluster postgres-cluster -n database
+# Add bootstrap.recovery section (see example above)
+
+# Re-enable reconciliation
+kubectl annotate cluster postgres-cluster \
+  cnpg.io/reconciliationLoop- \
+  -n database
+```
+
+**Point-in-Time Recovery (PITR)**:
+
+Restore to any moment in time (within retention period):
+```bash
+# Restore to specific timestamp
+recoveryTarget:
+  targetTime: "2025-12-03 14:30:00+00:00"
+
+# Or restore to specific transaction ID
+recoveryTarget:
+  targetXID: "12345"
+
+# Or restore to named restore point
+recoveryTarget:
+  targetName: "before-migration"
+```
+
+**Recovery Best Practices**:
+1. Always restore to a new cluster first to verify data
+2. Test backups regularly in staging environment
+3. Document recovery procedures for your team
+4. Keep B2 credentials secure and backed up separately
+5. Monitor backup jobs for failures
+
+**Backup Costs** (Backblaze B2):
+- Storage: $0.006/GB/month (~$0.06/month for 10GB)
+- Downloads: $0.01/GB (only when restoring)
+- Very affordable for homelab use
+
 **Monitoring**:
 - Metrics exposed for Prometheus
 - PodMonitor for automatic scraping
 - Integration with Grafana dashboards
+- Backup job status visible in kubectl
 
 ## Applications
 

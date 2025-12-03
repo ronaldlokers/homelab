@@ -109,6 +109,14 @@ Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
 - TLS certificates for all services
 - Private keys stored in Proton Pass (not in Git)
 
+### Automated Backups
+
+- PostgreSQL backups to Backblaze B2 object storage
+- Daily automated backups with 14-30 day retention
+- Point-in-time recovery (PITR) capability
+- Continuous WAL archiving for near-zero data loss
+- Off-cluster storage survives complete cluster failure
+
 ## Repository Structure
 
 ```
