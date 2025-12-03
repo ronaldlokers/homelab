@@ -138,18 +138,19 @@ DNS records point to the Proxmox VM IP:
 
 The k3d load balancer distributes traffic internally to pods.
 
-#### Production (3-node HA with K3s ServiceLB)
+#### Production (3-node HA with MetalLB)
 
-DNS records can point to any node IP (or all three for round-robin):
-- `linkding.ronaldlokers.nl` → 10.0.40.101, 10.0.40.102, or 10.0.40.103
-- `longhorn.ronaldlokers.nl` → 10.0.40.101, 10.0.40.102, or 10.0.40.103
-- `grafana.ronaldlokers.nl` → 10.0.40.101, 10.0.40.102, or 10.0.40.103
+DNS records point to a single virtual IP provided by MetalLB:
+- `linkding.ronaldlokers.nl` → 10.0.40.100
+- `longhorn.ronaldlokers.nl` → 10.0.40.100
+- `homepage.ronaldlokers.nl` → 10.0.40.100
+- `grafana.ronaldlokers.nl` → 10.0.40.100
 
-K3s ServiceLB (Klipper) automatically distributes traffic across all nodes.
-
-**Recommendation**: Configure DNS with all three IPs for best redundancy:
-- Cloudflare can do round-robin load balancing
-- If one node is down, DNS will route to the others
+MetalLB provides a single stable IP address with automatic failover:
+- **Load Balancer VIP**: 10.0.40.100
+- Layer 2 mode with ARP announcement
+- Automatic failover between nodes
+- No DNS round-robin required
 
 ### Load Balancing
 
@@ -160,28 +161,36 @@ k3d includes a load balancer that:
 - Distributes traffic to Traefik ingress controller
 - Handles external connectivity
 
-#### Production: K3s ServiceLB (Klipper)
+#### Production: MetalLB
 
-K3s includes a built-in load balancer called Klipper/ServiceLB:
-- Assigns external IPs to LoadBalancer services
-- Uses all node IPs as external IPs
-- Routes traffic to pods across all nodes
-- No external load balancer required
+MetalLB provides network load balancing for bare-metal Kubernetes clusters:
+- Assigns a single virtual IP to LoadBalancer services
+- Layer 2 mode using ARP announcement
+- Automatic failover between nodes
+- Standard Kubernetes LoadBalancer interface
 
-When a LoadBalancer service is created (like Traefik), ServiceLB:
-1. Assigns all node IPs as external IPs
-2. Opens ports on all nodes using iptables
-3. Forwards traffic to service pods
-4. Handles pod distribution and health checks
+**Configuration**:
+- **IP Pool**: 10.0.40.100/32
+- **Mode**: Layer 2 (L2Advertisement)
+- **VIP**: 10.0.40.100
+
+When a LoadBalancer service is created (like Traefik), MetalLB:
+1. Assigns the VIP (10.0.40.100) to the service
+2. Speaker pods announce the VIP via ARP on the network
+3. Traffic to 10.0.40.100 is routed to the service pods
+4. Automatic failover if the announcing node fails
+5. New speaker takes over and re-announces the VIP
 
 ### Ingress
 
 Both clusters use **Traefik** as the ingress controller.
 
 **Traffic flow**:
-1. External request → DNS resolves to node IP(s)
-2. Request hits node on port 80 or 443
-3. ServiceLB/k3d forwards to Traefik pod
+1. External request → DNS resolves to load balancer IP
+   - Staging: 10.0.40.52 (k3d VM)
+   - Production: 10.0.40.100 (MetalLB VIP)
+2. Request hits load balancer on port 80 or 443
+3. Load balancer forwards to Traefik pod
 4. Traefik routes based on Host header to backend service
 5. Service forwards to application pod
 
@@ -189,7 +198,7 @@ Both clusters use **Traefik** as the ingress controller.
 - Automatic TLS certificates from cert-manager
 - HTTPS redirect middleware (HTTP → HTTPS)
 - SNI-based routing
-- Integrates with K3s ServiceLB for multi-node distribution
+- Integrates with MetalLB (production) or k3d (staging) for load balancing
 
 ### TLS Certificates
 
@@ -245,9 +254,10 @@ Full high-availability setup:
 
 **Application HA**:
 - Pods can be scheduled on any node
-- K3s ServiceLB distributes ingress traffic
+- MetalLB provides single VIP with automatic failover
 - Traefik runs as a Deployment (can scale)
 - Applications can run multiple replicas
+- PostgreSQL cluster with 3 instances (1 primary + 2 replicas)
 
 **Failure Scenarios**:
 - 1 node down: Cluster fully operational
