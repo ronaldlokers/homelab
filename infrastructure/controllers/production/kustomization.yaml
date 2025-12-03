@@ -3,4 +3,5 @@ kind: Kustomization
 resources:
   - cert-manager
   - longhorn
+  - metallb
   - renovate
