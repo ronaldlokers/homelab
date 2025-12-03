@@ -1,0 +1,11 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: postgres-cluster-daily-backup
+  namespace: database
+spec:
+  schedule: "0 3 * * *"  # Daily at 3 AM
+  backupOwnerReference: self
+  cluster:
+    name: postgres-cluster
+  immediate: true  # Take first backup immediately

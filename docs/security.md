@@ -144,6 +144,35 @@ PostgreSQL database credentials for Linkding.
 - `username`: PostgreSQL user (`app`)
 - `password`: PostgreSQL password (from postgres-cluster-app secret)
 
+### database/b2-credentials
+
+Backblaze B2 object storage credentials for PostgreSQL backups.
+
+**Location**:
+- Staging: `infrastructure/configs/staging/cloudnative-pg/b2-credentials-secret.yaml`
+- Production: `infrastructure/configs/production/cloudnative-pg/b2-credentials-secret.yaml`
+
+**Contents**:
+- `ACCESS_KEY_ID`: Backblaze B2 application key ID
+- `ACCESS_SECRET_KEY`: Backblaze B2 application key
+
+**Purpose**:
+- Automated PostgreSQL backups to Backblaze B2
+- WAL archiving for point-in-time recovery
+- Off-cluster disaster recovery
+
+**Backup Details**:
+- **Bucket**: `homelab-postgres-backups`
+- **Paths**: `staging/` and `production/` subdirectories
+- **Retention**: 14 days (staging), 30 days (production)
+- **Schedule**: Daily automated backups
+
+**Security Notes**:
+- Credentials encrypted with SOPS
+- Application key scoped to backup bucket only
+- Read and write access required for backup/restore operations
+- Store key ID and secret separately from this repository
+
 ### renovate/renovate-container-env
 
 Renovate GitHub token for automated dependency updates.
