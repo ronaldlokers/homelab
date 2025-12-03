@@ -26,3 +26,9 @@ spec:
                 secretKeyRef:
                   name: linkding-db-user
                   key: password
+          volumeMounts:
+            - name: linkding-data
+              mountPath: "/etc/linkding/data"
+      volumes:
+        - name: linkding-data
+          emptyDir: {}
