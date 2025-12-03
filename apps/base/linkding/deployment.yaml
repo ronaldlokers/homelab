@@ -26,10 +26,3 @@ spec:
                 name: linkding-container-env
           securityContext:
             allowPrivilegeEscalation: false
-          volumeMounts:
-            - name: linkding-data
-              mountPath: "/etc/linkding/data"
-      volumes:
-        - name: linkding-data
-          persistentVolumeClaim:
-            claimName: linkding-data-pvc

@@ -3,7 +3,9 @@ kind: Kustomization
 namespace: linkding
 resources:
   - ../../base/linkding/
+  - database.yaml
   - linkding-container-env-secret.yaml
+  - linkding-db-secret.yaml
   - ingress.yaml
 patchesStrategicMerge:
-  - storage-patch.yaml
+  - deployment-postgres-patch.yaml

@@ -132,6 +132,18 @@ Linkding application environment variables.
 - `LD_SUPERUSER_NAME`: Admin username
 - `LD_SUPERUSER_PASSWORD`: Admin password
 
+### linkding/linkding-db-user
+
+PostgreSQL database credentials for Linkding.
+
+**Location**:
+- Staging: `apps/staging/linkding/linkding-db-secret.yaml`
+- Production: `apps/production/linkding/linkding-db-secret.yaml`
+
+**Contents**:
+- `username`: PostgreSQL user (`app`)
+- `password`: PostgreSQL password (from postgres-cluster-app secret)
+
 ### renovate/renovate-container-env
 
 Renovate GitHub token for automated dependency updates.
