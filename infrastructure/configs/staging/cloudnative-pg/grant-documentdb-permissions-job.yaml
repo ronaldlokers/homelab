@@ -1,0 +1,77 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: grant-documentdb-permissions
+  namespace: database
+  annotations:
+    # Run this job after the cluster is created
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: grant-permissions
+          image: postgres:17
+          env:
+            - name: PGHOST
+              value: "postgres-cluster-rw"
+            - name: PGDATABASE
+              value: "postgres"
+            - name: PGUSER
+              value: "postgres"
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-cluster-superuser
+                  key: password
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              echo "Waiting for PostgreSQL to be ready..."
+              until psql -c "SELECT 1" > /dev/null 2>&1; do
+                sleep 2
+              done
+
+              echo "Granting DocumentDB permissions to app user..."
+              psql <<'EOF'
+              -- Grant usage on all documentdb schemas
+              GRANT USAGE ON SCHEMA documentdb_api, documentdb_api_catalog, documentdb_api_internal, documentdb_core, documentdb_data TO app;
+              GRANT ALL ON SCHEMA documentdb_api_catalog, documentdb_data TO app;
+
+              -- Grant all privileges on existing objects
+              GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA documentdb_api TO app;
+              GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA documentdb_api_catalog TO app;
+              GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA documentdb_api_internal TO app;
+              GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA documentdb_core TO app;
+              GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA documentdb_data TO app;
+
+              GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA documentdb_api TO app;
+              GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA documentdb_api_catalog TO app;
+              GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA documentdb_api_internal TO app;
+              GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA documentdb_core TO app;
+              GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA documentdb_data TO app;
+
+              GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA documentdb_api TO app;
+              GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA documentdb_api_catalog TO app;
+              GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA documentdb_api_internal TO app;
+              GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA documentdb_core TO app;
+              GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA documentdb_data TO app;
+
+              -- Set default privileges for future objects
+              ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA documentdb_api GRANT ALL ON TABLES TO app;
+              ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA documentdb_api_catalog GRANT ALL ON TABLES TO app;
+              ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA documentdb_api_internal GRANT ALL ON TABLES TO app;
+              ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA documentdb_core GRANT ALL ON TABLES TO app;
+              ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA documentdb_data GRANT ALL ON TABLES TO app;
+
+              ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA documentdb_data GRANT ALL ON SEQUENCES TO app;
+
+              SELECT 'DocumentDB permissions granted successfully' AS status;
+              EOF
+
+              echo "Permissions granted successfully!"
