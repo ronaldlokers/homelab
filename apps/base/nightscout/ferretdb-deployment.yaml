@@ -20,13 +20,8 @@ spec:
             - containerPort: 27017
               name: mongodb
           env:
-            - name: FERRETDB_POSTGRESQL_URL
-              value: "postgres://app@postgres-cluster-rw.database.svc.cluster.local:5432/nightscout"
             - name: FERRETDB_TELEMETRY
               value: "disable"
-          envFrom:
-            - secretRef:
-                name: ferretdb-postgres-secret
 ---
 apiVersion: v1
 kind: Service
