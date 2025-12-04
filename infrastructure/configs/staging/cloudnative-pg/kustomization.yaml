@@ -5,3 +5,4 @@ resources:
   - b2-credentials-secret.yaml
   - postgres-cluster.yaml
   - scheduled-backup.yaml
+  - linkding-database.yaml
