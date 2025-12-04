@@ -11,6 +11,12 @@ data:
             href: https://linkding.staging.ronaldlokers.nl
             description: Bookmark manager
 
+    - Health:
+        - Nightscout:
+            icon: nightscout.png
+            href: https://nightscout.staging.ronaldlokers.nl
+            description: CGM remote monitoring
+
     - Monitoring:
         - Grafana:
             icon: grafana.png

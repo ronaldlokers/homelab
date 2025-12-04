@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nightscout
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - secretName: nightscout-tls
+      hosts:
+        - nightscout.ronaldlokers.nl
+  rules:
+    - host: nightscout.ronaldlokers.nl
+      http:
+        paths:
+          - backend:
+              service:
+                name: nightscout
+                port:
+                  number: 1337
+            path: /
+            pathType: Prefix
