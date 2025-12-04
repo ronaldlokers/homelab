@@ -67,7 +67,7 @@ Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
 - **Ingress**: [Traefik](https://traefik.io/) - Ingress controller
 - **Load Balancer**: [MetalLB](https://metallb.universe.tf/) - Bare-metal load balancer (production only)
 - **Storage**: [Longhorn](https://longhorn.io/) - Distributed block storage (production only)
-- **Database**: [CloudNative-PG](https://cloudnative-pg.io/) - PostgreSQL operator for Kubernetes
+- **Database**: [CloudNative-PG](https://cloudnative-pg.io/) - PostgreSQL operator with DocumentDB extension for MongoDB compatibility
 - **Monitoring**: [kube-prometheus-stack](https://github.com/prometheus-operator/kube-prometheus) - Prometheus & Grafana
 - **Applications**:
   - [Homepage](https://gethomepage.dev/) - Modern application dashboard
@@ -88,7 +88,7 @@ Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
 - **Control Plane**: 3-node HA with embedded etcd (survives 1-node failure)
 - **Storage**: Longhorn with 3-replica redundancy (survives 2-node failure)
 - **Load Balancing**: MetalLB provides single VIP (10.0.40.100) for ingress
-- **Database**: PostgreSQL cluster with 3 instances for redundancy
+- **Database**: PostgreSQL cluster with 3 instances and DocumentDB extension for redundancy
 - **Certificates**: Automatic TLS with Let's Encrypt DNS-01 challenges
 
 ### GitOps Workflow

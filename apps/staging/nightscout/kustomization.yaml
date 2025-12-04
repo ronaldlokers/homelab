@@ -4,7 +4,8 @@ namespace: nightscout
 resources:
   - ../../base/nightscout/
   - nightscout-env-secret.yaml
-  - ferretdb-postgres-secret.yaml
+  - ferretdb-url-secret.yaml
   - ingress.yaml
 patchesStrategicMerge:
   - deployment-patch.yaml
+  - ferretdb-deployment-patch.yaml

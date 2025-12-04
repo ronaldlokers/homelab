@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ferretdb
+  namespace: nightscout
+spec:
+  template:
+    spec:
+      containers:
+        - name: ferretdb
+          env:
+            - name: FERRETDB_AUTH
+              value: "false"
+            - name: FERRETDB_POSTGRESQL_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ferretdb-url-secret
+                  key: FERRETDB_POSTGRESQL_URL

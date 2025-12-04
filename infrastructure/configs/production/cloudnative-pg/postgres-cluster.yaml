@@ -6,10 +6,47 @@ metadata:
 spec:
   instances: 3
 
+  # Use DocumentDB-enabled PostgreSQL image for FerretDB v2.x (ARM64-compatible)
+  imageName: 'ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0'
+
+  # DocumentDB image uses UID/GID 999
+  postgresUID: 999
+  postgresGID: 999
+
+  # Enable superuser access for extension management
+  enableSuperuserAccess: true
+
   postgresql:
+    # Load DocumentDB extensions
+    shared_preload_libraries:
+      - pg_cron
+      - pg_documentdb_core
+      - pg_documentdb
     parameters:
       max_connections: "100"
       shared_buffers: "256MB"
+      cron.database_name: 'postgres'
+
+  # Bootstrap from existing backup to restore data
+  bootstrap:
+    recovery:
+      source: oldClusterBackup
+
+  # Reference to the old cluster backup in B2
+  externalClusters:
+    - name: oldClusterBackup
+      barmanObjectStore:
+        destinationPath: "s3://homelab-postgres-backups/production/"
+        endpointURL: "https://s3.eu-central-003.backblazeb2.com"
+        s3Credentials:
+          accessKeyId:
+            name: b2-credentials
+            key: ACCESS_KEY_ID
+          secretAccessKey:
+            name: b2-credentials
+            key: ACCESS_SECRET_KEY
+        wal:
+          maxParallel: 8
 
   storage:
     size: 10Gi
