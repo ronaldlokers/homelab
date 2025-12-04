@@ -37,8 +37,14 @@ spec:
                 sleep 2
               done
 
-              echo "Granting DocumentDB permissions to app user..."
+              echo "Creating DocumentDB extension and configuring permissions..."
               psql <<'EOF'
+              -- Create DocumentDB extension (idempotent)
+              CREATE EXTENSION IF NOT EXISTS documentdb CASCADE;
+
+              -- Grant DocumentDB admin role to app user (required for FerretDB)
+              GRANT documentdb_admin_role TO app;
+
               -- Grant usage on all documentdb schemas
               GRANT USAGE ON SCHEMA documentdb_api, documentdb_api_catalog, documentdb_api_internal, documentdb_core, documentdb_data TO app;
               GRANT ALL ON SCHEMA documentdb_api_catalog, documentdb_data TO app;
@@ -74,4 +80,12 @@ spec:
               SELECT 'DocumentDB permissions granted successfully' AS status;
               EOF
 
-              echo "Permissions granted successfully!"
+              echo "Ensuring app user password matches cluster secret..."
+              # Get the current app user password from the cluster secret
+              APP_PASSWORD=$(kubectl get secret -n database postgres-cluster-app -o jsonpath='{.data.password}' | base64 -d)
+
+              # Reset the app user password to match the cluster secret
+              # This ensures password consistency after cluster restore from backup
+              psql -c "ALTER USER app WITH PASSWORD '${APP_PASSWORD}';"
+
+              echo "Permissions and credentials configured successfully!"
