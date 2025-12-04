@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: nightscout
-          image: nightscout/cgm-remote-monitor:15.0.2
+          image: nightscout/cgm-remote-monitor:15.0.3
           ports:
             - containerPort: 1337
           env:
