@@ -7,3 +7,4 @@ resources:
   - scheduled-backup.yaml
   - linkding-database.yaml
   - nightscout-database.yaml
+  - grant-documentdb-permissions-job.yaml
