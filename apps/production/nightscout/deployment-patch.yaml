@@ -10,4 +10,4 @@ spec:
         - name: nightscout
           env:
             - name: MONGODB_URI
-              value: "mongodb://ferretdb:27017/nightscout"
+              value: "mongodb://ferretdb:27017/postgres"
