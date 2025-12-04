@@ -232,10 +232,18 @@ Uses Cloudflare DNS API for DNS-01 challenges:
 - **Name**: postgres-cluster
 - **Namespace**: database
 - **Instances**: 3 (high availability)
+- **Image**: ghcr.io/ferretdb/postgres-documentdb:17-0.102.0-ferretdb-2.1.0
 - **Storage Size**: 10Gi per instance
 - **Storage Class**:
   - Staging: local-path
   - Production: longhorn (replicated)
+
+**DocumentDB Extension**:
+The cluster uses PostgreSQL 17 with the DocumentDB extension installed, which provides:
+- MongoDB API compatibility for FerretDB v2.x
+- Native BSON data type support
+- Optimized MongoDB-like operations at the database level
+- Required for Nightscout (via FerretDB) to function properly
 
 **Features**:
 - Automated PostgreSQL cluster provisioning
@@ -244,6 +252,7 @@ Uses Cloudflare DNS API for DNS-01 challenges:
 - Rolling updates with zero downtime
 - Connection pooling with PgBouncer
 - Monitoring integration with Prometheus
+- DocumentDB extension for MongoDB compatibility layer
 
 **High Availability**:
 - Primary-replica architecture
@@ -509,16 +518,22 @@ recoveryTarget:
 - Display units configured as mmol/L
 
 **Database Architecture**:
-- **FerretDB**: Provides MongoDB API compatibility layer
-- **Backend**: PostgreSQL cluster managed by CloudNative-PG
+- **FerretDB**: Provides MongoDB API compatibility layer (v2.1.0)
+- **Backend**: PostgreSQL 17 with DocumentDB extension
 - **Database**: `nightscout` database in the PostgreSQL cluster
 - **High Availability**: Through PostgreSQL replication (3 instances)
 
 **How FerretDB Works**:
 1. Nightscout connects to FerretDB using MongoDB protocol
-2. FerretDB translates MongoDB queries to PostgreSQL
-3. Data stored in PostgreSQL with same reliability and backup strategy
-4. No separate MongoDB cluster needed
+2. FerretDB uses the DocumentDB PostgreSQL extension for native BSON support
+3. MongoDB operations are executed using the extension's functions
+4. Data stored in PostgreSQL with same reliability and backup strategy
+5. No separate MongoDB cluster needed
+
+**Requirements**:
+- PostgreSQL with DocumentDB extension installed
+- FerretDB v2.x requires this extension (v1.x worked with plain PostgreSQL)
+- The extension provides native MongoDB compatibility at the database level
 
 **Access**:
 - **Staging**: https://nightscout.staging.ronaldlokers.nl

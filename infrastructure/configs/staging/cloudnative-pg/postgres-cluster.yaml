@@ -6,10 +6,32 @@ metadata:
 spec:
   instances: 3
 
+  # Use DocumentDB-enabled PostgreSQL image for FerretDB v2.x (ARM64-compatible)
+  imageName: 'ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0'
+
+  # DocumentDB image uses UID/GID 999
+  postgresUID: 999
+  postgresGID: 999
+
+  # Enable superuser access for extension management
+  enableSuperuserAccess: true
+
   postgresql:
+    # Load DocumentDB extensions
+    shared_preload_libraries:
+      - pg_cron
+      - pg_documentdb_core
+      - pg_documentdb
     parameters:
       max_connections: "100"
       shared_buffers: "256MB"
+      cron.database_name: 'postgres'
+
+  # Create DocumentDB extension on initialization
+  bootstrap:
+    initdb:
+      postInitSQL:
+        - 'CREATE EXTENSION IF NOT EXISTS documentdb CASCADE;'
 
   storage:
     size: 10Gi
