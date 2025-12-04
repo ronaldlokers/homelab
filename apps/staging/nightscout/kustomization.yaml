@@ -6,3 +6,5 @@ resources:
   - nightscout-env-secret.yaml
   - ferretdb-postgres-secret.yaml
   - ingress.yaml
+patchesStrategicMerge:
+  - deployment-patch.yaml

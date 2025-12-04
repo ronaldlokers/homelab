@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nightscout
+  namespace: nightscout
+spec:
+  template:
+    spec:
+      containers:
+        - name: nightscout
+          env:
+            - name: FERRETDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ferretdb-postgres-secret
+                  key: FERRETDB_POSTGRESQL_PASSWORD
+            - name: MONGODB_URI
+              value: "mongodb://app:$(FERRETDB_PASSWORD)@ferretdb:27017/nightscout?authMechanism=PLAIN"
