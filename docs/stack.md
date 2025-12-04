@@ -245,6 +245,30 @@ The cluster uses PostgreSQL 17 with the DocumentDB extension installed, which pr
 - Optimized MongoDB-like operations at the database level
 - Required for Nightscout (via FerretDB) to function properly
 
+**Automatic Credential and Permission Management**:
+
+A PostSync job (`grant-documentdb-permissions`) runs automatically after the cluster is created or updated to ensure proper configuration:
+
+1. **DocumentDB Extension Setup**: Creates the DocumentDB extension and all required schemas
+2. **Role Assignment**: Grants the `documentdb_admin_role` to the `app` user (required for FerretDB operations like SET ROLE)
+3. **Schema Permissions**: Grants necessary privileges on all DocumentDB schemas (documentdb_api, documentdb_core, documentdb_data, etc.)
+4. **Password Synchronization**: Resets the `app` user password to match the `postgres-cluster-app` secret
+
+**Why Password Synchronization is Important**:
+- When restoring from backup, user passwords come from the backup data
+- Application secrets may have different passwords than the restored backup
+- The job ensures passwords are synchronized after every cluster deployment or restore
+- This prevents authentication failures in applications (linkding, FerretDB) after disaster recovery
+
+**Manual Password Reset** (if needed):
+```bash
+# Get the app password from the secret
+APP_PASSWORD=$(kubectl get secret -n database postgres-cluster-app -o jsonpath='{.data.password}' | base64 -d)
+
+# Reset the password in PostgreSQL
+kubectl exec -n database postgres-cluster-1 -- psql -U postgres -c "ALTER USER app WITH PASSWORD '${APP_PASSWORD}';"
+```
+
 **Features**:
 - Automated PostgreSQL cluster provisioning
 - Built-in high availability with automatic failover
