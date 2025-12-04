@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nightscout
+  namespace: nightscout
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nightscout
+  template:
+    metadata:
+      labels:
+        app: nightscout
+    spec:
+      containers:
+        - name: nightscout
+          image: nightscout/cgm-remote-monitor:15.0.2
+          ports:
+            - containerPort: 1337
+          env:
+            - name: DISPLAY_UNITS
+              value: "mmol/L"
+            - name: MONGODB_URI
+              value: "mongodb://ferretdb:27017/nightscout"
+            - name: INSECURE_USE_HTTP
+              value: "true"
+          envFrom:
+            - secretRef:
+                name: nightscout-env

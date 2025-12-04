@@ -489,6 +489,59 @@ recoveryTarget:
 - Ingress with TLS certificate from cert-manager
 - HTTPS redirect middleware
 
+### Nightscout
+
+[Nightscout](https://nightscout.github.io/) (CGM in the Cloud) is an open-source remote monitoring system for continuous glucose monitoring (CGM) data.
+
+**Features**:
+- Real-time CGM data display
+- Blood glucose trend visualization
+- Alerts and notifications for high/low glucose
+- Treatment logging (insulin, carbs, exercise)
+- Reports and analytics
+- Mobile app integration
+- Caregiver remote monitoring
+
+**Deployment**:
+- Single replica
+- PostgreSQL database via CloudNative-PG cluster (through FerretDB)
+- Uses FerretDB to provide MongoDB API compatibility
+- Display units configured as mmol/L
+
+**Database Architecture**:
+- **FerretDB**: Provides MongoDB API compatibility layer
+- **Backend**: PostgreSQL cluster managed by CloudNative-PG
+- **Database**: `nightscout` database in the PostgreSQL cluster
+- **High Availability**: Through PostgreSQL replication (3 instances)
+
+**How FerretDB Works**:
+1. Nightscout connects to FerretDB using MongoDB protocol
+2. FerretDB translates MongoDB queries to PostgreSQL
+3. Data stored in PostgreSQL with same reliability and backup strategy
+4. No separate MongoDB cluster needed
+
+**Access**:
+- **Staging**: https://nightscout.staging.ronaldlokers.nl
+- **Production**: https://nightscout.ronaldlokers.nl
+
+**Authentication**:
+- API_SECRET stored in SOPS-encrypted secret
+- Required for accessing and modifying data
+- Environment-specific secrets for staging and production
+
+**Configuration**:
+- Display units: mmol/L (configurable)
+- MongoDB connection via FerretDB service
+- PostgreSQL credentials stored in encrypted secrets
+- Ingress with TLS certificate from cert-manager
+- HTTPS redirect middleware
+
+**Benefits**:
+- Unified database platform (PostgreSQL for all applications)
+- Automated backups and point-in-time recovery
+- High availability through PostgreSQL replication
+- No need to maintain separate MongoDB cluster
+
 ## Monitoring
 
 ### kube-prometheus-stack
@@ -603,6 +656,7 @@ Automatically provisioned to Grafana via ConfigMap.
 | CloudNative-PG | ✅ | ✅ | PostgreSQL operator |
 | Homepage | ✅ | ✅ | Application dashboard |
 | Linkding | ✅ | ✅ | Bookmark manager |
+| Nightscout | ✅ | ✅ | CGM remote monitoring |
 | kube-prometheus-stack | ✅ | ✅ | Monitoring and observability |
 
 ## Resource Usage

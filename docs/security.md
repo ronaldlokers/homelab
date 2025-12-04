@@ -173,6 +173,38 @@ Backblaze B2 object storage credentials for PostgreSQL backups.
 - Read and write access required for backup/restore operations
 - Store key ID and secret separately from this repository
 
+### nightscout/nightscout-env
+
+Nightscout application environment variables.
+
+**Location**:
+- Staging: `apps/staging/nightscout/nightscout-env-secret.yaml`
+- Production: `apps/production/nightscout/nightscout-env-secret.yaml`
+
+**Contents**:
+- `API_SECRET`: Nightscout API authentication secret
+
+**Purpose**:
+- Authentication for Nightscout web interface
+- API access control for uploading CGM data
+- Required for all data modifications
+
+### nightscout/ferretdb-postgres-secret
+
+PostgreSQL database credentials for FerretDB (MongoDB API compatibility layer).
+
+**Location**:
+- Staging: `apps/staging/nightscout/ferretdb-postgres-secret.yaml`
+- Production: `apps/production/nightscout/ferretdb-postgres-secret.yaml`
+
+**Contents**:
+- `FERRETDB_POSTGRESQL_PASSWORD`: PostgreSQL password (from postgres-cluster-app secret)
+
+**Purpose**:
+- FerretDB connects to PostgreSQL using these credentials
+- Provides MongoDB API compatibility for Nightscout
+- Uses same PostgreSQL cluster as other applications
+
 ### renovate/renovate-container-env
 
 Renovate GitHub token for automated dependency updates.
