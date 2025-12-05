@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: commafeed
+  namespace: commafeed
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
+spec:
+  ingressClassName: "traefik"
+  rules:
+    - host: commafeed.staging.ronaldlokers.nl
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: commafeed
+                port:
+                  number: 8082
+  tls:
+    - hosts:
+        - commafeed.staging.ronaldlokers.nl
+      secretName: commafeed-tls-staging

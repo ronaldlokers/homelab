@@ -5,6 +5,7 @@ resources:
   - b2-credentials-secret.yaml
   - postgres-cluster.yaml
   - scheduled-backup.yaml
+  - commafeed-database.yaml
   - linkding-database.yaml
   - nightscout-database.yaml
   - grant-documentdb-permissions-job.yaml
