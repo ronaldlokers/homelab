@@ -27,6 +27,11 @@ spec:
                 secretKeyRef:
                   name: postgres-cluster-superuser
                   key: password
+            - name: APP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-cluster-app
+                  key: password
           command:
             - /bin/bash
             - -c
@@ -81,11 +86,9 @@ spec:
               EOF
 
               echo "Ensuring app user password matches cluster secret..."
-              # Get the current app user password from the cluster secret
-              APP_PASSWORD=$(kubectl get secret -n database postgres-cluster-app -o jsonpath='{.data.password}' | base64 -d)
-
+              # APP_PASSWORD is injected as an environment variable from the secret
               # Reset the app user password to match the cluster secret
               # This ensures password consistency after cluster restore from backup
-              psql -c "ALTER USER app WITH PASSWORD '${APP_PASSWORD}';"
+              psql -c "ALTER USER app WITH ENCRYPTED PASSWORD '${APP_PASSWORD}';"
 
               echo "Permissions and credentials configured successfully!"
