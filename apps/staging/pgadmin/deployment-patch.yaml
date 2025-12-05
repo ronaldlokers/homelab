@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgadmin4
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: pgadmin4
+          env:
+            - name: PGADMIN_DEFAULT_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: pgadmin-credentials
+                  key: email
+            - name: PGADMIN_DEFAULT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pgadmin-credentials
+                  key: password
+          # Mount the servers json from the secret
+          volumeMounts:
+            - name: pgadmin-servers
+              mountPath: "/pgadmin4/servers.json"
+              subPath: servers.json
+      volumes:
+        - name: pgadmin-servers
+          secret:
+            secretName: pgadmin-servers
