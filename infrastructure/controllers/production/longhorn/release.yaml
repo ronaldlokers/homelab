@@ -25,8 +25,7 @@ spec:
       # Minimum 50% of replicas must be healthy
       replicaSoftAntiAffinity: false
       replicaAutoBalance: "least-effort"
-      # Store data on eMMC for now (will rebuild with SSDs later)
-      defaultDataPath: /var/lib/longhorn
+      defaultDataPath: /mnt/longhorn
       # Backup settings (optional, can enable later)
       backupTarget: ""
     # Configure default StorageClass with 3 replicas
