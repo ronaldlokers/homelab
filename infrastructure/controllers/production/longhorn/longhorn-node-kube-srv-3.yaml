@@ -14,8 +14,8 @@ spec:
       allowScheduling: true
       storageReserved: 0
     default-disk-fc378d7767c48000:
-      allowScheduling: true # will change later
-      evictionRequested: false # will change later
+      allowScheduling: false # stop new replicas
+      evictionRequested: true # begin moving data
       diskDriver: ""
       diskType: filesystem
       path: /var/lib/longhorn
