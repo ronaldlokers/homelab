@@ -24,6 +24,8 @@ spec:
               value: "1000"
             - name: DISPLAY_TIMEZONE
               value: Europe/Amsterdam
+            - name: DATETIME_FORMAT
+              value: "j F Y, G:i"
             - name: SPEEDTEST_SCHEDULE
               value: 37 * * * *
             - name: SPEEDTEST_SERVERS
