@@ -25,6 +25,7 @@ This repository contains the complete infrastructure and application configurati
 
 | Service | Staging | Production |
 |---------|---------|------------|
+| **Commafeed** | [commafeed.staging.ronaldlokers.nl](https://commafeed.staging.ronaldlokers.nl) | [commafeed.ronaldlokers.nl](https://commafeed.ronaldlokers.nl) |
 | **Homepage** | [homepage.staging.ronaldlokers.nl](https://homepage.staging.ronaldlokers.nl) | [homepage.ronaldlokers.nl](https://homepage.ronaldlokers.nl) |
 | **Linkding** | [linkding.staging.ronaldlokers.nl](https://linkding.staging.ronaldlokers.nl) | [linkding.ronaldlokers.nl](https://linkding.ronaldlokers.nl) |
 | **Nightscout** | [nightscout.staging.ronaldlokers.nl](https://nightscout.staging.ronaldlokers.nl) | [nightscout.ronaldlokers.nl](https://nightscout.ronaldlokers.nl) |
@@ -70,6 +71,7 @@ Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
 - **Database**: [CloudNative-PG](https://cloudnative-pg.io/) - PostgreSQL operator with DocumentDB extension for MongoDB compatibility
 - **Monitoring**: [kube-prometheus-stack](https://github.com/prometheus-operator/kube-prometheus) - Prometheus & Grafana
 - **Applications**:
+  - [Commafeed](https://www.commafeed.com/) - Self-hosted RSS reader
   - [Homepage](https://gethomepage.dev/) - Modern application dashboard
   - [Linkding](https://github.com/sissbruecker/linkding) - Bookmark manager
   - [Nightscout](https://nightscout.github.io/) - CGM remote monitoring for diabetes management
