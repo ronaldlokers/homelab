@@ -8,4 +8,5 @@ resources:
   - commafeed-database.yaml
   - linkding-database.yaml
   - nightscout-database.yaml
+  - speedtest-database.yaml
   - grant-documentdb-permissions-job.yaml

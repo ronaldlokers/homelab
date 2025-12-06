@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: speedtest
+  namespace: speedtest
+spec:
+  template:
+    spec:
+      containers:
+        - name: speedtest
+          imagePullPolicy: Always
+          env:
+            - name: APP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: speedtest-env
+                  key: APP_KEY
+            - name: DB_CONNECTION
+              value: pgsql
+            - name: DB_HOST
+              value: postgres-cluster-rw.database.svc.cluster.local
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_DATABASE
+              value: speedtest
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: speedtest-db-secret
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: speedtest-db-secret
+                  key: password
