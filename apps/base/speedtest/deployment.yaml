@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: speedtest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: speedtest
+  template:
+    metadata:
+      labels:
+        app: speedtest
+    spec:
+      dnsPolicy: None
+      dnsConfig:
+        nameservers:
+          - 8.8.8.8
+        searches:
+          - speedtest.svc.cluster.local
+        options:
+          - name: ndots
+            value: "5"
+      containers:
+        - name: speedtest-tracker
+          image: lscr.io/linuxserver/speedtest-tracker:latest
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: DISPLAY_TIMEZONE
+              value: Europe/Amsterdam
+            - name: SPEEDTEST_SCHEDULE
+              value: 37 * * * *
+            - name: SPEEDTEST_SERVERS
+              value: 6554,61186,52857
+
+          volumeMounts:
+            - mountPath: /config
+              name: speedtest-config
+      volumes:
+        - name: speedtest-config
+          persistentVolumeClaim:
+            claimName: speedtest-config
