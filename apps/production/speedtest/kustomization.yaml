@@ -6,9 +6,5 @@ resources:
   - ingress.yaml
   - speedtest-db-secret.yaml
   - speedtest-env-secret.yaml
-
-patches:
-  - path: deployment-patch.yaml
-    target:
-      kind: Deployment
-      name: speedtest
+patchesStrategicMerge:
+  - deployment-patch.yaml
