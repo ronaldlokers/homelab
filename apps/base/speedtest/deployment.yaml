@@ -22,7 +22,7 @@ spec:
           - name: ndots
             value: "5"
       containers:
-        - name: speedtest-tracker
+        - name: speedtest
           image: lscr.io/linuxserver/speedtest-tracker:latest
           env:
             - name: PUID
