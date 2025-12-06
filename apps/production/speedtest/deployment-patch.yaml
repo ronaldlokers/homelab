@@ -13,7 +13,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: speedtest-env
-                  key: APP_KEY
+                  key: API_KEY
             - name: DB_CONNECTION
               value: pgsql
             - name: DB_HOST
