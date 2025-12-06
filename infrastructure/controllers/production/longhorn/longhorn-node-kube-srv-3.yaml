@@ -1,0 +1,27 @@
+apiVersion: longhorn.io/v1beta2
+kind: Node
+metadata:
+  finalizers:
+    - longhorn.io
+  generation: 1
+  name: kube-srv-3
+  namespace: longhorn-system
+spec:
+  allowScheduling: true
+  disks:
+    ssd-disk:
+      path: /mnt/longhorn
+      allowScheduling: true
+      storageReserved: 0
+    default-disk-fc378d7767c48000:
+      allowScheduling: true # will change later
+      evictionRequested: false # will change later
+      diskDriver: ""
+      diskType: filesystem
+      path: /var/lib/longhorn
+      storageReserved: 18287300198
+      tags: []
+  evictionRequested: false
+  instanceManagerCPURequest: 0
+  name: kube-srv-3
+  tags: []
