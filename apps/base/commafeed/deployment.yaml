@@ -18,15 +18,7 @@ spec:
         - name: commafeed
           image: athou/commafeed:latest-postgresql
           ports:
-            - name: http
-              containerPort: 8082
-              protocol: TCP
-          #env:
-          # These will be patched by overlays
-          # - name: SPRING_DATASOURCE_URL
-          # - name: SPRING_DATASOURCE_USERNAME
-          # - name: SPRING_DATASOURCE_PASSWORD
-          # - name: COMMAFEED_PUBLIC_URL
+            - containerPort: 8082
           volumeMounts:
             - name: commafeed-data
               mountPath: /data

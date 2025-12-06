@@ -16,9 +16,7 @@ spec:
         - name: speedtest
           image: lscr.io/linuxserver/speedtest-tracker:latest
           ports:
-            - name: http
-              containerPort: 80
-              protocol: TCP
+            - containerPort: 80
           env:
             - name: PUID
               value: "1000"
