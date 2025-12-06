@@ -13,14 +13,6 @@ spec:
       path: /mnt/longhorn
       allowScheduling: true
       storageReserved: 0
-    default-disk-fc378d7767c48000:
-      allowScheduling: false # stop new replicas
-      evictionRequested: true # begin moving data
-      diskDriver: ""
-      diskType: filesystem
-      path: /var/lib/longhorn
-      storageReserved: 18287300198
-      tags: []
   evictionRequested: false
   instanceManagerCPURequest: 0
   name: kube-srv-1
