@@ -12,15 +12,6 @@ spec:
       labels:
         app: speedtest
     spec:
-      dnsPolicy: None
-      dnsConfig:
-        nameservers:
-          - 8.8.8.8
-        searches:
-          - speedtest.svc.cluster.local
-        options:
-          - name: ndots
-            value: "5"
       containers:
         - name: speedtest
           image: lscr.io/linuxserver/speedtest-tracker:latest
