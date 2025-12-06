@@ -4,3 +4,6 @@ resources:
   - namespace.yaml
   - repository.yaml
   - release.yaml
+  - longhorn-node-kube-srv-1.yaml
+  - longhorn-node-kube-srv-2.yaml
+  - longhorn-node-kube-srv-3.yaml
