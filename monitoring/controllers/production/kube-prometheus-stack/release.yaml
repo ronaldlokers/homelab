@@ -31,6 +31,11 @@ spec:
         serviceMonitorNamespaceSelector:
           any: true
 
+        # Allow ANY ServiceMonitor (ignore Helm 'release=' label)
+        serviceMonitorSelectorNilUsesHelmValues: false
+
+        # Accept ALL ServiceMonitors (empty selector)
+        serviceMonitorSelector: {}
     grafana:
       adminPassword: ronald
       grafana.ini:
