@@ -11,6 +11,12 @@ data:
             href: https://linkding.staging.ronaldlokers.nl
             description: Bookmark manager
 
+    - Reading:
+        - Commafeed:
+            icon: commafeed.png
+            href: https://commafeed.staging.ronaldlokers.nl
+            description: RSS feed reader
+
     - Health:
         - Nightscout:
             icon: nightscout.png

@@ -11,6 +11,12 @@ data:
             href: https://linkding.ronaldlokers.nl
             description: Bookmark manager
 
+    - Reading:
+        - Commafeed:
+            icon: commafeed.png
+            href: https://commafeed.ronaldlokers.nl
+            description: RSS feed reader
+
     - Health:
         - Nightscout:
             icon: nightscout.png
@@ -27,6 +33,10 @@ data:
               url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local:80
               username: "{{HOMEPAGE_VAR_GRAFANA_USER}}"
               password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
+        - Speedtest:
+            icon: speedtest.png
+            href: https://speedtest.ronaldlokers.nl
+            description: Network speed test
 
     - Infrastructure:
         - Proxmox:
@@ -38,11 +48,14 @@ data:
               url: https://proxmox.lokilabs.nl
               username: "{{HOMEPAGE_VAR_PROXMOX_USER}}"
               password: "{{HOMEPAGE_VAR_PROXMOX_PASSWORD}}"
-
         - Longhorn:
             icon: longhorn.png
             href: https://longhorn.ronaldlokers.nl
             description: Distributed block storage
+        - pgAdmin:
+            icon: pgadmin.png
+            href: https://pgadmin.ronaldlokers.nl
+            description: PostgreSQL admin
 
     - GitOps:
         - Flux:
