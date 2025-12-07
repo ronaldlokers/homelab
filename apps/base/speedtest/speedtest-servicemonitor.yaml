@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: speedtest
+  labels:
+    name: speedtest
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: speedtest
+  endpoints:
+    - port: 80
+      path: /prometheus
+      interval: 60s
