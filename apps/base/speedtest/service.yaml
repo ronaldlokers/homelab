@@ -4,7 +4,8 @@ metadata:
   name: speedtest
 spec:
   ports:
-    - port: 80
+    - name: http
+      port: 80
   selector:
     app: speedtest
   type: ClusterIP
