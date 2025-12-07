@@ -42,6 +42,9 @@ data:
         - Proxmox:
             icon: proxmox.png
             href: https://proxmox.lokilabs.nl
+            username: "{{HOMEPAGE_VAR_PROXMOX_TOKEN}}"
+            password: "{{HOMEPAGE_VAR_PROXMOX_SECRET}}"
+            node: gandalf
             description: Virtualization platform
             widget:
               type: proxmox
