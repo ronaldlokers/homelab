@@ -5,3 +5,4 @@ resources:
   - deployment.yaml
   - pvc.yaml
   - service.yaml
+  - speedtest-servicemonitor.yaml
