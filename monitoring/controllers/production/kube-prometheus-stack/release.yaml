@@ -36,6 +36,18 @@ spec:
 
         # Accept ALL ServiceMonitors (empty selector)
         serviceMonitorSelector: {}
+      ingress:
+        enabled: true
+        ingressClassName: traefik
+        annotations:
+          cert-manager.io/cluster-issuer: letsencrypt-production
+          traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
+        hosts:
+          - prometheus.ronaldlokers.nl
+        tls:
+          - secretName: prometheus-tls
+            hosts:
+              - prometheus.ronaldlokers.nl
     grafana:
       adminPassword: ronald
       grafana.ini:
