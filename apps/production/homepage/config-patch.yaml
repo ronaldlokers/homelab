@@ -45,9 +45,6 @@ data:
             description: Virtualization platform
             widget:
               type: proxmox
-              url: https://proxmox.lokilabs.nl
-              username: "{{HOMEPAGE_VAR_PROXMOX_USER}}"
-              password: "{{HOMEPAGE_VAR_PROXMOX_PASSWORD}}"
         - Longhorn:
             icon: longhorn.png
             href: https://longhorn.ronaldlokers.nl
@@ -62,3 +59,8 @@ data:
             icon: flux-cd.png
             href: https://fluxcd.io/
             description: GitOps continuous delivery
+  proxmox.yaml: |
+    - gandalf:
+        url: https://proxmox.lokilabs.nl
+        token: "{{HOMEPAGE_VAR_PROXMOX_USER}}"
+        secret: "{{HOMEPAGE_VAR_PROXMOX_PASSWORD}}"
