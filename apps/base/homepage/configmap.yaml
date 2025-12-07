@@ -10,7 +10,7 @@ data:
     mode: cluster
     ingress: true
     traefik: true
-    gateway: true
+    gateway: false
   settings.yaml: |
     title: Homelab Dashboard
     favicon: https://gethomepage.dev/img/favicon.ico
