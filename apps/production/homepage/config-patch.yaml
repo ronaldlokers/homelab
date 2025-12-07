@@ -41,7 +41,6 @@ data:
               type: speedtest
               url: https://speedtest.ronaldlokers.nl
               version: 1
-              bitratePrecision: 3
 
     - Infrastructure:
         - Proxmox:
