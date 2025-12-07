@@ -83,7 +83,7 @@ Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
 - **[Setup Guide](docs/setup.md)** - How to set up staging and production clusters
 - **[Architecture](docs/architecture.md)** - Repository structure, deployment flow, and networking
 - **[Security](docs/security.md)** - SOPS encryption and secrets management
-- **[Stack Details](docs/stack.md)** - Detailed component information
+- **[Stack Details](docs/stack/README.md)** - Detailed component information
 
 ## Key Features
 
