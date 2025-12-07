@@ -37,6 +37,11 @@ data:
             icon: speedtest.png
             href: https://speedtest.ronaldlokers.nl
             description: Network speed test
+            widget:
+              type: speedtest
+              url: https://speedtest.ronaldlokers.nl
+              version: 1
+              bitratePrecision: 3
 
     - Infrastructure:
         - Proxmox:
