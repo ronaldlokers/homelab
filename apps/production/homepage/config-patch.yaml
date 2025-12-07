@@ -62,6 +62,15 @@ data:
             icon: pgadmin.png
             href: https://pgadmin.ronaldlokers.nl
             description: PostgreSQL admin
+        - Mikrotik:
+            icon: mikrotik.png
+            href: https://10.0.1.1
+            description: Mikrotik Router
+            widget:
+              type: mikrotik
+              url: https://10.0.1.1
+              username: "{{HOMEPAGE_VAR_MIKROTIK_USERNAME}}"
+              password: "{{HOMEPAGE_VAR_MIKROTIK_PASSWORD}}"
 
     - GitOps:
         - Flux:
