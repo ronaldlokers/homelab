@@ -5,6 +5,7 @@ resources:
   - repository.yaml
   - s3-secret.yaml
   - release.yaml
+  - recurring-jobs.yaml
   - longhorn-node-kube-srv-1.yaml
   - longhorn-node-kube-srv-2.yaml
   - longhorn-node-kube-srv-3.yaml
