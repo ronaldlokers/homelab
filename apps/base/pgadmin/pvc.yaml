@@ -3,6 +3,9 @@ kind: PersistentVolumeClaim
 metadata:
   name: pgadmin4
   namespace: pgadmin
+  labels:
+    recurring-job.longhorn.io/backup-daily: enabled
+    recurring-job.longhorn.io/snapshot-daily: enabled
 spec:
   accessModes:
     - ReadWriteOnce
