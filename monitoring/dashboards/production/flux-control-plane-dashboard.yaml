@@ -56,7 +56,7 @@ data:
       "panels": [
         {
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -106,7 +106,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(go_info{namespace=\"$namespace\",pod=~\".*-controller-.*\"})",
               "interval": "",
@@ -119,7 +119,7 @@ data:
         },
         {
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -172,7 +172,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "max(workqueue_longest_running_processor_seconds{namespace=\"$namespace\",pod=~\".*-controller-.*\"})",
               "hide": false,
@@ -186,7 +186,7 @@ data:
         },
         {
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -237,7 +237,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(go_memstats_alloc_bytes{namespace=\"$namespace\",pod=~\".*-controller-.*\"})",
               "interval": "",
@@ -250,7 +250,7 @@ data:
         },
         {
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -302,7 +302,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(rate(rest_client_requests_total{namespace=\"$namespace\",pod=~\".*-controller-.*\"}[1m]))",
               "interval": "",
@@ -315,7 +315,7 @@ data:
         },
         {
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -397,7 +397,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(rate(rest_client_requests_total{namespace=\"$namespace\"}[1m]))",
               "hide": false,
@@ -407,7 +407,7 @@ data:
             },
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(rate(rest_client_requests_total{namespace=\"$namespace\",code!~\"2..\"}[1m]))",
               "hide": false,
@@ -422,7 +422,7 @@ data:
         {
           "collapsed": false,
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "gridPos": {
             "h": 1,
@@ -435,7 +435,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "refId": "A"
             }
@@ -445,7 +445,7 @@ data:
         },
         {
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -526,7 +526,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "rate(process_cpu_seconds_total{namespace=\"$namespace\",pod=~\".*-controller-.*\"}[1m])",
               "interval": "",
@@ -539,7 +539,7 @@ data:
         },
         {
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -621,7 +621,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(container_memory_working_set_bytes{namespace=\"$namespace\",container!=\"POD\",container!=\"\",pod=~\".*-controller-.*\"}) by (pod)",
               "hide": false,
@@ -636,7 +636,7 @@ data:
         {
           "collapsed": false,
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "gridPos": {
             "h": 1,
@@ -649,7 +649,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "refId": "A"
             }
@@ -659,7 +659,7 @@ data:
         },
         {
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -740,7 +740,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "workqueue_longest_running_processor_seconds{name=\"kustomization\"}",
               "hide": false,
@@ -754,7 +754,7 @@ data:
         },
         {
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -836,7 +836,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(increase(controller_runtime_reconcile_total{controller=\"kustomization\",result!=\"error\"}[1m])) by (controller)",
               "format": "time_series",
@@ -846,7 +846,7 @@ data:
             },
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(increase(controller_runtime_reconcile_total{controller=\"kustomization\",result=\"error\"}[1m])) by (controller)",
               "format": "time_series",
@@ -861,7 +861,7 @@ data:
         {
           "collapsed": false,
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "gridPos": {
             "h": 1,
@@ -874,7 +874,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "refId": "A"
             }
@@ -884,7 +884,7 @@ data:
         },
         {
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -966,7 +966,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(increase(controller_runtime_reconcile_total{controller=\"gitrepository\",result!=\"error\"}[1m]))",
               "format": "time_series",
@@ -976,7 +976,7 @@ data:
             },
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(increase(controller_runtime_reconcile_total{controller=\"gitrepository\",result=\"error\"}[1m]))",
               "format": "time_series",
@@ -990,7 +990,7 @@ data:
         },
         {
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -1072,7 +1072,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(increase(controller_runtime_reconcile_total{controller=\"ocirepository\",result!=\"error\"}[1m]))",
               "format": "time_series",
@@ -1082,7 +1082,7 @@ data:
             },
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(increase(controller_runtime_reconcile_total{controller=\"ocirepository\",result=\"error\"}[1m]))",
               "format": "time_series",
@@ -1096,7 +1096,7 @@ data:
         },
         {
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -1178,7 +1178,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(increase(controller_runtime_reconcile_total{controller=\"helmrepository\",result!=\"error\"}[1m]))",
               "format": "time_series",
@@ -1188,7 +1188,7 @@ data:
             },
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(increase(controller_runtime_reconcile_total{controller=\"helmrepository\",result=\"error\"}[1m]))",
               "format": "time_series",
@@ -1202,7 +1202,7 @@ data:
         },
         {
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -1284,7 +1284,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(increase(controller_runtime_reconcile_total{controller=\"bucket\",result!=\"error\"}[1m]))",
               "format": "time_series",
@@ -1294,7 +1294,7 @@ data:
             },
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(increase(controller_runtime_reconcile_total{controller=\"bucket\",result=\"error\"}[1m]))",
               "format": "time_series",
@@ -1309,7 +1309,7 @@ data:
         {
           "collapsed": false,
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "gridPos": {
             "h": 1,
@@ -1322,7 +1322,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "refId": "A"
             }
@@ -1332,7 +1332,7 @@ data:
         },
         {
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -1413,7 +1413,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "histogram_quantile(0.50, sum(rate(controller_runtime_reconcile_time_seconds_bucket{controller=\"helmrelease\"}[5m])) by (le))",
               "hide": true,
@@ -1423,7 +1423,7 @@ data:
             },
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "histogram_quantile(0.90, sum(rate(controller_runtime_reconcile_time_seconds_bucket{controller=\"helmrelease\"}[5m])) by (le))",
               "hide": true,
@@ -1433,7 +1433,7 @@ data:
             },
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "histogram_quantile(0.99, sum(rate(controller_runtime_reconcile_time_seconds_bucket{controller=\"helmrelease\"}[5m])) by (le))",
               "hide": false,
@@ -1447,7 +1447,7 @@ data:
         },
         {
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -1529,7 +1529,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(increase(controller_runtime_reconcile_total{controller=\"helmrelease\",result!=\"error\"}[1m])) by (controller)",
               "format": "time_series",
@@ -1539,7 +1539,7 @@ data:
             },
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(increase(controller_runtime_reconcile_total{controller=\"helmrelease\",result=\"error\"}[1m])) by (controller)",
               "format": "time_series",
@@ -1553,7 +1553,7 @@ data:
         },
         {
           "datasource": {
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -1635,7 +1635,7 @@ data:
           "targets": [
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(increase(controller_runtime_reconcile_total{controller=\"helmchart\",result!=\"error\"}[1m])) by (controller)",
               "format": "time_series",
@@ -1645,7 +1645,7 @@ data:
             },
             {
               "datasource": {
-                "uid": "${DS_PROMETHEUS}"
+                "uid": "${datasource}"
               },
               "expr": "sum(increase(controller_runtime_reconcile_total{controller=\"helmchart\",result=\"error\"}[1m])) by (controller)",
               "format": "time_series",
@@ -1675,7 +1675,7 @@ data:
             "hide": 2,
             "includeAll": false,
             "multi": false,
-            "name": "DS_PROMETHEUS",
+            "name": "datasource",
             "options": [],
             "query": "prometheus",
             "refresh": 1,
@@ -1691,7 +1691,7 @@ data:
             },
             "datasource": {
               "type": "prometheus",
-              "uid": "${DS_PROMETHEUS}"
+              "uid": "${datasource}"
             },
             "definition": "workqueue_work_duration_seconds_count",
             "hide": 0,
