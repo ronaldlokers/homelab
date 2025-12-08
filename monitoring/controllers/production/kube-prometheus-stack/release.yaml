@@ -28,6 +28,7 @@ spec:
   values:
     prometheus:
       prometheusSpec:
+        # Allow ServiceMonitors from any namespace
         serviceMonitorNamespaceSelector:
           any: true
 
@@ -36,6 +37,17 @@ spec:
 
         # Accept ALL ServiceMonitors (empty selector)
         serviceMonitorSelector: {}
+
+        # Allow PodMonitors from any namespace
+        podMonitorNamespaceSelector:
+          any: true
+
+        # Allow ANY PodMonitor (ignore Helm 'release=' label)
+        podMonitorSelectorNilUsesHelmValues: false
+
+        # Accept ALL PodMonitors (empty selector)
+        podMonitorSelector: {}
+
         useEndpointSlices: true
 
       ingress:

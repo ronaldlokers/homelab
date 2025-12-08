@@ -48,7 +48,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -118,7 +118,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -184,7 +184,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -254,7 +254,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -318,7 +318,7 @@ data:
           "type": "stat"
         },
         {
-          "datasource": "${DS_PROMETHEUS}",
+          "datasource": "${datasource}",
           "description": "",
           "fieldConfig": {
             "defaults": {
@@ -381,7 +381,7 @@ data:
           "type": "bargauge"
         },
         {
-          "datasource": "${DS_PROMETHEUS}",
+          "datasource": "${datasource}",
           "description": "",
           "fieldConfig": {
             "defaults": {
@@ -445,7 +445,7 @@ data:
         },
         {
           "collapsed": false,
-          "datasource": "${DS_PROMETHEUS}",
+          "datasource": "${datasource}",
           "gridPos": {
             "h": 1,
             "w": 24,
@@ -460,7 +460,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -636,7 +636,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -834,7 +834,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "description": "",
           "fieldConfig": {
@@ -993,7 +993,7 @@ data:
         },
         {
           "collapsed": false,
-          "datasource": "${DS_PROMETHEUS}",
+          "datasource": "${datasource}",
           "gridPos": {
             "h": 1,
             "w": 24,
@@ -1006,7 +1006,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": "${DS_PROMETHEUS}",
+          "datasource": "${datasource}",
           "description": "",
           "fieldConfig": {
             "defaults": {
@@ -1138,7 +1138,7 @@ data:
           "type": "timeseries"
         },
         {
-          "datasource": "${DS_PROMETHEUS}",
+          "datasource": "${datasource}",
           "description": "",
           "fieldConfig": {
             "defaults": {
@@ -1291,7 +1291,7 @@ data:
             },
             "datasource": {
               "type": "prometheus",
-              "uid": "$DS_PROMETHEUS"
+              "uid": "${datasource}"
             },
             "definition": "label_values(gotk_resource_info, exported_namespace)",
             "hide": 0,
@@ -1325,7 +1325,7 @@ data:
             },
             "datasource": {
               "type": "prometheus",
-              "uid": "$DS_PROMETHEUS"
+              "uid": "${datasource}"
             },
             "definition": "label_values(gotk_resource_info,exported_namespace)",
             "hide": 0,
@@ -1357,7 +1357,7 @@ data:
             "includeAll": false,
             "label": "Datasource",
             "multi": false,
-            "name": "DS_PROMETHEUS",
+            "name": "datasource",
             "options": [],
             "query": "prometheus",
             "refresh": 1,
