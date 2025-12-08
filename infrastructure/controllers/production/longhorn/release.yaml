@@ -26,7 +26,8 @@ spec:
       replicaSoftAntiAffinity: false
       replicaAutoBalance: "least-effort"
       defaultDataPath: /mnt/longhorn
-      backupTarget: "nfs://10.0.40.10/mnt/bulkpool/longhorn-backups"
+      backupTarget: "s3://longhorn-backups@us-east-1/"
+      backupTargetCredentialSecret: "longhorn-s3-secret"
     # Configure default StorageClass with 3 replicas
     persistence:
       defaultClass: true
