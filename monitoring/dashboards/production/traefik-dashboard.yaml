@@ -514,7 +514,7 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(15,\n    label_replace( \n        traefik_service_request_duration_seconds_sum{namespace=~\"$namespace\",service=~\"$service.*\",protocol=\"http\"} / \n          traefik_service_request_duration_seconds_count{namespace=~\"$namespace\",service=~\"$service.*\",protocol=\"http\"},\n        \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\")\n)\n\n",
+              "expr": "topk(15,\n  sum by (namespace, service, method, code) (\n    label_replace( \n        traefik_service_request_duration_seconds_sum{namespace=~\"$namespace\",service=~\"$service.*\",protocol=\"http\"} / \n          traefik_service_request_duration_seconds_count{namespace=~\"$namespace\",service=~\"$service.*\",protocol=\"http\"},\n        \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\")\n  )\n)\n",
               "legendFormat": "{{namespace}} {{method}}[{{code}}] on {{service}}",
               "range": true,
               "refId": "A"
@@ -613,7 +613,7 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(15,\n    label_replace(\n        sum by (namespace,service,code) \n          (rate(traefik_service_requests_total{namespace=~\"$namespace\",service=~\"$service.*\",protocol=\"http\"}[5m])) > 0,\n        \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\")\n)",
+              "expr": "topk(15,\n  sum by (namespace,service,code) (\n    label_replace(\n        sum by (namespace,service,code) \n          (rate(traefik_service_requests_total{namespace=~\"$namespace\",service=~\"$service.*\",protocol=\"http\"}[5m])) > 0,\n        \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\")\n  )\n)",
               "legendFormat": "{{namespace}} [{{code}}] on {{service}}",
               "range": true,
               "refId": "A"
@@ -717,7 +717,7 @@ data:
                     "uid": "${datasource}"
                   },
                   "editorMode": "code",
-                  "expr": "label_replace(\n  1 - (sum by (service,namespace)\n    (rate(traefik_service_request_duration_seconds_bucket{le=\"1.2\",namespace=~\"$namespace\",service=~\"$service.*\"}[5m])) / sum by (service,namespace) \n    (rate(traefik_service_request_duration_seconds_count{namespace=~\"$namespace\",service=~\"$service.*\"}[5m]))\n  ) > 0,\n  \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\"\n)",
+                  "expr": "sum by (namespace,service) (\n  label_replace(\n    1 - (sum by (service,namespace)\n      (rate(traefik_service_request_duration_seconds_bucket{le=\"1.2\",namespace=~\"$namespace\",service=~\"$service.*\"}[5m])) / sum by (service,namespace) \n      (rate(traefik_service_request_duration_seconds_count{namespace=~\"$namespace\",service=~\"$service.*\"}[5m]))\n    ) > 0,\n    \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\"\n  )\n)",
                   "legendFormat": "{{namespace}} on {{service}}",
                   "range": true,
                   "refId": "A"
@@ -811,7 +811,7 @@ data:
                     "uid": "${datasource}"
                   },
                   "editorMode": "code",
-                  "expr": "label_replace(\n  1 - (sum by (service,namespace)\n    (rate(traefik_service_request_duration_seconds_bucket{le=\"0.3\",namespace=~\"$namespace\",service=~\"$service.*\"}[5m])) / sum by (service,namespace) \n    (rate(traefik_service_request_duration_seconds_count{namespace=~\"$namespace\",service=~\"$service.*\"}[5m]))\n  ) > 0,\n  \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\"\n)",
+                  "expr": "sum by (namespace,service) (\n  label_replace(\n    1 - (sum by (service,namespace)\n      (rate(traefik_service_request_duration_seconds_bucket{le=\"0.3\",namespace=~\"$namespace\",service=~\"$service.*\"}[5m])) / sum by (service,namespace) \n      (rate(traefik_service_request_duration_seconds_count{namespace=~\"$namespace\",service=~\"$service.*\"}[5m]))\n    ) > 0,\n    \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\"\n  )\n)",
                   "legendFormat": "{{namespace}} on {{service}}",
                   "range": true,
                   "refId": "A"
@@ -927,7 +927,7 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(15,\n    label_replace(\n        sum by (namespace,service,method,code) \n          (rate(traefik_service_requests_total{namespace=~\"$namespace\",service=~\"$service.*\",code=~\"2..\",protocol=\"http\"}[5m])) > 0,\n        \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\")\n)",
+              "expr": "topk(15,\n  sum by (namespace,service,method,code) (\n    label_replace(\n        sum by (namespace,service,method,code) \n          (rate(traefik_service_requests_total{namespace=~\"$namespace\",service=~\"$service.*\",code=~\"2..\",protocol=\"http\"}[5m])) > 0,\n        \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\")\n  )\n)",
               "legendFormat": "{{namespace}} {{method}}[{{code}}] on {{service}}",
               "range": true,
               "refId": "A"
@@ -1027,7 +1027,7 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(15,\n    label_replace(\n        sum by (namespace,service,method,code) \n          (rate(traefik_service_requests_total{namespace=~\"$namespace\",service=~\"$service.*\",code=~\"5..\",protocol=\"http\"}[5m])) > 0,\n        \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\")\n)",
+              "expr": "topk(15,\n  sum by (namespace,service,method,code) (\n    label_replace(\n        sum by (namespace,service,method,code) \n          (rate(traefik_service_requests_total{namespace=~\"$namespace\",service=~\"$service.*\",code=~\"5..\",protocol=\"http\"}[5m])) > 0,\n        \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\")\n  )\n)",
               "legendFormat": "{{namespace}} {{method}}[{{code}}] on {{service}}",
               "range": true,
               "refId": "A"
@@ -1126,7 +1126,7 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(15,\n    label_replace(\n        sum by (namespace,service,method,code) \n          (rate(traefik_service_requests_total{namespace=~\"$namespace\",service=~\"$service.*\",code!~\"2..|5..\",protocol=\"http\"}[5m])) > 0,\n        \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\")\n)",
+              "expr": "topk(15,\n  sum by (namespace,service,method,code) (\n    label_replace(\n        sum by (namespace,service,method,code) \n          (rate(traefik_service_requests_total{namespace=~\"$namespace\",service=~\"$service.*\",code!~\"2..|5..\",protocol=\"http\"}[5m])) > 0,\n        \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\")\n  )\n)",
               "legendFormat": "{{namespace}} {{method}}[{{code}}] on {{service}}",
               "range": true,
               "refId": "A"
@@ -1225,7 +1225,7 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(15,\n    label_replace(\n        sum by (namespace,service,method) \n          (rate(traefik_service_requests_bytes_total{namespace=~\"$namespace\",service=~\"$service.*\",protocol=\"http\"}[1m])) > 0,\n        \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\")\n)",
+              "expr": "topk(15,\n  sum by (namespace,service,method) (\n    label_replace(\n        sum by (namespace,service,method) \n          (rate(traefik_service_requests_bytes_total{namespace=~\"$namespace\",service=~\"$service.*\",protocol=\"http\"}[1m])) > 0,\n        \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\")\n  )\n)",
               "legendFormat": "{{namespace}} {{method}} on {{service}}",
               "range": true,
               "refId": "A"
@@ -1323,7 +1323,7 @@ data:
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "label_replace(\n    sum(traefik_service_requests_total{namespace=~\"$namespace\",service=~\"$service.*\"}) by (namespace,service),\n    \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\")",
+              "expr": "sum by (namespace,service) (\n  label_replace(\n      sum(traefik_service_requests_total{namespace=~\"$namespace\",service=~\"$service.*\"}) by (namespace,service),\n      \"service\", \"$1\", \"service\", \"([^-]+-[^-]+).*\")\n)",
               "legendFormat": "{{namespace}} on {{service}}",
               "range": true,
               "refId": "A"
