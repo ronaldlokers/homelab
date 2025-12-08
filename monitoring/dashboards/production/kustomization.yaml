@@ -3,3 +3,9 @@ kind: Kustomization
 resources:
   - longhorn-dashboard.yaml
   - speedtest-dashboard.yaml
+  - traefik-dashboard.yaml
+  - cert-manager-dashboard.yaml
+  - cloudnativepg-dashboard.yaml
+  - metallb-dashboard.yaml
+  - flux-control-plane-dashboard.yaml
+  - flux-cluster-dashboard.yaml
