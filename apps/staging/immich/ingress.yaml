@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: immich
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - secretName: immich-tls
+      hosts:
+        - immich.staging.ronaldlokers.nl
+  rules:
+    - host: immich.staging.ronaldlokers.nl
+      http:
+        paths:
+          - backend:
+              service:
+                name: immich-server
+                port:
+                  number: 3001
+            path: /
+            pathType: Prefix
