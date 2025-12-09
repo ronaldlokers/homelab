@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immich-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: immich-server
+  template:
+    metadata:
+      labels:
+        app: immich-server
+    spec:
+      containers:
+        - name: immich-server
+          image: ghcr.io/immich-app/immich-server:v1.122.3
+          command: ["/bin/sh"]
+          args: ["./start.sh", "immich"]
+          ports:
+            - containerPort: 3001
+          env:
+            - name: DB_HOSTNAME
+              value: "postgres-cluster-rw.database.svc.cluster.local"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_DATABASE_NAME
+              value: "immich"
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: immich-db-user
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: immich-db-user
+                  key: password
+            - name: REDIS_HOSTNAME
+              value: "immich-redis"
+            - name: MACHINE_LEARNING_URL
+              value: "http://immich-machine-learning:3003"
+          volumeMounts:
+            - name: library
+              mountPath: /usr/src/app/upload
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+            requests:
+              cpu: 200m
+              memory: 512Mi
+      volumes:
+        - name: library
+          persistentVolumeClaim:
+            claimName: immich-library
