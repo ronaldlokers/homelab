@@ -1,0 +1,48 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: immich-cluster
+  namespace: database
+spec:
+  instances: 1
+
+  # Use TensorChord's CloudNativePG image with VectorChord extension
+  imageName: 'ghcr.io/tensorchord/cloudnative-vectorchord:17-0.4.3'
+
+  postgresql:
+    # Load VectorChord extension
+    shared_preload_libraries:
+      - vchord.so
+    parameters:
+      max_connections: "100"
+      shared_buffers: "256MB"
+
+  # Bootstrap with Immich-required extensions
+  bootstrap:
+    initdb:
+      postInitApplicationSQL:
+        - CREATE EXTENSION IF NOT EXISTS vchord CASCADE
+        - CREATE EXTENSION IF NOT EXISTS cube
+        - CREATE EXTENSION IF NOT EXISTS earthdistance
+
+  storage:
+    size: 20Gi
+    storageClass: local-path
+
+  backup:
+    retentionPolicy: "14d"
+    barmanObjectStore:
+      destinationPath: "s3://homelab-postgres-backups/staging/immich/"
+      endpointURL: "https://s3.eu-central-003.backblazeb2.com"
+      s3Credentials:
+        accessKeyId:
+          name: b2-credentials
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: b2-credentials
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+        jobs: 2

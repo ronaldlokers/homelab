@@ -5,6 +5,6 @@ metadata:
   namespace: database
 spec:
   cluster:
-    name: postgres-cluster
+    name: immich-cluster
   name: immich
-  owner: app
+  owner: immich
