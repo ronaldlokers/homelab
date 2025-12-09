@@ -7,4 +7,4 @@ spec:
   cluster:
     name: immich-cluster
   name: immich
-  owner: immich
+  owner: app

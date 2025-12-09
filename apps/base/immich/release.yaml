@@ -30,7 +30,7 @@ spec:
           main:
             env:
               DB_HOSTNAME:
-                value: postgres-cluster-rw.database.svc.cluster.local
+                value: immich-cluster-rw.database.svc.cluster.local
               DB_PORT:
                 value: "5432"
               DB_DATABASE_NAME:
