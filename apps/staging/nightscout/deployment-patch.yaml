@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nightscout
-  namespace: nightscout
 spec:
   template:
     spec:
