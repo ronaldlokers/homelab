@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: immich-model-cache
-spec:
-  storageClassName: local-path
