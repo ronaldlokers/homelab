@@ -6,3 +6,8 @@ resources:
   - immich-library-pv.yaml
   - ingress.yaml
   - immich-db-secret.yaml
+patches:
+  - path: pvc-patch.yaml
+    target:
+      kind: PersistentVolumeClaim
+      name: immich-model-cache
