@@ -9,6 +9,9 @@ spec:
   # Use TensorChord's CloudNativePG image with VectorChord extension
   imageName: 'ghcr.io/tensorchord/cloudnative-vectorchord:17-0.4.3'
 
+  # Enable superuser access for extension management
+  enableSuperuserAccess: true
+
   postgresql:
     # Load VectorChord extension
     shared_preload_libraries:
