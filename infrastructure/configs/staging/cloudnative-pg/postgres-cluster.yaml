@@ -27,28 +27,11 @@ spec:
       shared_buffers: "256MB"
       cron.database_name: 'postgres'
 
-  # Bootstrap from existing backup to restore data
-  # This ensures the cluster always restores from the latest backup if recreated
+  # Initialize fresh cluster (recovery disabled temporarily after WAL cleanup)
   bootstrap:
-    recovery:
-      source: clusterBackup
-
-  # Reference to backup location in B2
-  externalClusters:
-    - name: clusterBackup
-      barmanObjectStore:
-        destinationPath: "s3://homelab-postgres-backups/staging/"
-        serverName: postgres-cluster
-        endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-        s3Credentials:
-          accessKeyId:
-            name: b2-credentials
-            key: ACCESS_KEY_ID
-          secretAccessKey:
-            name: b2-credentials
-            key: ACCESS_SECRET_KEY
-        wal:
-          maxParallel: 8
+    initdb:
+      database: app
+      owner: app
 
   storage:
     size: 10Gi
