@@ -48,3 +48,4 @@ data:
             icon: flux-cd.png
             href: https://fluxcd.io/
             description: GitOps continuous delivery
+  proxmox.yaml: ""
