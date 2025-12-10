@@ -22,6 +22,16 @@ data:
             href: https://nightscout.ronaldlokers.nl
             description: CGM remote monitoring
 
+    - Photos:
+        - Immich:
+            icon: immich.png
+            href: https://immich.ronaldlokers.nl
+            description: Photo management
+            widget:
+              type: immich
+              url: https://immich.ronaldlokers.nl
+              key: IeLyIEuyA5bSzy2Sfotk7MFTemWg3uOQ7JdimY88
+              version: 2
     - Monitoring:
         - Grafana:
             icon: grafana.png
