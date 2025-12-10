@@ -7,7 +7,7 @@ spec:
   instances: 3
 
   # Use DocumentDB-enabled PostgreSQL image for FerretDB v2.x (ARM64-compatible)
-  imageName: 'ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0'
+  imageName: "ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0"
 
   # DocumentDB image uses UID/GID 999
   postgresUID: 999
@@ -25,7 +25,7 @@ spec:
     parameters:
       max_connections: "100"
       shared_buffers: "256MB"
-      cron.database_name: 'postgres'
+      cron.database_name: "postgres"
 
   # Bootstrap from existing backup to restore data
   # This ensures the cluster always restores from the latest backup if recreated
@@ -53,13 +53,6 @@ spec:
   storage:
     size: 10Gi
     storageClass: longhorn
-    pvcTemplate:
-      metadata:
-        labels:
-          recurring-job.longhorn.io/backup-daily: enabled
-          recurring-job.longhorn.io/backup-weekly: enabled
-          recurring-job.longhorn.io/backup-monthly: enabled
-          recurring-job.longhorn.io/snapshot-daily: enabled
 
   backup:
     retentionPolicy: "30d"
