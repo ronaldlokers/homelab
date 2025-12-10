@@ -279,31 +279,24 @@ stringData:
   key: my-value  # Use stringData for plain text
 ```
 
-2. Encrypt with SOPS (set environment variable and specify config):
+2. Encrypt with SOPS
 ```bash
-# For staging secrets
-export SOPS_AGE_KEY_FILE=/path/to/homelab/staging-age.key
-sops --encrypt --config clusters/staging/.sops.yaml path/to/secret.yaml > path/to/secret.yaml.enc
-mv path/to/secret.yaml.enc path/to/secret.yaml
+export AGE_PUBLIC=<public age key>
 
-# For production secrets
-export SOPS_AGE_KEY_FILE=/path/to/homelab/production-age.key
-sops --encrypt --config clusters/production/.sops.yaml path/to/secret.yaml > path/to/secret.yaml.enc
-mv path/to/secret.yaml.enc path/to/secret.yaml
+sops --age=$AGE_PUBLIC --encrypt --encrypted-regex '^(data|stringData)$' --in-place test-secret.yaml
 ```
 
-**Note**: The `--config` flag explicitly specifies which `.sops.yaml` configuration to use.
 
 ### Editing an Encrypted Secret
 
 ```bash
 # For staging
-export SOPS_AGE_KEY_FILE=/path/to/homelab/staging-age.key
-sops --config clusters/staging/.sops.yaml path/to/secret.yaml
+export SOPS_AGE_KEY_FILE=/workspaces/homelab/staging-age.key
+sops path/to/secret.yaml
 
 # For production
-export SOPS_AGE_KEY_FILE=/path/to/homelab/production-age.key
-sops --config clusters/production/.sops.yaml path/to/secret.yaml
+export SOPS_AGE_KEY_FILE=/workspaces/homelab/production-age.key
+sops path/to/secret.yaml
 ```
 
 SOPS will:
@@ -315,31 +308,12 @@ SOPS will:
 
 ```bash
 # For staging
-export SOPS_AGE_KEY_FILE=/path/to/homelab/staging-age.key
-sops --decrypt --config clusters/staging/.sops.yaml path/to/secret.yaml
+export SOPS_AGE_KEY_FILE=/workspaces/homelab/staging-age.key
+sops --decrypt path/to/secret.yaml
 
 # For production
-export SOPS_AGE_KEY_FILE=/path/to/homelab/production-age.key
-sops --decrypt --config clusters/production/.sops.yaml path/to/secret.yaml
-```
-
-### Re-encrypting Secrets with a New Key
-
-If you need to change the encryption key:
-
-1. Update the `.sops.yaml` file with the new public key
-2. Re-encrypt all secrets:
-
-```bash
-# For staging
-export SOPS_AGE_KEY_FILE=/path/to/homelab/staging-age.key
-find . -name "*.yaml" -path "*/staging/*" -exec grep -l "sops:" {} \; | \
-  xargs -I {} sops updatekeys --yes --config clusters/staging/.sops.yaml {}
-
-# For production
-export SOPS_AGE_KEY_FILE=/path/to/homelab/production-age.key
-find . -name "*.yaml" -path "*/production/*" -exec grep -l "sops:" {} \; | \
-  xargs -I {} sops updatekeys --yes --config clusters/production/.sops.yaml {}
+export SOPS_AGE_KEY_FILE=/workspaces/homelab/production-age.key
+sops --decrypt path/to/secret.yaml
 ```
 
 3. Update the `sops-age` secret in the cluster with the new private key
@@ -408,13 +382,13 @@ If you accidentally encrypted a staging secret with the production key (or vice 
 
 1. Decrypt with the correct key (the one it was encrypted with):
 ```bash
-export SOPS_AGE_KEY_FILE=/path/to/homelab/production-age.key  # or staging-age.key
-sops --decrypt --config clusters/production/.sops.yaml path/to/secret.yaml > /tmp/secret-decrypted.yaml
+export SOPS_AGE_KEY_FILE=/workspaces/homelab/production-age.key  # or staging-age.key
+sops --decrypt path/to/secret.yaml > /tmp/secret-decrypted.yaml
 ```
 
 2. Re-encrypt with the correct key (the one it should use):
 ```bash
-export SOPS_AGE_KEY_FILE=/path/to/homelab/staging-age.key  # or production-age.key
-sops --encrypt --config clusters/staging/.sops.yaml /tmp/secret-decrypted.yaml > path/to/secret.yaml
+export SOPS_AGE_KEY_FILE=/workspaces/homelab/staging-age.key  # or production-age.key
+sops --encrypt /tmp/secret-decrypted.yaml > path/to/secret.yaml
 rm /tmp/secret-decrypted.yaml
 ```
