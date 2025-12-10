@@ -10,19 +10,11 @@ data:
             href: https://linkding.ronaldlokers.nl
             description: Bookmark manager
 
-    - Reading:
+    - Media:
         - Commafeed:
             icon: commafeed.png
             href: https://commafeed.ronaldlokers.nl
             description: RSS feed reader
-
-    - Health:
-        - Nightscout:
-            icon: nightscout.png
-            href: https://nightscout.ronaldlokers.nl
-            description: CGM remote monitoring
-
-    - Photos:
         - Immich:
             icon: immich.png
             href: https://immich.ronaldlokers.nl
@@ -32,7 +24,13 @@ data:
               url: https://immich.ronaldlokers.nl
               key: IeLyIEuyA5bSzy2Sfotk7MFTemWg3uOQ7JdimY88
               version: 2
-    - Monitoring:
+
+    - Health:
+        - Nightscout:
+            icon: nightscout.png
+            href: https://nightscout.ronaldlokers.nl
+            description: CGM remote monitoring
+    - DevOps:
         - Grafana:
             icon: grafana.png
             href: https://grafana.ronaldlokers.nl
@@ -50,6 +48,10 @@ data:
               type: speedtest
               url: https://speedtest.ronaldlokers.nl
               version: 1
+        - Flux:
+            icon: flux-cd.png
+            href: https://fluxcd.io/
+            description: GitOps continuous delivery
 
     - Infrastructure:
         - Proxmox:
@@ -79,12 +81,6 @@ data:
               url: https://10.0.1.1
               username: "{{HOMEPAGE_VAR_MIKROTIK_USERNAME}}"
               password: "{{HOMEPAGE_VAR_MIKROTIK_PASSWORD}}"
-
-    - GitOps:
-        - Flux:
-            icon: flux-cd.png
-            href: https://fluxcd.io/
-            description: GitOps continuous delivery
   proxmox.yaml: |
     - gandalf:
         url: https://proxmox.lokilabs.nl
