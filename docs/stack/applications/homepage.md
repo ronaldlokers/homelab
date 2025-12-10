@@ -23,9 +23,20 @@
 
 **Configuration**:
 - Kubernetes cluster mode enabled for monitoring
-- Pre-configured service widgets for Linkding and Grafana
+- Service widgets with live data:
+  - Immich: Library statistics
+  - Grafana: Dashboard monitoring
+  - Speedtest: Network performance (production)
+  - Proxmox: VM monitoring (production)
+  - Mikrotik: Router stats (production)
 - Dark theme with clean header style
 - Custom bookmarks and search integration
+- Organized service categories:
+  - **Bookmarks**: Linkding
+  - **Media**: Commafeed, Immich
+  - **Health**: Nightscout
+  - **DevOps**: Grafana, Flux (+ Speedtest in production)
+  - **Infrastructure**: Proxmox, Longhorn, pgAdmin, Mikrotik (production only)
 
 **Kubernetes Integration**:
 - ClusterRole for reading namespaces, pods, nodes, and ingresses

@@ -27,6 +27,7 @@ This repository contains the complete infrastructure and application configurati
 |---------|---------|------------|
 | **Commafeed** | [commafeed.staging.ronaldlokers.nl](https://commafeed.staging.ronaldlokers.nl) | [commafeed.ronaldlokers.nl](https://commafeed.ronaldlokers.nl) |
 | **Homepage** | [homepage.staging.ronaldlokers.nl](https://homepage.staging.ronaldlokers.nl) | [homepage.ronaldlokers.nl](https://homepage.ronaldlokers.nl) |
+| **Immich** | [immich.staging.ronaldlokers.nl](https://immich.staging.ronaldlokers.nl) | [immich.ronaldlokers.nl](https://immich.ronaldlokers.nl) |
 | **Linkding** | [linkding.staging.ronaldlokers.nl](https://linkding.staging.ronaldlokers.nl) | [linkding.ronaldlokers.nl](https://linkding.ronaldlokers.nl) |
 | **Nightscout** | [nightscout.staging.ronaldlokers.nl](https://nightscout.staging.ronaldlokers.nl) | [nightscout.ronaldlokers.nl](https://nightscout.ronaldlokers.nl) |
 | **Speedtest Tracker** | N/A | [speedtest.ronaldlokers.nl](https://speedtest.ronaldlokers.nl) |
@@ -74,6 +75,7 @@ Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
 - **Applications**:
   - [Commafeed](https://www.commafeed.com/) - Self-hosted RSS reader
   - [Homepage](https://gethomepage.dev/) - Modern application dashboard
+  - [Immich](https://immich.app/) - Self-hosted photo and video management
   - [Linkding](https://github.com/sissbruecker/linkding) - Bookmark manager
   - [Nightscout](https://nightscout.github.io/) - CGM remote monitoring for diabetes management
   - [Speedtest Tracker](https://github.com/alexjustesen/speedtest-tracker) - Internet speed test history with Grafana integration

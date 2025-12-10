@@ -12,6 +12,7 @@ This document provides detailed information about all components running in the 
 - Applications
   - [Commafeed](./applications/commafeed.md)
   - [Homepage](./applications/homepage.md)
+  - [Immich](./applications/immich.md)
   - [Linkding](./applications/linkding.md)
   - [Nightscout](./applications/nightscout.md)
   - [pgAdmin](./applications/pgadmin.md)
@@ -34,6 +35,7 @@ This document provides detailed information about all components running in the 
 | Linkding | ✅ | ✅ | Bookmark manager |
 | Nightscout | ✅ | ✅ | CGM remote monitoring |
 | Commafeed | ✅ | ✅ | RSS feed reader |
+| Immich | ✅ | ✅ | Photo and video management |
 | pgAdmin | ❌ | ✅ | PostgreSQL administration |
 | Speedtest | ❌ | ✅ | Network speed test |
 | kube-prometheus-stack | ✅ | ✅ | Monitoring and observability |
