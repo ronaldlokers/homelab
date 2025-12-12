@@ -6,6 +6,7 @@ resources:
   - immich-library-pv.yaml
   - ingress.yaml
   - immich-db-secret.yaml
+  - hpa.yaml
 patches:
   - path: values-patch.yaml
     target:
