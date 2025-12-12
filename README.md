@@ -86,6 +86,7 @@ Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
 - **[Architecture](docs/architecture.md)** - Repository structure, deployment flow, and networking
 - **[Security](docs/security.md)** - SOPS encryption and secrets management
 - **[Stack Details](docs/stack/README.md)** - Detailed component information
+- **[War Stories](docs/war-stories/README.md)** - Real-world challenges and solutions from building this cluster
 
 ## Key Features
 
