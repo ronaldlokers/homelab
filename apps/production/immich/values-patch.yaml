@@ -17,27 +17,28 @@ spec:
               requests:
                 cpu: 50m
                 memory: 4Gi
-    ingress:
-      main:
-        enabled: true
-        className: traefik
-        annotations:
-          cert-manager.io/cluster-issuer: letsencrypt-production
-          traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
-          nginx.ingress.kubernetes.io/proxy-body-size: "0"
-        hosts:
-          - host: immich.ronaldlokers.nl
-            paths:
-              - path: /
-                pathType: Prefix
-                service:
-                  identifier: main
-                  port: 2283
-        tls:
-          - secretName: immich-tls
-            hosts:
-              - immich.ronaldlokers.nl
-    "machine-learning":
+    server:
+      ingress:
+        main:
+          enabled: true
+          className: traefik
+          annotations:
+            cert-manager.io/cluster-issuer: letsencrypt-production
+            traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
+            nginx.ingress.kubernetes.io/proxy-body-size: "0"
+          hosts:
+            - host: immich.ronaldlokers.nl
+              paths:
+                - path: /
+                  pathType: Prefix
+                  service:
+                    identifier: main
+                    port: 2283
+          tls:
+            - secretName: immich-tls
+              hosts:
+                - immich.ronaldlokers.nl
+    machine-learning:
       persistence:
         cache:
           storageClass: longhorn
