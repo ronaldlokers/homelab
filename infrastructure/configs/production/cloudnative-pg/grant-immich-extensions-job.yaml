@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: grant-immich-extensions
+  namespace: database
+  annotations:
+    # Run this job after the cluster is created
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: grant-extensions
+          image: ghcr.io/tensorchord/cloudnative-vectorchord:17-0.4.3
+          env:
+            - name: PGHOST
+              value: "immich-cluster-rw"
+            - name: PGDATABASE
+              value: "app"
+            - name: PGUSER
+              value: "app"
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: immich-cluster-app
+                  key: password
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              echo "Waiting for PostgreSQL to be ready..."
+              until psql -c "SELECT 1" > /dev/null 2>&1; do
+                sleep 2
+              done
+
+              echo "Creating Immich-required extensions..."
+              psql <<'EOF'
+              -- Create VectorChord extension (idempotent)
+              CREATE EXTENSION IF NOT EXISTS vchord CASCADE;
+
+              -- Create cube extension (required for Immich)
+              CREATE EXTENSION IF NOT EXISTS cube;
+
+              -- Create earthdistance extension (required for Immich geolocation)
+              CREATE EXTENSION IF NOT EXISTS earthdistance;
+
+              SELECT 'Immich extensions created successfully' AS status;
+              EOF
+
+              echo "Extensions configured successfully!"

@@ -12,3 +12,4 @@ resources:
   - nightscout-database.yaml
   - speedtest-database.yaml
   - grant-documentdb-permissions-job.yaml
+  - grant-immich-extensions-job.yaml

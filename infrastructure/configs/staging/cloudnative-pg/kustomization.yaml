@@ -11,3 +11,4 @@ resources:
   - linkding-database.yaml
   - nightscout-database.yaml
   - grant-documentdb-permissions-job.yaml
+  - grant-immich-extensions-job.yaml

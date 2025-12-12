@@ -20,13 +20,28 @@ spec:
       max_connections: "100"
       shared_buffers: "256MB"
 
-  # Bootstrap with Immich-required extensions
+  # Bootstrap from existing backup to restore data
+  # This ensures the cluster always restores from the latest backup if recreated
   bootstrap:
-    initdb:
-      postInitApplicationSQL:
-        - CREATE EXTENSION IF NOT EXISTS vchord CASCADE
-        - CREATE EXTENSION IF NOT EXISTS cube
-        - CREATE EXTENSION IF NOT EXISTS earthdistance
+    recovery:
+      source: clusterBackup
+
+  # Reference to backup location in B2
+  externalClusters:
+    - name: clusterBackup
+      barmanObjectStore:
+        destinationPath: "s3://homelab-postgres-backups/production/immich/"
+        serverName: immich-cluster
+        endpointURL: "https://s3.eu-central-003.backblazeb2.com"
+        s3Credentials:
+          accessKeyId:
+            name: b2-credentials
+            key: ACCESS_KEY_ID
+          secretAccessKey:
+            name: b2-credentials
+            key: ACCESS_SECRET_KEY
+        wal:
+          maxParallel: 8
 
   storage:
     size: 50Gi
