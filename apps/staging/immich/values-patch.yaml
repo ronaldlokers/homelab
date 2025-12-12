@@ -3,7 +3,16 @@ kind: HelmRelease
 metadata:
   name: immich
 spec:
+  chart:
+    spec:
+      version: "0.10.3"
   values:
+    controllers:
+      main:
+        containers:
+          main:
+            image:
+              tag: v2.3.1
     "machine-learning":
       persistence:
         cache:
