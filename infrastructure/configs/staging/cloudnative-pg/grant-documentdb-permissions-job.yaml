@@ -14,7 +14,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: grant-permissions
-          image: postgres:17
+          image: postgres:18
           env:
             - name: PGHOST
               value: "postgres-cluster-rw"
