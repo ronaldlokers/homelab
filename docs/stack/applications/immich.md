@@ -20,7 +20,13 @@
   - **Valkey**: Redis-compatible in-memory cache
 - PostgreSQL database with pgvector/vchord extension for vector search
 - NFS storage for photo library (ReadWriteMany)
-- Longhorn storage for ML cache (production only)
+- Longhorn storage for ML cache (production: ReadWriteMany for horizontal scaling)
+- Helm chart deployment using Flux GitOps
+
+**Version Management**:
+- Chart and image versions managed per cluster
+- Staging can test newer versions before production
+- Base configuration shared, versions in overlay patches
 
 **Access**:
 - **Staging**: https://immich.staging.ronaldlokers.nl
@@ -35,7 +41,26 @@
 **Storage**:
 - **Library Storage**: NFS persistent volume (500Gi) on TrueNAS
   - Configured with `maproot=root` to prevent permission issues
-- **ML Cache**: Longhorn volume for machine learning model cache (production)
+  - ReadWriteMany access mode for multi-pod access
+- **ML Cache**: Longhorn volume for machine learning model cache
+  - Production: ReadWriteMany (10Gi) for horizontal scaling
+  - Staging: ReadWriteOnce (local-path)
+
+**Scaling (Production)**:
+- **HorizontalPodAutoscaler** configured for server and machine-learning components
+- Min replicas: 1, Max replicas: 3
+- CPU target: 50% average utilization
+- Stabilization window: 300 seconds (5 minutes) for scale up/down
+- Resource requests required for HPA metrics:
+  - Server: 50m CPU, 4Gi memory
+  - Machine Learning: 50m CPU, 4Gi memory
+
+**Ingress**:
+- Managed via Helm chart values (not separate Ingress resource)
+- Traefik ingress class
+- Automatic TLS certificates via cert-manager
+- HTTPS redirect middleware
+- Unlimited request body size for photo uploads
 
 **Integration**:
 - Homepage widget displays library statistics

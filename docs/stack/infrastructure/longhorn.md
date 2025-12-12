@@ -11,8 +11,9 @@
 - **instance-manager**: Manages volume replicas
 
 **Storage**:
+- **Hardware**: 512GB NVMe SSD on each Raspberry Pi CM5 node
 - **Default replica count**: 3
-- **Data path**: `/var/lib/longhorn` on each node
+- **Data path**: `/mnt/longhorn` on each node's NVMe SSD
 - **Replication**: Synchronous replication across 3 nodes
 - **Auto-balance**: least-effort strategy
 

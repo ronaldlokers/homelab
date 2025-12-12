@@ -79,6 +79,30 @@ Flux monitors this repository and automatically applies changes in the following
 
 Dependencies are enforced through Kustomization `dependsOn` fields to ensure correct ordering.
 
+## Hardware
+
+### Staging Environment
+
+- **Platform**: Ubuntu Server VM running in Proxmox on MS-01 mini PC
+- **k3d cluster**: 1 server node + 3 agent nodes (containerized)
+- **Storage**: VM disk storage
+
+### Production Environment
+
+- **Platform**: Sipeed NanoCluster with 3× Raspberry Pi CM5 modules
+- **Nodes**: 3× Raspberry Pi CM5 (16GB RAM each)
+- **Storage**: Each node has a dedicated 512GB NVMe SSD for Longhorn storage
+- **Network**: Gigabit Ethernet
+
+**Node Configuration**:
+- **kube-srv-1** (10.0.40.101): Control plane + worker
+- **kube-srv-2** (10.0.40.102): Control plane + worker
+- **kube-srv-3** (10.0.40.103): Control plane + worker
+
+**Operating System**:
+- Debian GNU/Linux 13 (Trixie)
+- Kernel: 6.12.47+rpt-rpi-2712
+
 ## Storage Architecture
 
 ### Staging Environment
@@ -100,6 +124,7 @@ Dependencies are enforced through Kustomization `dependsOn` fields to ensure cor
 
 - **Storage Class**: `longhorn` (default)
 - **Type**: Distributed block storage
+- **Hardware**: 512GB NVMe SSD on each Raspberry Pi node
 - **Replication**: 3 replicas across all three nodes
 - **Management UI**: https://longhorn.ronaldlokers.nl
 
@@ -110,10 +135,11 @@ Dependencies are enforced through Kustomization `dependsOn` fields to ensure cor
 - Survives two-node failure (3 replicas)
 - iSCSI-based block storage
 - Web UI for management
+- High-performance NVMe backend storage
 
 **How it works**:
 1. When a PVC is created, Longhorn creates a volume
-2. Data is replicated to 3 nodes automatically
+2. Data is replicated to 3 nodes automatically (stored on NVMe SSDs)
 3. If a node fails, replicas on other nodes remain available
 4. Applications can continue running during node failures
 5. Replicas automatically rebalance using "least-effort" strategy
@@ -122,7 +148,7 @@ Dependencies are enforced through Kustomization `dependsOn` fields to ensure cor
 - Default replica count: 3
 - Replica anti-affinity: Disabled (allows replicas on same node if needed)
 - Auto-balance: least-effort (balances when convenient)
-- Data path: `/var/lib/longhorn` on each node
+- Data path: `/mnt/longhorn` on each node's NVMe SSD
 
 ## Networking
 

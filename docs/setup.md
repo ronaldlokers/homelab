@@ -54,11 +54,24 @@ The production cluster is a 3-node high-availability cluster with embedded etcd,
 Install required packages on all nodes (kube-srv-1, kube-srv-2, kube-srv-3):
 
 ```bash
-# Install open-iscsi (required for Longhorn storage)
+# Update package lists
 sudo apt update
+
+# Install open-iscsi (required for Longhorn storage)
 sudo apt install -y open-iscsi
 sudo systemctl enable --now iscsid
+
+# Install nfs-common (required for NFS mounts)
+# Note: Debian Trixie does not include this by default
+# Without this, NFS mounts will fail with "mount program didn't pass remote address"
+sudo apt install -y nfs-common
 ```
+
+**Why these packages are needed**:
+- **open-iscsi**: Longhorn uses iSCSI for block storage replication
+- **nfs-common**: Required for mounting NFS shares (e.g., Immich photo library from TrueNAS)
+  - Debian Trixie intentionally excludes this from minimal installs
+  - Provides `mount.nfs` helper and NFS client utilities
 
 ### Install K3s on First Node
 
