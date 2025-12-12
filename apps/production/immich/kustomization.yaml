@@ -4,7 +4,6 @@ namespace: immich
 resources:
   - ../../base/immich
   - immich-library-pv.yaml
-  - ingress.yaml
   - immich-db-secret.yaml
   - hpa.yaml
 patches:

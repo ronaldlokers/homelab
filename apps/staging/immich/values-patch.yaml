@@ -13,6 +13,26 @@ spec:
           main:
             image:
               tag: v2.3.1
+    ingress:
+      main:
+        enabled: true
+        className: traefik
+        annotations:
+          cert-manager.io/cluster-issuer: letsencrypt-staging
+          traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
+          nginx.ingress.kubernetes.io/proxy-body-size: "0"
+        hosts:
+          - host: immich.staging.ronaldlokers.nl
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: main
+                  port: 2283
+        tls:
+          - secretName: immich-tls
+            hosts:
+              - immich.staging.ronaldlokers.nl
     "machine-learning":
       persistence:
         cache:
