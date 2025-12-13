@@ -29,8 +29,7 @@ spec:
     prometheus:
       prometheusSpec:
         # Allow ServiceMonitors from any namespace
-        serviceMonitorNamespaceSelector:
-          any: true
+        serviceMonitorNamespaceSelector: {}
 
         # Allow ANY ServiceMonitor (ignore Helm 'release=' label)
         serviceMonitorSelectorNilUsesHelmValues: false
@@ -39,8 +38,7 @@ spec:
         serviceMonitorSelector: {}
 
         # Allow PodMonitors from any namespace
-        podMonitorNamespaceSelector:
-          any: true
+        podMonitorNamespaceSelector: {}
 
         # Allow ANY PodMonitor (ignore Helm 'release=' label)
         podMonitorSelectorNilUsesHelmValues: false
