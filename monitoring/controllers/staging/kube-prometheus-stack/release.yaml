@@ -43,3 +43,11 @@ spec:
           - secretName: grafana-tls
             hosts:
               - grafana.staging.ronaldlokers.nl
+      additionalDataSources:
+        - name: Loki
+          type: loki
+          uid: loki-staging
+          access: proxy
+          url: http://loki-gateway.monitoring.svc.cluster.local:80
+          isDefault: false
+          editable: false
