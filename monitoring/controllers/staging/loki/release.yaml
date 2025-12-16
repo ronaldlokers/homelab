@@ -46,11 +46,11 @@ spec:
     deploymentMode: SimpleScalable
 
     backend:
-      replicas: 1
+      replicas: 3
     read:
-      replicas: 1
+      replicas: 3
     write:
-      replicas: 1
+      replicas: 3
 
     # Enable minio for storage
     minio:
