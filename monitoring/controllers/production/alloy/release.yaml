@@ -1,0 +1,34 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: alloy
+  namespace: monitoring
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: alloy
+      version: "1.5.0"
+      sourceRef:
+        kind: HelmRepository
+        name: alloy
+        namespace: monitoring
+      interval: 12h
+  install:
+    crds: Create
+  upgrade:
+    crds: CreateReplace
+  driftDetection:
+    mode: enabled
+  values:
+    alloy:
+      clustering:
+        enabled: true
+      configMap:
+        create: false
+        name: alloy-config
+        key: config.alloy
+    controller:
+      type: "daemonset"
+    serviceAccount:
+      create: true

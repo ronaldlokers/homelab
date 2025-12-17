@@ -90,3 +90,11 @@ spec:
               editable: true
               options:
                 path: /var/lib/grafana/dashboards/default
+      additionalDataSources:
+        - name: Loki
+          type: loki
+          uid: loki-production
+          access: proxy
+          url: http://loki-gateway.monitoring.svc.cluster.local:80
+          isDefault: false
+          editable: false
