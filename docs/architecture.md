@@ -399,6 +399,12 @@ Both clusters include the kube-prometheus-stack:
 - **Node Exporter**: Node-level metrics
 - **kube-state-metrics**: Kubernetes object metrics
 
+Staging also includes log aggregation:
+- **Loki**: Log storage and indexing (Simple Scalable Deployment mode)
+- **Grafana Alloy**: Log collection agent (DaemonSet on all nodes)
+
+See [Loki + Alloy documentation](../stack/monitoring/loki-alloy.md) for details.
+
 **ServiceMonitors**:
 - Longhorn metrics (production only)
 - Kubernetes system metrics

@@ -19,6 +19,7 @@ This document provides detailed information about all components running in the 
   - [Speedtest](./applications/speedtest.md)
 - Monitoring
   - [kube-prometheus-stack](./monitoring/kube-prometheus-stack.md)
+  - [Loki + Alloy](./monitoring/loki-alloy.md)
 
 ## Summary
 
@@ -39,6 +40,7 @@ This document provides detailed information about all components running in the 
 | pgAdmin | ❌ | ✅ | PostgreSQL administration |
 | Speedtest | ❌ | ✅ | Network speed test |
 | kube-prometheus-stack | ✅ | ✅ | Monitoring and observability |
+| Loki + Alloy | ✅ | ❌ | Log aggregation and querying |
 
 ## Resource Usage
 

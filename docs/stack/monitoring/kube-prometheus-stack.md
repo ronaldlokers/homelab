@@ -32,6 +32,7 @@ Dashboards and visualization.
 - Custom Longhorn dashboard (production)
 - Data source auto-configuration
 - Dashboard provisioning
+- Loki data source for log querying (see [Loki + Alloy](./loki-alloy.md))
 
 **Access**:
 - **Staging**: https://grafana.staging.ronaldlokers.nl

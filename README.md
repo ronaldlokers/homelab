@@ -72,6 +72,7 @@ Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
 - **Storage**: [Longhorn](https://longhorn.io/) - Distributed block storage (production only)
 - **Database**: [CloudNative-PG](https://cloudnative-pg.io/) - PostgreSQL operator with DocumentDB extension for MongoDB compatibility
 - **Monitoring**: [kube-prometheus-stack](https://github.com/prometheus-operator/kube-prometheus) - Prometheus & Grafana
+- **Logging**: [Loki](https://grafana.com/oss/loki/) + [Grafana Alloy](https://grafana.com/oss/alloy/) - Log aggregation and querying (staging)
 - **Applications**:
   - [Commafeed](https://www.commafeed.com/) - Self-hosted RSS reader
   - [Homepage](https://gethomepage.dev/) - Modern application dashboard
