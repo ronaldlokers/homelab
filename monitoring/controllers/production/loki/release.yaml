@@ -56,8 +56,6 @@ spec:
         s3:
           endpoint: http://10.0.40.10:9000
           region: us-east-1
-          secretAccessKey: ${AWS_SECRET_ACCESS_KEY}
-          accessKeyId: ${AWS_ACCESS_KEY_ID}
           s3ForcePathStyle: true
           insecure: true
 
