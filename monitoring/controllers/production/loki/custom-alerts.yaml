@@ -1,0 +1,46 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: loki-custom-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+    app.kubernetes.io/name: loki
+spec:
+  groups:
+    - name: loki_storage_alerts
+      rules:
+        # Alert when Loki fails to flush chunks to S3
+        - alert: LokiS3FlushFailures
+          annotations:
+            summary: "Loki is failing to flush chunks to S3 storage"
+            description: "{{ $labels.job }} has failed to flush {{ $value }} chunks to S3 in the last 5 minutes. Check S3 connectivity to 10.0.40.10:9000 and credentials."
+          expr: |
+            sum(rate(loki_ingester_chunks_flush_failures_total[5m])) by (namespace, job, pod) > 0
+          for: 5m
+          labels:
+            severity: critical
+
+    - name: loki_ingestion_alerts
+      rules:
+        # Alert when Loki stops receiving logs completely
+        - alert: LokiNoIngestion
+          annotations:
+            summary: "Loki has stopped receiving logs"
+            description: "Loki has received no log entries for 10 minutes. Check if Grafana Alloy DaemonSet is running and collecting logs."
+          expr: |
+            sum(rate(loki_distributor_lines_received_total[5m])) == 0
+          for: 10m
+          labels:
+            severity: critical
+
+        # Alert on high rate of discarded log entries
+        - alert: LokiHighDiscardRate
+          annotations:
+            summary: "Loki is discarding a high rate of log entries"
+            description: '{{ $labels.job }} is discarding {{ printf "%.2f" $value }} samples/second. Check for validation failures or configuration issues.'
+          expr: |
+            sum(rate(loki_write_failures_discarded_total[5m])) by (namespace, job) > 1
+          for: 10m
+          labels:
+            severity: warning

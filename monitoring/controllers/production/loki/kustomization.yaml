@@ -5,3 +5,4 @@ resources:
   - ../../base/loki/
   - release.yaml
   - s3-secret.yaml
+  - custom-alerts.yaml
