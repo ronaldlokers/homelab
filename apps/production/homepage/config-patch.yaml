@@ -40,6 +40,10 @@ data:
               url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local:80
               username: "{{HOMEPAGE_VAR_GRAFANA_USER}}"
               password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
+        - Prometheus:
+            icon: prometheus.png
+            href: https://prometheus.ronaldlokers.nl
+            description: Metrics collection and storage
         - Speedtest:
             icon: speedtest-tracker.png
             href: https://speedtest.ronaldlokers.nl
@@ -64,6 +68,10 @@ data:
               url: https://proxmox.lokilabs.nl
               username: "{{HOMEPAGE_VAR_PROXMOX_TOKEN}}"
               password: "{{HOMEPAGE_VAR_PROXMOX_SECRET}}"
+        - TrueNAS:
+            icon: truenas.png
+            href: https://truenas.ronaldlokers.nl
+            description: Network-attached storage
         - Longhorn:
             icon: longhorn.png
             href: https://longhorn.ronaldlokers.nl
