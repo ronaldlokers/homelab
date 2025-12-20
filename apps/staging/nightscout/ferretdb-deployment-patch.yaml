@@ -15,3 +15,27 @@ spec:
                 secretKeyRef:
                   name: ferretdb-url-secret
                   key: FERRETDB_POSTGRESQL_URL
+          readinessProbe:
+            httpGet:
+              path: /debug/readyz
+              port: 8088
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /debug/livez
+              port: 8088
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /debug/readyz
+              port: 8088
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
