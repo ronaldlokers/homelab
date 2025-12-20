@@ -50,9 +50,12 @@ spec:
               -- Grant DocumentDB admin role to app user (required for FerretDB)
               GRANT documentdb_admin_role TO app;
 
-              -- Grant usage on all documentdb schemas
+              -- Grant usage on all documentdb schemas to app user
               GRANT USAGE ON SCHEMA documentdb_api, documentdb_api_catalog, documentdb_api_internal, documentdb_core, documentdb_data TO app;
               GRANT ALL ON SCHEMA documentdb_api_catalog, documentdb_data TO app;
+
+              -- Grant usage on documentdb schemas to streaming_replica (required for pg_rewind)
+              GRANT USAGE ON SCHEMA documentdb_api, documentdb_api_catalog, documentdb_api_internal, documentdb_core, documentdb_data TO streaming_replica;
 
               -- Grant all privileges on existing objects
               GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA documentdb_api TO app;
