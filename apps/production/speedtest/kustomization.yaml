@@ -4,7 +4,6 @@ namespace: speedtest
 resources:
   - ../../base/speedtest
   - ingress.yaml
-  - speedtest-db-secret.yaml
   - speedtest-env-secret.yaml
 patchesStrategicMerge:
   - deployment-patch.yaml

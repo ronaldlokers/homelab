@@ -31,15 +31,9 @@ spec:
               DB_DATABASE_NAME:
                 value: immich
               DB_USERNAME:
-                valueFrom:
-                  secretKeyRef:
-                    name: immich-db-user
-                    key: username
+                value: "app"
               DB_PASSWORD:
-                valueFrom:
-                  secretKeyRef:
-                    name: immich-db-user
-                    key: password
+                value: ""
 
     # Server component
     server:

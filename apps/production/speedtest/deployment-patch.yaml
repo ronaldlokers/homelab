@@ -23,12 +23,6 @@ spec:
             - name: DB_DATABASE
               value: speedtest
             - name: DB_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: speedtest-db-secret
-                  key: username
+              value: "app"
             - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: speedtest-db-secret
-                  key: password
+              value: ""

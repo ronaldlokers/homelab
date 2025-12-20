@@ -3,10 +3,6 @@ kind: Job
 metadata:
   name: grant-documentdb-permissions
   namespace: database
-  annotations:
-    # Run this job after the cluster is created
-    argocd.argoproj.io/hook: PostSync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   ttlSecondsAfterFinished: 300
   template:
@@ -22,16 +18,6 @@ spec:
               value: "postgres"
             - name: PGUSER
               value: "postgres"
-            - name: PGPASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-cluster-superuser
-                  key: password
-            - name: APP_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-cluster-app
-                  key: password
           command:
             - /bin/bash
             - -c
@@ -88,10 +74,4 @@ spec:
               SELECT 'DocumentDB permissions granted successfully' AS status;
               EOF
 
-              echo "Ensuring app user password matches cluster secret..."
-              # APP_PASSWORD is injected as an environment variable from the secret
-              # Reset the app user password to match the cluster secret
-              # This ensures password consistency after cluster restore from backup
-              psql -c "ALTER USER app WITH ENCRYPTED PASSWORD '${APP_PASSWORD}';"
-
-              echo "Permissions and credentials configured successfully!"
+              echo "Permissions configured successfully!"

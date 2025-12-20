@@ -10,17 +10,8 @@ spec:
         - name: commafeed
           env:
             - name: QUARKUS_DATASOURCE_JDBC_URL
-              valueFrom:
-                secretKeyRef:
-                  name: commafeed-db-secret
-                  key: QUARKUS_DATASOURCE_JDBC_URL
+              value: "jdbc:postgresql://postgres-cluster-rw.database.svc.cluster.local/commafeed"
             - name: QUARKUS_DATASOURCE_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: commafeed-db-secret
-                  key: QUARKUS_DATASOURCE_USERNAME
+              value: "app"
             - name: QUARKUS_DATASOURCE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: commafeed-db-secret
-                  key: QUARKUS_DATASOURCE_PASSWORD
+              value: ""

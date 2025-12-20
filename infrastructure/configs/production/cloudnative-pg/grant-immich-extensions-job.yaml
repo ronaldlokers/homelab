@@ -3,10 +3,6 @@ kind: Job
 metadata:
   name: grant-immich-extensions
   namespace: database
-  annotations:
-    # Run this job after the cluster is created
-    argocd.argoproj.io/hook: PostSync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   ttlSecondsAfterFinished: 300
   template:
@@ -22,11 +18,6 @@ spec:
               value: "app"
             - name: PGUSER
               value: "app"
-            - name: PGPASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: immich-cluster-app
-                  key: password
           command:
             - /bin/bash
             - -c

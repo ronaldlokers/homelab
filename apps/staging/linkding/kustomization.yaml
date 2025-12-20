@@ -4,7 +4,6 @@ namespace: linkding
 resources:
   - ../../base/linkding/
   - linkding-container-env-secret.yaml
-  - linkding-db-secret.yaml
   - ingress.yaml
 patchesStrategicMerge:
   - deployment-postgres-patch.yaml

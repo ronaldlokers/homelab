@@ -26,6 +26,11 @@ spec:
       max_connections: "100"
       shared_buffers: "256MB"
       cron.database_name: 'postgres'
+    # Allow password-less connections from within cluster
+    pg_hba:
+      - host all app all trust
+      - host all streaming_replica all trust
+      - host all postgres all md5
 
   # Initialize fresh cluster (recovery disabled temporarily after WAL cleanup)
   bootstrap:

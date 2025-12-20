@@ -18,15 +18,9 @@ spec:
             - name: LD_DB_DATABASE
               value: "linkding"
             - name: LD_DB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: linkding-db-user
-                  key: username
+              value: "app"
             - name: LD_DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: linkding-db-user
-                  key: password
+              value: ""
           volumeMounts:
             - name: linkding-data
               mountPath: "/etc/linkding/data"

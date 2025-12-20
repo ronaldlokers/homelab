@@ -4,7 +4,6 @@ namespace: commafeed
 resources:
   - ../../base/commafeed/
   - ingress.yaml
-  - commafeed-db-secret.yaml
 patches:
   - path: deployment-patch.yaml
     target:

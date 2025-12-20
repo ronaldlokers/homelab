@@ -19,6 +19,11 @@ spec:
     parameters:
       max_connections: "100"
       shared_buffers: "256MB"
+    # Allow password-less connections from within cluster
+    pg_hba:
+      - host all app all trust
+      - host all streaming_replica all trust
+      - host all postgres all md5
 
   # Bootstrap from existing backup to restore data
   # This ensures the cluster always restores from the latest backup if recreated
