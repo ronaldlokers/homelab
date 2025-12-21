@@ -6,5 +6,6 @@ resources:
   - immich
   - linkding
   - nightscout
+  - ntfy
   - pgadmin
   - speedtest

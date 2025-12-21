@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ntfy-config
+  namespace: ntfy
+data:
+  server.yml: |
+    # ntfy server configuration
+    base-url: https://ntfy.ronaldlokers.nl
+
+    # web push (keys provided via environment variables)
+    web-push-file: /var/cache/ntfy/webpush.db
+    web-push-email-address: ronaldlokers@me.com
+    web-push-expiry-warning-duration: "55d"
+    web-push-expiry-duration: "60d"
+
+    # upstream for IOS notifcations (token provided via environment variable)
+    upstream-base-url: https://ntfy.sh
+
+    # login
+    enable-login: true
+
+    # metrics for prometheus
+    enable-metrics: true

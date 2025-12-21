@@ -4,3 +4,4 @@ namespace: monitoring
 resources:
   - ../../base/kube-prometheus-stack/
   - release.yaml
+  - alertmanager-config.yaml

@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: ntfy-config
+  namespace: monitoring
+spec:
+  route:
+    groupBy: ['alertname', 'cluster', 'service']
+    groupWait: 10s
+    groupInterval: 10s
+    repeatInterval: 12h
+    receiver: 'ntfy'
+  receivers:
+    - name: 'ntfy'
+      webhookConfigs:
+        - url: 'http://ntfy.ntfy.svc.cluster.local/alerts?template=alertmanager'
+          sendResolved: true

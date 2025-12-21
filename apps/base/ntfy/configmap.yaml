@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ntfy-config
+  namespace: ntfy
+data:
+  server.yml: |
+    # ntfy server configuration
+    # Cache settings
+    cache-file: /var/cache/ntfy/cache.db
+    cache-duration: 12h
+
+    # Behind reverse proxy
+    behind-proxy: true
+
+    # Enable web app
+    enable-web-app: true

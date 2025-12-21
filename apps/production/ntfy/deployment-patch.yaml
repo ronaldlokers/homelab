@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ntfy
+  namespace: ntfy
+spec:
+  template:
+    spec:
+      containers:
+        - name: ntfy
+          env:
+            - name: NTFY_WEB_PUSH_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ntfy-secret
+                  key: web-push-public-key
+            - name: NTFY_WEB_PUSH_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ntfy-secret
+                  key: web-push-private-key
+            - name: NTFY_UPSTREAM_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ntfy-secret
+                  key: upstream-access-token
+            - name: NTFY_AUTH_FILE
+              valueFrom:
+                secretKeyRef:
+                  name: ntfy-secret
+                  key: auth-file
+            - name: NTFY_AUTH_DEFAULT_ACCESS
+              valueFrom:
+                secretKeyRef:
+                  name: ntfy-secret
+                  key: auth-default-access
+            - name: NTFY_AUTH_USERS
+              valueFrom:
+                secretKeyRef:
+                  name: ntfy-secret
+                  key: auth-users
+            - name: NTFY_AUTH_ACCESS
+              value: "*:alerts:write-only"

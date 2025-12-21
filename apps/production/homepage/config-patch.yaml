@@ -44,6 +44,10 @@ data:
             icon: prometheus.png
             href: https://prometheus.ronaldlokers.nl
             description: Metrics collection and storage
+        - Ntfy:
+            icon: ntfy.png
+            href: https://ntfy.ronaldlokers.nl
+            description: Push notifications
         - Speedtest:
             icon: speedtest-tracker.png
             href: https://speedtest.ronaldlokers.nl
