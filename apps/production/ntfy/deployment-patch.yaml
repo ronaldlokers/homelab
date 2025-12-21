@@ -40,4 +40,4 @@ spec:
                   name: ntfy-secret
                   key: auth-users
             - name: NTFY_AUTH_ACCESS
-              value: "*:alerts:write-only"
+              value: "*:alerts:write-only,*:deurbel:write-only,*:homeassistant:write-only"
