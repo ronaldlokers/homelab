@@ -19,7 +19,6 @@ spec:
           enabled: true
           className: traefik
           annotations:
-            cert-manager.io/cluster-issuer: letsencrypt-staging
             traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
             nginx.ingress.kubernetes.io/proxy-body-size: "0"
           hosts:
@@ -31,7 +30,7 @@ spec:
                     identifier: main
                     port: 2283
           tls:
-            - secretName: immich-tls
+            - secretName: wildcard-staging-ronaldlokers-nl-tls
               hosts:
                 - immich.staging.ronaldlokers.nl
     machine-learning:

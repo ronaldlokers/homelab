@@ -3,4 +3,5 @@ kind: Kustomization
 resources:
   - cert-manager
   - cloudnative-pg
+  - traefik-default-cert.yaml
   - traefik-https-redirect-middleware.yaml

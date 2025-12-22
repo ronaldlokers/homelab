@@ -4,7 +4,6 @@ metadata:
   name: proxmox
   namespace: external-services
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-production
     traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
 spec:
   ingressClassName: traefik
@@ -20,6 +19,6 @@ spec:
                 port:
                   name: https
   tls:
-    - secretName: proxmox-tls
+    - secretName: wildcard-ronaldlokers-nl-tls
       hosts:
         - proxmox.ronaldlokers.nl

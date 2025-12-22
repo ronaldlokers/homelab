@@ -52,12 +52,11 @@ spec:
         enabled: true
         ingressClassName: traefik
         annotations:
-          cert-manager.io/cluster-issuer: letsencrypt-production
           traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
         hosts:
           - prometheus.ronaldlokers.nl
         tls:
-          - secretName: prometheus-tls
+          - secretName: wildcard-ronaldlokers-nl-tls
             hosts:
               - prometheus.ronaldlokers.nl
     grafana:
@@ -69,12 +68,11 @@ spec:
         enabled: true
         ingressClassName: traefik
         annotations:
-          cert-manager.io/cluster-issuer: letsencrypt-production
           traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
         hosts:
           - grafana.ronaldlokers.nl
         tls:
-          - secretName: grafana-tls
+          - secretName: wildcard-ronaldlokers-nl-tls
             hosts:
               - grafana.ronaldlokers.nl
       # Dashboard providers for automatic dashboard provisioning

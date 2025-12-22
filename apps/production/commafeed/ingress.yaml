@@ -3,7 +3,6 @@ kind: Ingress
 metadata:
   name: commafeed
   annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-production"
     traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
 spec:
   ingressClassName: "traefik"
@@ -21,4 +20,4 @@ spec:
   tls:
     - hosts:
         - commafeed.ronaldlokers.nl
-      secretName: commafeed-tls
+      secretName: wildcard-ronaldlokers-nl-tls

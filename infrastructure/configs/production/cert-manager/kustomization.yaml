@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - cloudflare-api-token-secret.yaml
   - letsencrypt-production.yaml
+  - wildcard-certificate.yaml

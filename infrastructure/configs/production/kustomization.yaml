@@ -5,4 +5,5 @@ resources:
   - cloudnative-pg
   - external-services
   - metallb
+  - traefik-default-cert.yaml
   - traefik-https-redirect-middleware.yaml
