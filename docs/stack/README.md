@@ -15,6 +15,7 @@ This document provides detailed information about all components running in the 
   - [Immich](./applications/immich.md)
   - [Linkding](./applications/linkding.md)
   - [Nightscout](./applications/nightscout.md)
+  - [ntfy](./applications/ntfy.md)
   - [pgAdmin](./applications/pgadmin.md)
   - [Speedtest](./applications/speedtest.md)
 - Monitoring
@@ -37,10 +38,11 @@ This document provides detailed information about all components running in the 
 | Nightscout | ✅ | ✅ | CGM remote monitoring |
 | Commafeed | ✅ | ✅ | RSS feed reader |
 | Immich | ✅ | ✅ | Photo and video management |
+| ntfy | ❌ | ✅ | Notification service |
 | pgAdmin | ❌ | ✅ | PostgreSQL administration |
 | Speedtest | ❌ | ✅ | Network speed test |
 | kube-prometheus-stack | ✅ | ✅ | Monitoring and observability |
-| Loki + Alloy | ✅ | ❌ | Log aggregation and querying |
+| Loki + Alloy | ✅ | ✅ | Log aggregation and querying |
 
 ## Resource Usage
 

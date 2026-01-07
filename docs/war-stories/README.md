@@ -15,6 +15,9 @@ These stories document actual problems, debugging processes, and solutions. They
 - [Longhorn ReadWriteMany Multi-Attach Errors](longhorn-rwx-multi-attach.md) - PVC access mode changes and the recreation challenge
 - [Longhorn S3 Backups Failing with MinIO](longhorn-s3-virtual-hosted-style.md) - Virtual-hosted vs path-style S3 URLs
 - [PostgreSQL Cluster Disaster Recovery Bootstrap Mode](postgres-bootstrap-recovery.md) - Ensuring clusters restore from backup after deletion
+- [Loki Ring Errors: Too Many Unhealthy Instances](loki-replication-factor-ring.md) - Replication factor mismatch in staging environment
+- [Kustomize ConfigMap Hash Suffix Breaking Alloy](kustomize-configmap-hash-suffix.md) - When Kustomize and Helm ConfigMap names don't match
+- [inotify Limits Exhausted in k3d](inotify-limits-k3d.md) - "Too many open files" errors in Docker-based clusters
 
 ### Applications
 
@@ -32,6 +35,11 @@ These stories document actual problems, debugging processes, and solutions. They
 7. **S3-compatible storage isn't always compatible** - MinIO uses path-style URLs by default, AWS uses virtual-hosted-style
 8. **Bootstrap mode determines disaster recovery behavior** - PostgreSQL clusters should use recovery mode in production to restore from backups after deletion
 9. **Test your disaster recovery process** - Don't wait for an accident to find out if your backups actually restore
+10. **Replication factor ≠ replica count** - Loki's replication_factor controls data copies, not component instances
+11. **Kustomize and Helm need coordination** - ConfigMap hash suffixes break Helm's static name references
+12. **k3d shares inotify limits across all containers** - Default Linux limits are too low for Docker-based Kubernetes
+13. **"Too many open files" is often about inotify watches** - Not file descriptors, check `/proc/sys/fs/inotify/`
+14. **Staging doesn't need production HA** - Simpler configurations (replication_factor: 1) make debugging easier
 
 ## Contributing Your Own War Stories
 

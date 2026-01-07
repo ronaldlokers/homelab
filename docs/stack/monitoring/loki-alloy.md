@@ -24,12 +24,14 @@ Complete log aggregation and querying for Kubernetes.
 - **Gateway**: HTTP gateway (NGINX)
 
 **Storage**:
-- **Staging**: MinIO (S3-compatible) running on local-path PVCs
-- **Production**: TBD (will use external S3 or MinIO cluster on Longhorn)
+- **Staging**: Embedded MinIO (S3-compatible) running on local-path PVCs
+- **Production**: External MinIO on NAS (http://10.0.40.10:9000), bucket `loki-production`
 
 **Schema**: TSDB (v13) for efficient log indexing
 
 ### Configuration
+
+#### Staging
 
 **Location**: `monitoring/controllers/staging/loki/release.yaml`
 
@@ -54,19 +56,70 @@ loki:
     delete_request_store: s3
 ```
 
-**Replica Counts** (Staging):
+**Replica Counts**:
 - Backend: 3
 - Read: 3
 - Write: 3
 
-**Why 3 replicas in staging?**
+**Why 3 replicas?**
 - Loki's hash ring requires multiple instances for proper operation
 - SSD mode works best with 3+ replicas per component
-- For production, consider increasing based on log volume
+
+#### Production
+
+**Location**: `monitoring/controllers/production/loki/release.yaml`
+
+**Key Differences from Staging**:
+```yaml
+loki:
+  commonConfig:
+    replication_factor: 2  # HA with 2 replicas
+  limits_config:
+    retention_period: 30d  # Longer retention for production
+  storage:
+    type: s3
+    bucketNames:
+      chunks: loki-production
+      ruler: loki-production
+      admin: loki-production
+    s3:
+      endpoint: http://10.0.40.10:9000  # External NAS MinIO
+      region: us-east-1
+      s3ForcePathStyle: true
+      insecure: true  # Using HTTP not HTTPS
+
+# Disable embedded MinIO - using external NAS S3
+minio:
+  enabled: false
+
+# S3 credentials from SOPS-encrypted secret
+backend:
+  extraEnvFrom:
+    - secretRef:
+        name: loki-s3-secret
+read:
+  extraEnvFrom:
+    - secretRef:
+        name: loki-s3-secret
+write:
+  extraEnvFrom:
+    - secretRef:
+        name: loki-s3-secret
+```
+
+**Production-Specific Configuration**:
+- **Replication Factor**: 2 (HA mode, can survive 1 node failure)
+- **Retention**: 30 days (vs 7 days in staging)
+- **Storage**: External MinIO on NAS at 10.0.40.10:9000
+- **Bucket**: `loki-production` (dedicated bucket)
+- **Credentials**: SOPS-encrypted secret with AWS access keys
+- **SOPS Decryption**: Enabled in Flux Kustomization via `sops-age` secret
 
 ### Storage Retention
 
-**Retention Period**: 7 days (configurable via `limits_config.retention_period`)
+**Retention Period**:
+- **Staging**: 7 days
+- **Production**: 30 days
 
 **Compaction**:
 - Runs automatically on backend components
@@ -82,7 +135,8 @@ loki:
 
 **Grafana Integration**:
 - Pre-configured as Loki data source in Grafana
-- Access via Grafana Explore: https://grafana.staging.ronaldlokers.nl
+- **Staging**: https://grafana.staging.ronaldlokers.nl
+- **Production**: https://grafana.ronaldlokers.nl
 
 ### Log Labels
 
@@ -105,13 +159,15 @@ Logs are automatically labeled with:
 
 ### Configuration
 
-**Location**: `monitoring/controllers/staging/alloy/config.alloy`
+**Locations**:
+- **Staging**: `monitoring/controllers/staging/alloy/config.alloy`
+- **Production**: `monitoring/controllers/production/alloy/config.alloy`
 
 **Pipeline**:
 1. **Discovery**: Find all pods on the node
 2. **Relabeling**: Extract Kubernetes metadata as labels
 3. **Collection**: Tail pod logs via Kubernetes API
-4. **Processing**: Add cluster label
+4. **Processing**: Add cluster label (staging/production)
 5. **Write**: Forward to Loki write endpoint
 
 **Key Components**:
@@ -137,11 +193,11 @@ loki.source.kubernetes "pod_logs" {
   forward_to = [loki.process.pod_logs.receiver]
 }
 
-// Add cluster label
+// Add cluster label (staging or production depending on environment)
 loki.process "pod_logs" {
   stage.static_labels {
     values = {
-      cluster = "staging"
+      cluster = "staging"  # "production" in production config
     }
   }
   forward_to = [loki.write.default.receiver]
@@ -171,15 +227,48 @@ Alloy automatically adds:
 - `job`: Namespace/container combination
 - `container_runtime`: Detected from pod (containerd/docker/cri-o)
 
+## Loki Canary
+
+Loki includes a **canary** component that continuously writes test logs to verify the logging pipeline is working.
+
+**What it does**:
+- Writes test data (repeated "p" characters) directly to Loki
+- Validates end-to-end logging functionality
+- Runs as a DaemonSet on each node
+
+**Identifying canary logs**:
+```logql
+{app="loki-canary"}
+```
+
+**Note**: Canary logs don't have the `cluster` label because they bypass Alloy and write directly to Loki.
+
+**Filtering out canary logs**:
+```logql
+{cluster="production"} != "pppppp"
+# or
+{cluster="production", app!="loki-canary"}
+```
+
+**Should you disable it?**
+- **Recommended**: Keep it enabled - it's a lightweight health check
+- It validates the entire logging pipeline is functional
+- Minimal storage/performance impact
+
 ## Querying Logs in Grafana
 
-**Access**: https://grafana.staging.ronaldlokers.nl → Explore → Select "Loki" data source
+**Access**:
+- **Staging**: https://grafana.staging.ronaldlokers.nl → Explore → Select "Loki" data source
+- **Production**: https://grafana.ronaldlokers.nl → Explore → Select "Loki" data source
 
 **Example Queries**:
 
 ```logql
 # All logs from staging cluster
 {cluster="staging"}
+
+# All logs from production cluster
+{cluster="production"}
 
 # Logs from monitoring namespace
 {namespace="monitoring"}
@@ -190,8 +279,8 @@ Alloy automatically adds:
 # Logs from all Loki components
 {app="loki"}
 
-# Error logs from any container
-{cluster="staging"} |= "error"
+# Error logs from any container (excluding canary)
+{cluster="production", app!="loki-canary"} |= "error"
 
 # Logs from nightscout excluding health checks
 {namespace="nightscout"} != "health"
@@ -261,6 +350,64 @@ kubectl exec -n monitoring loki-minio-0 -- df -h
 4. Network connectivity? Test from Alloy pod to loki-write service
 5. Check Grafana data source config in kube-prometheus-stack values
 
+### Production-Specific Issues
+
+**SOPS Decryption Failures** (S3 credentials not working):
+
+Check if SOPS decryption is enabled:
+```bash
+kubectl get kustomization monitoring-controllers -n flux-system -o yaml | grep -A 3 decryption
+```
+
+Should show:
+```yaml
+decryption:
+  provider: sops
+  secretRef:
+    name: sops-age
+```
+
+If missing, update `clusters/production/monitoring.yaml` to enable decryption.
+
+**Verify secret is decrypted**:
+```bash
+# Should show plain text credentials, not ENC[...]
+kubectl get secret loki-s3-secret -n monitoring -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d
+```
+
+**inotify Limits Exhausted** ("too many open files"):
+
+Increase limits on all production nodes:
+```bash
+# SSH to each node (kube-srv-1, kube-srv-2, kube-srv-3)
+sudo nano /etc/sysctl.conf
+
+# Add:
+fs.inotify.max_user_watches=524288
+fs.inotify.max_user_instances=512
+
+# Apply:
+sudo sysctl -p
+```
+
+Then restart affected pods:
+```bash
+kubectl delete pods -n monitoring -l app.kubernetes.io/name=loki
+```
+
+**S3 Connection Issues**:
+
+Check S3 credentials are injected:
+```bash
+kubectl get statefulset loki-backend -n monitoring -o yaml | grep -A 5 extraEnvFrom
+```
+
+Test S3 connectivity from a pod:
+```bash
+kubectl run -it --rm debug --image=amazon/aws-cli --restart=Never -- \
+  s3 ls --endpoint-url http://10.0.40.10:9000 s3://loki-production
+```
+
 ## Migration Notes
 
 **From Promtail to Alloy**:
@@ -269,17 +416,30 @@ kubectl exec -n monitoring loki-minio-0 -- df -h
 - More features: service discovery, pipelines, remote write
 - Better performance and resource usage
 
-## Production Considerations
+## Production Implementation
 
-**For production deployment**:
+**Current Production Setup**:
 
-1. **External Storage**: Replace MinIO with S3, Azure Blob, or dedicated MinIO cluster
-2. **Replication Factor**: Increase to 2 or 3 for high availability
-3. **Replica Counts**: Scale based on log volume
-4. **Retention**: Adjust `retention_period` based on compliance requirements
-5. **Multi-tenancy**: Enable `auth_enabled: true` for tenant isolation
-6. **Monitoring**: Add ServiceMonitors for Loki metrics
-7. **Alerting**: Create alerts for log ingestion failures, storage issues
+1. ✅ **External Storage**: NAS MinIO at 10.0.40.10:9000, bucket `loki-production`
+2. ✅ **Replication Factor**: 2 for high availability (can survive 1 node failure)
+3. ✅ **Replica Counts**: 3 replicas per component (backend, read, write)
+4. ✅ **Retention**: 30 days (vs 7 days in staging)
+5. ✅ **Credentials**: SOPS-encrypted secret with AWS access keys
+6. ✅ **SOPS Decryption**: Enabled in Flux Kustomization
+7. ✅ **Cluster Label**: `cluster="production"` for log filtering
+8. ⚠️ **Multi-tenancy**: Disabled (`auth_enabled: false`) - single-tenant mode
+9. ⚠️ **Monitoring**: No ServiceMonitors yet - consider adding
+10. ⚠️ **Alerting**: No alerts configured - consider adding for log ingestion failures
+
+**Future Enhancements**:
+- Add ServiceMonitors for Loki component metrics
+- Configure alerts for:
+  - Log ingestion failures
+  - S3 storage issues
+  - High error rates in logs
+  - Disk space usage on NAS
+- Consider increasing replication factor to 3 for better HA
+- Enable multi-tenancy if multiple teams/applications need isolation
 
 ## References
 

@@ -243,8 +243,9 @@ All resources follow **base/overlay pattern**:
 3. **Immich** - Photo/video management (with external NFS library mount)
 4. **Linkding** - Bookmark manager
 5. **Nightscout** - CGM remote monitoring (uses FerretDB for MongoDB compatibility)
-6. **pgAdmin** - PostgreSQL administration (production only)
-7. **Speedtest Tracker** - Internet speed history with Grafana integration (production only)
+6. **ntfy** - Notification service with web push and iOS support (production only)
+7. **pgAdmin** - PostgreSQL administration (production only)
+8. **Speedtest Tracker** - Internet speed history with Grafana integration (production only)
 
 ### PostgreSQL Architecture
 
