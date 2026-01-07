@@ -1,0 +1,17 @@
+[tools]
+claude-code = "latest"
+flux2 = "latest"
+gh = "latest"
+helm = "latest"
+k9s = "latest"
+kubeconform = "latest"
+kubectl = "latest"
+kubectx = "latest"
+kubens = "latest"
+kustomize = "latest"
+krew = "latest"
+sops = "latest"
+age = "latest"
+
+[env]
+MIOSE_ENV_FILE = ".env"
