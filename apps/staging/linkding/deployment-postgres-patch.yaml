@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
         - name: linkding
-          image: sissbruecker/linkding:1.44.2
+          image: sissbruecker/linkding:1.45.0
           env:
             - name: LD_DB_ENGINE
               value: "postgres"
