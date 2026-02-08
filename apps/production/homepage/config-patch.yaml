@@ -21,7 +21,7 @@ data:
             description: Photo management
             widget:
               type: immich
-              url: https://immich.ronaldlokers.nl
+              url: http://immich-server.immich.svc.cluster.local:3001
               key: IeLyIEuyA5bSzy2Sfotk7MFTemWg3uOQ7JdimY88
               version: 2
 
@@ -54,7 +54,7 @@ data:
             description: Network speed test
             widget:
               type: speedtest
-              url: https://speedtest.ronaldlokers.nl
+              url: http://speedtest.speedtest.svc.cluster.local
               version: 1
         - Flux:
             icon: flux-cd.png
