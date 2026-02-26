@@ -35,6 +35,9 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: kube-system
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: external-services
       ports:
         - protocol: TCP
           port: 80
@@ -46,6 +49,8 @@ spec:
           port: 3000
         - protocol: TCP
           port: 3003
+        - protocol: TCP
+          port: 8006
         - protocol: TCP
           port: 8080
 ---

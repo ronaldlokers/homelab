@@ -69,7 +69,7 @@ data:
             description: Virtualization platform
             widget:
               type: proxmox
-              url: https://proxmox.ronaldlokers.nl
+              url: https://proxmox.external-services.svc.cluster.local:8006
               username: "{{HOMEPAGE_VAR_PROXMOX_TOKEN}}"
               password: "{{HOMEPAGE_VAR_PROXMOX_SECRET}}"
         - TrueNAS:
@@ -95,6 +95,6 @@ data:
               password: "{{HOMEPAGE_VAR_MIKROTIK_PASSWORD}}"
   proxmox.yaml: |
     - gandalf:
-        url: https://proxmox.lokilabs.nl
+        url: https://proxmox.external-services.svc.cluster.local:8006
         token: "{{HOMEPAGE_VAR_PROXMOX_TOKEN}}"
         secret: "{{HOMEPAGE_VAR_PROXMOX_SECRET}}"
