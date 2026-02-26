@@ -56,8 +56,9 @@ spec:
           maxParallel: 8
 
   storage:
-    size: 10Gi
+    size: 20Gi
     storageClass: longhorn
+    resizeInUseVolumes: true
 
   backup:
     retentionPolicy: "30d"
