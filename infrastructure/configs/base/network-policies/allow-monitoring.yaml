@@ -192,6 +192,11 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: grafana
+    # Allow Loki components to communicate with each other (ring membership, replication)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: loki
   egress:
     # Allow Prometheus to scrape other monitoring components
     - to:

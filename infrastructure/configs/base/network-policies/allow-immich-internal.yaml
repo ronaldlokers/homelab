@@ -1,0 +1,51 @@
+---
+# Allow Immich server to connect to Valkey (Redis) within same namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-immich-to-valkey
+  namespace: immich
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: immich-server
+  policyTypes:
+    - Egress
+  egress:
+    # Allow connection to Valkey (Redis)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: immich-valkey
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow connection to machine learning service
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: immich-machine-learning
+      ports:
+        - protocol: TCP
+          port: 3003
+---
+# Allow Immich server to connect to database namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-immich-to-database
+  namespace: immich
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: immich-server
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: database
+      ports:
+        - protocol: TCP
+          port: 5432

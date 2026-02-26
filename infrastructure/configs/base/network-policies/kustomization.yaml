@@ -9,3 +9,5 @@ resources:
   - allow-egress-internet.yaml
   - allow-homepage-to-apps.yaml
   - allow-database-to-k8s-api.yaml
+  - allow-immich-internal.yaml
+  - allow-loki-to-s3.yaml

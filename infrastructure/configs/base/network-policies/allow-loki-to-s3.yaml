@@ -1,0 +1,21 @@
+---
+# Allow Loki to connect to S3 storage (MinIO at 10.0.40.10:9000)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-loki-to-s3
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: write
+  policyTypes:
+    - Egress
+  egress:
+    # Allow access to S3/MinIO storage
+    - to:
+        - ipBlock:
+            cidr: 10.0.40.10/32
+      ports:
+        - protocol: TCP
+          port: 9000
