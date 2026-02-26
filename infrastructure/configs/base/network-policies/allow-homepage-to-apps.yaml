@@ -47,6 +47,8 @@ spec:
         - protocol: TCP
           port: 3003
         - protocol: TCP
+          port: 8006
+        - protocol: TCP
           port: 8080
 ---
 # Allow Immich to accept connections from homepage
