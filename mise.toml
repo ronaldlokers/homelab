@@ -14,4 +14,4 @@ sops = "latest"
 age = "latest"
 
 [env]
-MIOSE_ENV_FILE = ".env"
+MISE_ENV_FILE = ".env"
