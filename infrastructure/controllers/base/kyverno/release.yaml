@@ -1,0 +1,91 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kyverno
+  namespace: kyverno
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: kyverno
+      version: 1.17.1
+      sourceRef:
+        kind: HelmRepository
+        name: kyverno
+        namespace: kyverno
+      interval: 12h
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  values:
+    # Start in audit mode - report violations but don't block
+    admissionController:
+      replicas: 1
+      resources:
+        limits:
+          memory: 512Mi
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      container:
+        resources:
+          limits:
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+
+    backgroundController:
+      replicas: 1
+      resources:
+        limits:
+          memory: 512Mi
+        requests:
+          cpu: 100m
+          memory: 256Mi
+
+    cleanupController:
+      replicas: 1
+      resources:
+        limits:
+          memory: 256Mi
+        requests:
+          cpu: 50m
+          memory: 128Mi
+
+    reportsController:
+      replicas: 1
+      resources:
+        limits:
+          memory: 256Mi
+        requests:
+          cpu: 50m
+          memory: 128Mi
+
+    # Start with validation failure action as audit
+    # Once policies are tested, can change to enforce
+    config:
+      webhooks:
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: NotIn
+                values:
+                  - kube-system
+                  - kube-public
+                  - kube-node-lease
+                  - flux-system
+
+    # Enable policy reports
+    policyReports:
+      enabled: true
+
+    # Grafana dashboard support
+    grafana:
+      enabled: true
