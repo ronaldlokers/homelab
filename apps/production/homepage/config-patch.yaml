@@ -64,12 +64,12 @@ data:
     - Infrastructure:
         - Proxmox:
             icon: proxmox.png
-            href: https://proxmox.lokilabs.nl
+            href: https://proxmox.ronaldlokers.nl
             node: gandalf
             description: Virtualization platform
             widget:
               type: proxmox
-              url: https://proxmox.lokilabs.nl
+              url: https://proxmox.ronaldlokers.nl
               username: "{{HOMEPAGE_VAR_PROXMOX_TOKEN}}"
               password: "{{HOMEPAGE_VAR_PROXMOX_SECRET}}"
         - TrueNAS:
