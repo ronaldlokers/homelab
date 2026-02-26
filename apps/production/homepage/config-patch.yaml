@@ -21,7 +21,7 @@ data:
             description: Photo management
             widget:
               type: immich
-              url: http://immich-server.immich.svc.cluster.local:3001
+              url: http://immich-server.immich.svc.cluster.local:2283
               key: IeLyIEuyA5bSzy2Sfotk7MFTemWg3uOQ7JdimY88
               version: 2
 
