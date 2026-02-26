@@ -59,6 +59,13 @@ A **runbook** is an action-oriented guide for handling specific incidents. Unlik
   - **Severity**: High
   - **Time to Fix**: 5 minutes
 
+### Security & Networking Issues
+
+- [**NetworkPolicy Connectivity Troubleshooting**](networkpolicy-connectivity-troubleshooting.md)
+  - **Symptoms**: Services can't connect after NetworkPolicy implementation
+  - **Severity**: High
+  - **Time to Fix**: 15-30 minutes
+
 ### Monitoring & Logging Issues
 
 - [**Loki Ring Errors: Too Many Unhealthy Instances**](loki-ring-unhealthy-instances.md)
@@ -304,6 +311,6 @@ Other teams' runbooks for inspiration:
 
 ---
 
-**Runbook Count**: 9 complete
-**Last Updated**: 2026-01-07
+**Runbook Count**: 10 complete
+**Last Updated**: 2026-02-26
 **Maintained By**: homelab operations (that's you!)

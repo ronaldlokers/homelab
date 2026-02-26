@@ -17,6 +17,11 @@ The repository follows a structured layout separating concerns by layers:
 │   │   ├── staging/
 │   │   └── production/
 │   └── configs/              # Infrastructure configuration
+│       ├── base/
+│       │   ├── network-policies/  # NetworkPolicy definitions
+│       │   ├── cert-manager/
+│       │   ├── cloudnative-pg/
+│       │   └── traefik/
 │       ├── staging/
 │       └── production/
 ├── apps/                     # Application deployments
@@ -252,6 +257,29 @@ All ingresses use automatic TLS certificates from Let's Encrypt.
 - TXT record removed
 
 This works even for services not publicly accessible, as only DNS needs to be verified.
+
+### NetworkPolicies
+
+Both environments implement **zero-trust network security** using Kubernetes NetworkPolicies:
+
+- **Default-deny**: All traffic blocked unless explicitly allowed
+- **Namespace isolation**: Prevents lateral movement between services
+- **Egress control**: Applications can only reach approved external endpoints
+- **Least privilege**: Each service has minimal required network access
+
+**Implemented policies**:
+- Default deny (all namespaces)
+- DNS resolution (CoreDNS access)
+- Ingress from Traefik
+- Database connectivity (app → PostgreSQL)
+- Monitoring (Prometheus scraping)
+- Internet egress (controlled per namespace)
+- Homepage dashboard access (internal service APIs)
+- Database operator (Kubernetes API access)
+- Immich microservices (internal communication)
+- Loki logging (S3 storage and ring membership)
+
+See [Network Security](network-security.md) for detailed policy documentation.
 
 ## High Availability
 

@@ -75,6 +75,8 @@ Our implementation follows **zero-trust principles**:
 - database
 - monitoring
 
+**Note**: `external-services` namespace contains only Service resources (no pods), so NetworkPolicies are not needed there.
+
 **Impact**: Without this, all pods can communicate freely. With this, all traffic must be explicitly allowed.
 
 ### 2. Allow DNS (`allow-dns.yaml`)
@@ -139,7 +141,8 @@ Our implementation follows **zero-trust principles**:
 
 **Traffic allowed**:
 - All application pods → Internet (0.0.0.0/0) on ports 80, 443
-- **Excludes** private networks: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+- **Excludes** private networks: 172.16.0.0/12, 192.168.0.0/16 (10.0.0.0/8 varies per namespace)
+- **Homepage** → Internet including 10.0.0.0/8 on ports 80, 443, 8006 (for Proxmox at 10.0.1.10)
 - Database namespace → Internet on port 443 (Backblaze B2 backups)
 - Monitoring namespace → Internet on ports 80, 443 (webhooks, external queries)
 
@@ -155,6 +158,80 @@ Our implementation follows **zero-trust principles**:
 - PostgreSQL: Backup to Backblaze B2
 
 **Security note**: Private networks are excluded to prevent pods from reaching internal infrastructure directly.
+
+### 7. Allow Homepage to Apps (`allow-homepage-to-apps.yaml`)
+
+**Purpose**: Enable Homepage dashboard to connect to internal services for status widgets.
+
+**Traffic allowed**:
+- Homepage → Internal services in namespaces:
+  - immich (ports 2283, 3003)
+  - speedtest (port 80)
+  - linkding (port 80)
+  - nightscout (ports 80, 1337)
+  - commafeed (port 80)
+  - ntfy (port 80)
+  - pgadmin (port 80)
+  - kube-system (Traefik)
+  - monitoring (Grafana on ports 80, 3000)
+
+**Why needed**: Homepage widgets query service APIs to show status, metrics, and health information on the dashboard.
+
+**Security note**: Homepage has broader access than typical apps because it's a monitoring dashboard that needs to query many services.
+
+**Special case - Proxmox**: Homepage's Proxmox widget connects via the `allow-internet-egress` policy (port 8006 to 10.0.1.10), not through namespace selectors, because Proxmox is an external service outside the cluster.
+
+### 8. Allow Database to Kubernetes API (`allow-database-to-k8s-api.yaml`)
+
+**Purpose**: Enable CloudNative-PG operator to manage PostgreSQL clusters.
+
+**Traffic allowed**:
+- Database pods → Kubernetes API server (10.43.0.1:443)
+- Database pods → Control plane nodes (10.0.40.101-103:6443)
+
+**Why needed**: CloudNative-PG operator requires API access for:
+- Cluster coordination and leader election
+- Health checks and status updates
+- Backup and recovery operations
+- Pod lifecycle management
+
+**Security note**: Limited to database namespace only. Required for operator functionality.
+
+### 9. Allow Immich Internal Communication (`allow-immich-internal.yaml`)
+
+**Purpose**: Enable Immich microservices to communicate within the same namespace.
+
+**Traffic allowed**:
+- Immich server → Valkey (Redis) on port 6379 (within immich namespace)
+- Immich server → Machine learning service on port 3003 (within immich namespace)
+- Immich server → Database namespace on port 5432
+
+**Ingress to Immich pods**:
+- Valkey accepts connections from Immich server
+
+**Why needed**: Immich is a microservices architecture:
+- **Valkey**: Job queue and session storage
+- **Machine learning**: AI-powered photo recognition
+- **PostgreSQL**: Metadata and user data storage
+
+**Security note**: Pod selectors ensure only specific components can communicate (e.g., server can access valkey, but valkey cannot initiate connections to server).
+
+### 10. Allow Loki to S3 Storage (`allow-loki-to-s3.yaml`)
+
+**Purpose**: Enable Loki write components to store logs in S3-compatible object storage.
+
+**Traffic allowed**:
+- Loki write pods → MinIO/S3 storage (10.0.40.10:9000)
+
+**Ingress within monitoring namespace**:
+- Loki pods ↔ Loki pods (ring membership and replication)
+
+**Why needed**: Loki Simple Scalable Deployment mode requires:
+- **S3 storage**: Persistent log storage beyond cluster lifetime
+- **Ring communication**: Distributed hash ring for pod coordination
+- **Replication**: Multiple write replicas share workload
+
+**Security note**: Only Loki write components need S3 access. Read components fetch from S3 through write components.
 
 ## Traffic Flows
 
@@ -183,10 +260,12 @@ Our implementation follows **zero-trust principles**:
 ### What Traffic is Blocked?
 
 - ❌ App pod → Another app pod in different namespace (lateral movement)
-- ❌ App pod → kube-system (except Traefik ingress response)
-- ❌ App pod → Internal infrastructure (private networks 10.x, 172.16.x, 192.168.x)
-- ❌ Database pod → App pod (only app → database is allowed)
-- ❌ Database pod → Internet (except HTTPS for backups)
+- ❌ App pod → kube-system (except Traefik ingress response and CoreDNS)
+- ❌ App pod → Internal infrastructure without explicit allow (private networks 10.x, 172.16.x, 192.168.x)
+- ❌ Database pod → App pod (only app → database is allowed, not bidirectional)
+- ❌ Database pod → Internet (except HTTPS port 443 for Backblaze B2 backups and Kubernetes API)
+- ❌ Homepage → Services not in allowed namespaces
+- ❌ Immich components → Other namespaces (except database)
 
 ## Adding a New Application
 
@@ -559,5 +638,5 @@ This significantly hardens the cluster against network-based attacks while maint
 
 ---
 
-**Last Updated**: 2026-02-07
+**Last Updated**: 2026-02-26
 **Related Documents**: `docs/security.md`, `docs/architecture.md`

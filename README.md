@@ -86,6 +86,7 @@ Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
 - **[Setup Guide](docs/setup.md)** - How to set up staging and production clusters
 - **[Architecture](docs/architecture.md)** - Repository structure, deployment flow, and networking
 - **[Security](docs/security.md)** - SOPS encryption and secrets management
+- **[Network Security](docs/network-security.md)** - NetworkPolicy implementation and zero-trust architecture
 - **[Stack Details](docs/stack/README.md)** - Detailed component information
 - **[War Stories](docs/war-stories/README.md)** - Real-world challenges and solutions from building this cluster
 
@@ -112,11 +113,13 @@ Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
 - Creates pull requests with changelogs
 - Review and merge to automatically deploy updates
 
-### Security
+### Security & Compliance
 
-- Secrets encrypted with [SOPS](https://github.com/getsops/sops) using [age](https://github.com/FiloSottile/age)
-- Separate encryption keys for staging and production
-- TLS certificates for all services
+- **Zero-Trust Networking**: NetworkPolicies enforce default-deny with explicit allow rules
+- **Namespace Isolation**: Prevents lateral movement between services
+- **Egress Control**: Limits external communication to approved endpoints
+- **TLS Everywhere**: Automatic certificates with Let's Encrypt DNS-01 challenges
+- **Secrets Management**: SOPS encryption with age keys (separate per environment)
 - Private keys stored in Proton Pass (not in Git)
 
 ### Automated Backups

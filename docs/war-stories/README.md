@@ -18,6 +18,7 @@ These stories document actual problems, debugging processes, and solutions. They
 - [Loki Ring Errors: Too Many Unhealthy Instances](loki-replication-factor-ring.md) - Replication factor mismatch in staging environment
 - [Kustomize ConfigMap Hash Suffix Breaking Alloy](kustomize-configmap-hash-suffix.md) - When Kustomize and Helm ConfigMap names don't match
 - [inotify Limits Exhausted in k3d](inotify-limits-k3d.md) - "Too many open files" errors in Docker-based clusters
+- [NetworkPolicy Connectivity Debugging](networkpolicy-connectivity-debugging.md) - Systematic troubleshooting of zero-trust network segmentation issues
 
 ### Applications
 
@@ -40,6 +41,12 @@ These stories document actual problems, debugging processes, and solutions. They
 12. **k3d shares inotify limits across all containers** - Default Linux limits are too low for Docker-based Kubernetes
 13. **"Too many open files" is often about inotify watches** - Not file descriptors, check `/proc/sys/fs/inotify/`
 14. **Staging doesn't need production HA** - Simpler configurations (replication_factor: 1) make debugging easier
+15. **NetworkPolicy structure matters** - Multiple `from` clauses create AND logic, not OR - combine selectors in one list
+16. **Default-deny blocks everything** - Including same-namespace traffic, DNS, and Kubernetes API access
+17. **Verify pod labels before writing NetworkPolicies** - Helm chart labels may differ from documentation
+18. **NetworkPolicies don't apply retroactively** - Restart pods after policy changes to apply new rules
+19. **Operators need Kubernetes API access** - CloudNative-PG and similar operators require egress to 10.43.0.1:443
+20. **Error messages can be misleading** - "Not enough disk space" in PostgreSQL actually meant "can't reach API server"
 
 ## Contributing Your Own War Stories
 
