@@ -11,21 +11,21 @@ spec:
   policyTypes:
     - Egress
   egress:
-    # Allow access to Kubernetes API server
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: default
-          podSelector:
-            matchLabels:
-              component: apiserver
-      ports:
-        - protocol: TCP
-          port: 443
-    # Also allow direct IP access to kubernetes service ClusterIP
+    # Allow access to kubernetes service ClusterIP
     - to:
         - ipBlock:
             cidr: 10.43.0.1/32
       ports:
         - protocol: TCP
           port: 443
+    # Allow access to control plane nodes (kubernetes service endpoints)
+    - to:
+        - ipBlock:
+            cidr: 10.0.40.101/32
+        - ipBlock:
+            cidr: 10.0.40.102/32
+        - ipBlock:
+            cidr: 10.0.40.103/32
+      ports:
+        - protocol: TCP
+          port: 6443
