@@ -8,3 +8,4 @@ resources:
   - allow-monitoring.yaml
   - allow-egress-internet.yaml
   - allow-homepage-to-apps.yaml
+  - allow-database-to-k8s-api.yaml
