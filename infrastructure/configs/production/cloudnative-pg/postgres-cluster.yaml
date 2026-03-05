@@ -33,11 +33,11 @@ spec:
       - host all postgres all md5
 
   # Bootstrap from existing backup to restore data
-  # This ensures the cluster always restores from the latest backup if recreated
-  # TEMPORARILY DISABLED: WAL archive validation failing after cluster deletion
-  # bootstrap:
-  #   recovery:
-  #     source: clusterBackup
+  bootstrap:
+    recovery:
+      source: clusterBackup
+      recoveryTarget:
+        backupID: "20260226T105921"
 
   # Reference to backup location in B2
   externalClusters:
@@ -64,7 +64,7 @@ spec:
   backup:
     retentionPolicy: "30d"
     barmanObjectStore:
-      destinationPath: "s3://homelab-postgres-backups/production/"
+      destinationPath: "s3://homelab-postgres-backups/production-2026-03/"
       endpointURL: "https://s3.eu-central-003.backblazeb2.com"
       s3Credentials:
         accessKeyId:
