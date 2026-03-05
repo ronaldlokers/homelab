@@ -25,11 +25,10 @@ spec:
       - host all streaming_replica all trust
       - host all postgres all md5
 
-  # Bootstrap from existing backup to restore data
-  # This ensures the cluster always restores from the latest backup if recreated
-  bootstrap:
-    recovery:
-      source: clusterBackup
+  # Start fresh without recovery - no backups available
+  # bootstrap:
+  #   recovery:
+  #     source: clusterBackup
 
   # Reference to backup location in B2
   externalClusters:
