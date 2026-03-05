@@ -4,7 +4,7 @@ metadata:
   name: immich-cluster
   namespace: database
 spec:
-  instances: 3
+  instances: 1  # Temporarily scaled down to clean WAL on immich-cluster-1
 
   # Use TensorChord's CloudNativePG image with VectorChord extension
   imageName: 'ghcr.io/tensorchord/cloudnative-vectorchord:17-0.4.3'
