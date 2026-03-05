@@ -25,12 +25,6 @@ spec:
       - host all streaming_replica all trust
       - host all postgres all md5
 
-  # Start fresh - initialize new cluster
-  bootstrap:
-    initdb:
-      database: app
-      owner: app
-
   # Reference to backup location in B2
   externalClusters:
     - name: clusterBackup
