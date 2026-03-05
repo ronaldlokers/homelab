@@ -34,9 +34,10 @@ spec:
 
   # Bootstrap from existing backup to restore data
   # This ensures the cluster always restores from the latest backup if recreated
-  bootstrap:
-    recovery:
-      source: clusterBackup
+  # TEMPORARILY DISABLED: WAL archive validation failing after cluster deletion
+  # bootstrap:
+  #   recovery:
+  #     source: clusterBackup
 
   # Reference to backup location in B2
   externalClusters:
