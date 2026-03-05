@@ -55,7 +55,7 @@ spec:
   backup:
     retentionPolicy: "30d"
     barmanObjectStore:
-      destinationPath: "s3://homelab-postgres-backups/production/immich/"
+      destinationPath: "s3://homelab-postgres-backups/production-2026-03-immich/"
       endpointURL: "https://s3.eu-central-003.backblazeb2.com"
       s3Credentials:
         accessKeyId:
