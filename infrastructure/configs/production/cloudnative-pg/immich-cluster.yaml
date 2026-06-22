@@ -52,20 +52,20 @@ spec:
     size: 50Gi
     storageClass: longhorn
 
-  #backup:
-  #  retentionPolicy: "30d"
-  #  barmanObjectStore:
-  #    destinationPath: "s3://homelab-postgres-backups/production-2026-03-immich/"
-  #    endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-  #    s3Credentials:
-  #      accessKeyId:
-  #        name: b2-credentials
-  #        key: ACCESS_KEY_ID
-  #      secretAccessKey:
-  #        name: b2-credentials
-  #        key: ACCESS_SECRET_KEY
-  #    wal:
-  #      compression: gzip
-  #    data:
-  #      compression: gzip
-  #      jobs: 2
+  backup:
+    retentionPolicy: "7d"
+    barmanObjectStore:
+      destinationPath: "s3://homelab-postgres-backups/production-2026-03-immich/"
+      endpointURL: "https://s3.eu-central-003.backblazeb2.com"
+      s3Credentials:
+        accessKeyId:
+          name: b2-credentials
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: b2-credentials
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+        jobs: 2
