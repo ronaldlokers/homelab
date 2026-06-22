@@ -8,7 +8,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/component: write
+      app.kubernetes.io/name: loki
   policyTypes:
     - Egress
   egress:
