@@ -1,0 +1,51 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cloudnativepg-custom-alerts
+  namespace: database
+  labels:
+    release: kube-prometheus-stack
+    app.kubernetes.io/name: cloudnativepg
+spec:
+  groups:
+    - name: postgres_archiving_alerts
+      rules:
+        # Alert when WAL archiving fails
+        - alert: PostgreSQLWALArchivingFailing
+          annotations:
+            summary: "PostgreSQL WAL archiving is failing on {{ $labels.pod }}"
+            description: "PostgreSQL cluster {{ $labels.cnpg_io_cluster }} has {{ $value }} failed WAL archive attempts. Check B2 connectivity to https://s3.eu-central-003.backblazeb2.com and verify credentials in b2-credentials secret."
+          expr: |
+            cnpg_pg_stat_archiver_failed_count > 0
+          for: 15m
+          labels:
+            severity: critical
+            component: database
+
+    - name: postgres_storage_alerts
+      rules:
+        # Alert when WAL directory is filling up (>70% of PVC)
+        - alert: PostgreSQLWALDirectoryFilling
+          annotations:
+            summary: "PostgreSQL WAL directory is filling up on {{ $labels.pod }}"
+            description: "WAL directory on {{ $labels.pod }} in cluster {{ $labels.cnpg_io_cluster }} is using more than 70% of available space. Current size may indicate archiving delays or failures."
+          expr: |
+            (cnpg_pg_wal_directory_size_bytes / (1024*1024*1024)) > 10
+          for: 10m
+          labels:
+            severity: warning
+            component: database
+
+        # Alert on continuous archiving status
+        - alert: PostgreSQLContinuousArchivingFailed
+          annotations:
+            summary: "PostgreSQL continuous archiving has failed on {{ $labels.cnpg_io_cluster }}"
+            description: "Continuous archiving status is not healthy for cluster {{ $labels.cnpg_io_cluster }}. WAL files may accumulate and fill PVCs. Check operator logs and B2 connectivity."
+          expr: |
+            cnpg_collector_up{cnpg_io_cluster=~"postgres-cluster|immich-cluster"} == 1
+            unless
+            cnpg_collector_last_collection_error{cnpg_io_cluster=~"postgres-cluster|immich-cluster"} == 0
+          for: 20m
+          labels:
+            severity: critical
+            component: database

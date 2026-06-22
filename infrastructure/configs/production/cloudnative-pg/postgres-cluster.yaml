@@ -26,6 +26,7 @@ spec:
       max_connections: "100"
       shared_buffers: "256MB"
       cron.database_name: "postgres"
+      wal_keep_size: "8GB"
     # Allow password-less connections from within cluster
     pg_hba:
       - host all app all trust
@@ -57,7 +58,7 @@ spec:
           maxParallel: 8
 
   storage:
-    size: 20Gi
+    size: 30Gi
     storageClass: longhorn
     resizeInUseVolumes: true
 

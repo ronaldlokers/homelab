@@ -6,6 +6,7 @@ resources:
   - b2-credentials-secret.yaml
   - postgres-cluster.yaml
   - immich-cluster.yaml
+  - postgres-alerts.yaml
   - scheduled-backup.yaml
   - commafeed-database.yaml
   - linkding-database.yaml

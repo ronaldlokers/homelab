@@ -19,6 +19,7 @@ spec:
     parameters:
       max_connections: "100"
       shared_buffers: "256MB"
+      wal_keep_size: "8GB"
     # Allow password-less connections from within cluster
     pg_hba:
       - host all app all trust
