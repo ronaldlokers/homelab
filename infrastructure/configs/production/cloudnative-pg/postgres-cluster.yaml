@@ -40,41 +40,41 @@ spec:
         backupID: "20260226T105921"
 
   # Reference to backup location in B2
-  externalClusters:
-    - name: clusterBackup
-      barmanObjectStore:
-        destinationPath: "s3://homelab-postgres-backups/production/"
-        serverName: postgres-cluster
-        endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-        s3Credentials:
-          accessKeyId:
-            name: b2-credentials
-            key: ACCESS_KEY_ID
-          secretAccessKey:
-            name: b2-credentials
-            key: ACCESS_SECRET_KEY
-        wal:
-          maxParallel: 8
+  # externalClusters:
+  #  - name: clusterBackup
+  #    barmanObjectStore:
+  #      destinationPath: "s3://homelab-postgres-backups/production/"
+  #      serverName: postgres-cluster
+  #      endpointURL: "https://s3.eu-central-003.backblazeb2.com"
+  #      s3Credentials:
+  #        accessKeyId:
+  #          name: b2-credentials
+  #          key: ACCESS_KEY_ID
+  #        secretAccessKey:
+  #          name: b2-credentials
+  #          key: ACCESS_SECRET_KEY
+  #      wal:
+  #        maxParallel: 8
 
   storage:
     size: 20Gi
     storageClass: longhorn
     resizeInUseVolumes: true
 
-  backup:
-    retentionPolicy: "30d"
-    barmanObjectStore:
-      destinationPath: "s3://homelab-postgres-backups/production-2026-03/"
-      endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-      s3Credentials:
-        accessKeyId:
-          name: b2-credentials
-          key: ACCESS_KEY_ID
-        secretAccessKey:
-          name: b2-credentials
-          key: ACCESS_SECRET_KEY
-      wal:
-        compression: gzip
-      data:
-        compression: gzip
-        jobs: 2
+  #backup:
+  #  retentionPolicy: "30d"
+  #  barmanObjectStore:
+  #    destinationPath: "s3://homelab-postgres-backups/production-2026-03/"
+  #    endpointURL: "https://s3.eu-central-003.backblazeb2.com"
+  #    s3Credentials:
+  #      accessKeyId:
+  #        name: b2-credentials
+  #        key: ACCESS_KEY_ID
+  #      secretAccessKey:
+  #        name: b2-credentials
+  #        key: ACCESS_SECRET_KEY
+  #    wal:
+  #      compression: gzip
+  #    data:
+  #      compression: gzip
+  #      jobs: 2

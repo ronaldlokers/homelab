@@ -7,7 +7,7 @@ spec:
   instances: 3
 
   # Use TensorChord's CloudNativePG image with VectorChord extension
-  imageName: 'ghcr.io/tensorchord/cloudnative-vectorchord:17-0.4.3'
+  imageName: "ghcr.io/tensorchord/cloudnative-vectorchord:17-0.4.3"
 
   # Enable superuser access for extension management
   enableSuperuserAccess: true
@@ -32,40 +32,40 @@ spec:
       owner: app
 
   # Reference to backup location in B2
-  externalClusters:
-    - name: clusterBackup
-      barmanObjectStore:
-        destinationPath: "s3://homelab-postgres-backups/production/immich/"
-        serverName: immich-cluster
-        endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-        s3Credentials:
-          accessKeyId:
-            name: b2-credentials
-            key: ACCESS_KEY_ID
-          secretAccessKey:
-            name: b2-credentials
-            key: ACCESS_SECRET_KEY
-        wal:
-          maxParallel: 8
+  #externalClusters:
+  #  - name: clusterBackup
+  #    barmanObjectStore:
+  #      destinationPath: "s3://homelab-postgres-backups/production/immich/"
+  #      serverName: immich-cluster
+  #      endpointURL: "https://s3.eu-central-003.backblazeb2.com"
+  #      s3Credentials:
+  #        accessKeyId:
+  #          name: b2-credentials
+  #          key: ACCESS_KEY_ID
+  #        secretAccessKey:
+  #          name: b2-credentials
+  #          key: ACCESS_SECRET_KEY
+  #      wal:
+  #        maxParallel: 8
 
   storage:
     size: 50Gi
     storageClass: longhorn
 
-  backup:
-    retentionPolicy: "30d"
-    barmanObjectStore:
-      destinationPath: "s3://homelab-postgres-backups/production-2026-03-immich/"
-      endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-      s3Credentials:
-        accessKeyId:
-          name: b2-credentials
-          key: ACCESS_KEY_ID
-        secretAccessKey:
-          name: b2-credentials
-          key: ACCESS_SECRET_KEY
-      wal:
-        compression: gzip
-      data:
-        compression: gzip
-        jobs: 2
+  #backup:
+  #  retentionPolicy: "30d"
+  #  barmanObjectStore:
+  #    destinationPath: "s3://homelab-postgres-backups/production-2026-03-immich/"
+  #    endpointURL: "https://s3.eu-central-003.backblazeb2.com"
+  #    s3Credentials:
+  #      accessKeyId:
+  #        name: b2-credentials
+  #        key: ACCESS_KEY_ID
+  #      secretAccessKey:
+  #        name: b2-credentials
+  #        key: ACCESS_SECRET_KEY
+  #    wal:
+  #      compression: gzip
+  #    data:
+  #      compression: gzip
+  #      jobs: 2
