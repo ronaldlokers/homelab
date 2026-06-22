@@ -12,11 +12,14 @@
 - **Name**: postgres-cluster
 - **Namespace**: database
 - **Instances**: 3 (high availability)
-- **Image**: ghcr.io/ferretdb/postgres-documentdb:17-0.102.0-ferretdb-2.1.0
-- **Storage Size**: 10Gi per instance
+- **Image**: ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0
+- **Storage Size**:
+  - Production: 30Gi per instance
+  - Staging: 10Gi per instance
 - **Storage Class**:
   - Staging: local-path
   - Production: longhorn (replicated)
+- **WAL Retention Limit**: 8GB (prevents unlimited disk growth)
 
 **DocumentDB Extension**:
 The cluster uses PostgreSQL 17 with the DocumentDB extension installed, which provides:
@@ -96,9 +99,12 @@ CloudNative-PG uses Barman for automated backups to Backblaze B2 object storage.
   - Production: Daily at 3 AM
 - **Retention**:
   - Staging: 14 days
-  - Production: 30 days
+  - Production: 7 days (optimized for homelab cost efficiency)
 - **WAL Archiving**: Continuous (enables point-in-time recovery)
 - **Compression**: gzip (both WAL and data)
+- **Backup Paths**:
+  - postgres-cluster: `production-2026-03/`
+  - immich-cluster: `production-2026-03-immich/`
 
 **How Backups Work**:
 1. Scheduled backup runs daily via CronJob
@@ -227,3 +233,82 @@ recoveryTarget:
 - PodMonitor for automatic scraping
 - Integration with Grafana dashboards
 - Backup job status visible in kubectl
+- Custom PrometheusRules for database health alerts
+
+**Custom Monitoring Alerts** (Production):
+
+Three critical alerts monitor database health and prevent failures:
+
+1. **PostgreSQLWALArchivingFailing**
+   - **Trigger**: `cnpg_pg_stat_archiver_failed_count > 0` for 15 minutes
+   - **Severity**: Critical
+   - **Purpose**: Detects when WAL files are failing to archive to Backblaze B2
+   - **Action**: Check B2 connectivity, credentials, and bucket permissions
+
+2. **PostgreSQLWALDirectoryFilling**
+   - **Trigger**: WAL directory size exceeds 10GB for 10 minutes
+   - **Severity**: Warning
+   - **Purpose**: Early warning before disk fills up completely
+   - **Action**: Investigate archiving delays or failures
+
+3. **PostgreSQLContinuousArchivingFailed**
+   - **Trigger**: Continuous archiving status unhealthy for 20 minutes
+   - **Severity**: Critical
+   - **Purpose**: Monitors overall archiving health via CNPG operator metrics
+   - **Action**: Check operator logs and B2 connectivity
+
+These alerts provide early detection of archiving issues before they cause PVC fill-up and database crashes. See [WAL Archiving Failure War Story](/docs/war-stories/postgres-wal-archiving-failure-pvc-fillup.md) for the incident that led to implementing these alerts.
+
+**Checking Alert Status**:
+```bash
+# View all Prometheus rules
+kubectl get prometheusrule -n database
+
+# Check specific alert configuration
+kubectl describe prometheusrule cloudnativepg-custom-alerts -n database
+
+# View active alerts in Prometheus UI or Grafana
+```
+
+**Resilience Features**:
+
+To prevent WAL archiving failures from causing disk fill-up and database crashes, the following safety mechanisms are in place:
+
+1. **WAL Retention Limit** (`wal_keep_size: 8GB`)
+   - Limits how many WAL files PostgreSQL keeps locally
+   - Even if archiving to B2 fails, PostgreSQL will delete old WAL files after 8GB accumulates
+   - **Trade-off**: Lose point-in-time recovery capability for deleted WAL segments
+   - **Benefit**: Prevents catastrophic disk fill-up and database corruption
+
+2. **Increased Storage Capacity**
+   - Production postgres-cluster: 30Gi (up from 20Gi)
+   - Provides ~29Gi buffer for WAL accumulation during transient failures
+   - Gives more time to detect and fix archiving issues before hitting limits
+
+3. **Optimized Retention Policy**
+   - 7-day retention (down from 30 days) reduces B2 storage costs
+   - Still provides adequate recovery window for homelab use
+   - Balances cost efficiency with disaster recovery needs
+
+**Checking WAL Retention Status**:
+```bash
+# Verify wal_keep_size is configured
+kubectl exec -n database postgres-cluster-3 -- psql -U postgres -c "SHOW wal_keep_size;"
+
+# Check current WAL directory size
+kubectl exec -n database postgres-cluster-3 -- du -sh /var/lib/postgresql/data/pgdata/pg_wal/
+
+# Count WAL files (normal is ~50, concerning is >500)
+kubectl exec -n database postgres-cluster-3 -- \
+  ls -1 /var/lib/postgresql/data/pgdata/pg_wal/*.* | wc -l
+
+# Check archiver statistics
+kubectl exec -n database postgres-cluster-3 -- psql -U postgres -c \
+  "SELECT archived_count, failed_count, last_archived_time FROM pg_stat_archiver;"
+```
+
+**When to Be Concerned**:
+- WAL directory size exceeds 10GB → Check archiving
+- More than 500 WAL files → Archiving likely delayed or failing
+- `failed_count` increasing → B2 connectivity or credentials issue
+- `last_archived_time` not recent → Archiving may be stuck

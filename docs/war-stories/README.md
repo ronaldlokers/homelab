@@ -15,6 +15,7 @@ These stories document actual problems, debugging processes, and solutions. They
 - [Longhorn ReadWriteMany Multi-Attach Errors](longhorn-rwx-multi-attach.md) - PVC access mode changes and the recreation challenge
 - [Longhorn S3 Backups Failing with MinIO](longhorn-s3-virtual-hosted-style.md) - Virtual-hosted vs path-style S3 URLs
 - [PostgreSQL Cluster Disaster Recovery Bootstrap Mode](postgres-bootstrap-recovery.md) - Ensuring clusters restore from backup after deletion
+- **[PostgreSQL WAL Archiving Failure Causing PVC Fill-Up](postgres-wal-archiving-failure-pvc-fillup.md)** - 68 days of silent WAL accumulation, root cause analysis, and preventive monitoring
 - [Loki Ring Errors: Too Many Unhealthy Instances](loki-replication-factor-ring.md) - Replication factor mismatch in staging environment
 - [Kustomize ConfigMap Hash Suffix Breaking Alloy](kustomize-configmap-hash-suffix.md) - When Kustomize and Helm ConfigMap names don't match
 - [inotify Limits Exhausted in k3d](inotify-limits-k3d.md) - "Too many open files" errors in Docker-based clusters
@@ -47,6 +48,13 @@ These stories document actual problems, debugging processes, and solutions. They
 18. **NetworkPolicies don't apply retroactively** - Restart pods after policy changes to apply new rules
 19. **Operators need Kubernetes API access** - CloudNative-PG and similar operators require egress to 10.43.0.1:443
 20. **Error messages can be misleading** - "Not enough disk space" in PostgreSQL actually meant "can't reach API server"
+21. **WAL archiving failures are silent** - PostgreSQL can report `failed_count: 0` while files accumulate for months
+22. **Disabled archiving is a ticking time bomb** - Without continuous WAL archiving, files accumulate until PVCs fill up
+23. **wal_keep_size is a critical safety valve** - Prevents unlimited WAL growth at the cost of some PITR capability
+24. **Monitor what you can't see** - 68 days of WAL accumulation went unnoticed without proper alerts
+25. **Archiving "success" can be misleading** - Archive command running doesn't mean files are reaching remote storage
+26. **Don't rush to quick fixes during incidents** - Understanding the full timeline is crucial for proper prevention
+27. **Configuration changes need monitoring** - Critical features (like backups) being disabled should trigger alerts
 
 ## Contributing Your Own War Stories
 
