@@ -31,22 +31,22 @@ spec:
       database: app
       owner: app
 
-  # Reference to backup location in B2
-  #externalClusters:
-  #  - name: clusterBackup
-  #    barmanObjectStore:
-  #      destinationPath: "s3://homelab-postgres-backups/production/immich/"
-  #      serverName: immich-cluster
-  #      endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-  #      s3Credentials:
-  #        accessKeyId:
-  #          name: b2-credentials
-  #          key: ACCESS_KEY_ID
-  #        secretAccessKey:
-  #          name: b2-credentials
-  #          key: ACCESS_SECRET_KEY
-  #      wal:
-  #        maxParallel: 8
+  # Reference to backup location in B2 (for bootstrap recovery only)
+  externalClusters:
+    - name: clusterBackup
+      barmanObjectStore:
+        destinationPath: "s3://homelab-postgres-backups/production/immich/"
+        serverName: immich-cluster
+        endpointURL: "https://s3.eu-central-003.backblazeb2.com"
+        s3Credentials:
+          accessKeyId:
+            name: b2-credentials
+            key: ACCESS_KEY_ID
+          secretAccessKey:
+            name: b2-credentials
+            key: ACCESS_SECRET_KEY
+        wal:
+          maxParallel: 8
 
   storage:
     size: 50Gi
