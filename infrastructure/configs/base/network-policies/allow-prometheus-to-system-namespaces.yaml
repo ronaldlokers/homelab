@@ -1,0 +1,45 @@
+---
+# Allow Prometheus to scrape metrics from system namespace pods
+# This enables collection of cluster-level metrics from:
+# - kube-system: kubelet, coredns, traefik, etc.
+# - cnpg-system: CloudNative-PG operator
+# - metallb-system: MetalLB speaker and controller
+# - flux-system: Flux controllers
+# - default: Kubernetes API server
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-to-system-namespaces
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes:
+    - Egress
+  egress:
+    # Allow Prometheus to scrape kube-system namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+    # Allow Prometheus to scrape cnpg-system namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+    # Allow Prometheus to scrape metallb-system namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: metallb-system
+    # Allow Prometheus to scrape flux-system namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: flux-system
+    # Allow Prometheus to scrape default namespace (API server)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default

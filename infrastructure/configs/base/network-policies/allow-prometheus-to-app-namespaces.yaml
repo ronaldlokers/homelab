@@ -1,0 +1,60 @@
+---
+# Allow Prometheus to scrape metrics from application namespace pods
+# This enables collection of application-level metrics
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-to-app-namespaces
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes:
+    - Egress
+  egress:
+    # Allow Prometheus to scrape linkding namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: linkding
+    # Allow Prometheus to scrape homepage namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: homepage
+    # Allow Prometheus to scrape nightscout namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: nightscout
+    # Allow Prometheus to scrape pgadmin namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: pgadmin
+    # Allow Prometheus to scrape commafeed namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: commafeed
+    # Allow Prometheus to scrape speedtest namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: speedtest
+    # Allow Prometheus to scrape immich namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: immich
+    # Allow Prometheus to scrape ntfy namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ntfy
+    # Allow Prometheus to scrape database namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: database
