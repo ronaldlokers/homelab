@@ -1,0 +1,32 @@
+---
+# Allow monitoring namespace pods to reach Kubernetes API server
+# Grafana sidecar needs this to discover dashboard ConfigMaps
+# Prometheus needs this for service discovery
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-k8s-api-egress
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # Allow access to kubernetes service ClusterIP
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
+    # Allow access to control plane nodes (kubernetes service endpoints)
+    - to:
+        - ipBlock:
+            cidr: 10.0.40.101/32
+        - ipBlock:
+            cidr: 10.0.40.102/32
+        - ipBlock:
+            cidr: 10.0.40.103/32
+      ports:
+        - protocol: TCP
+          port: 6443
