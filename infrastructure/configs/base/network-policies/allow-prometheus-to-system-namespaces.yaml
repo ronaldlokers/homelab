@@ -48,3 +48,22 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: longhorn-system
+    # Allow Prometheus to scrape node IPs for node-exporter (hostPort 9100)
+    - to:
+        - ipBlock:
+            cidr: 10.0.40.101/32
+      ports:
+        - protocol: TCP
+          port: 9100
+    - to:
+        - ipBlock:
+            cidr: 10.0.40.102/32
+      ports:
+        - protocol: TCP
+          port: 9100
+    - to:
+        - ipBlock:
+            cidr: 10.0.40.103/32
+      ports:
+        - protocol: TCP
+          port: 9100
