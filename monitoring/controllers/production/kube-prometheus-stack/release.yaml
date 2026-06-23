@@ -50,6 +50,10 @@ spec:
         # Accept ALL PodMonitors (empty selector)
         podMonitorSelector: {}
 
+        # Add cluster label to all metrics for dashboard compatibility
+        externalLabels:
+          cluster: production
+
         useEndpointSlices: true
 
       ingress:
