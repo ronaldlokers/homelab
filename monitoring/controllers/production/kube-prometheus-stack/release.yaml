@@ -26,6 +26,10 @@ spec:
         target:
           kind: PrometheusRule
   values:
+    # Disable etcd monitoring - K3s uses embedded etcd without exposed metrics
+    kubeEtcd:
+      enabled: false
+
     prometheus:
       prometheusSpec:
         # Allow ServiceMonitors from any namespace
