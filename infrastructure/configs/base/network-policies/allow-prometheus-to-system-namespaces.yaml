@@ -43,3 +43,8 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: default
+    # Allow Prometheus to scrape longhorn-system namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: longhorn-system
