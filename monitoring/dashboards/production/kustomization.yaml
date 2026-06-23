@@ -6,6 +6,5 @@ resources:
   - traefik-dashboard.yaml
   - cert-manager-dashboard.yaml
   - cloudnativepg-dashboard.yaml
-  - metallb-dashboard.yaml
   - flux-control-plane-dashboard.yaml
   - flux-cluster-dashboard.yaml
