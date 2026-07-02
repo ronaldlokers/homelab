@@ -47,7 +47,7 @@ spec:
       tlsSecret: longhorn-tls
       annotations:
         cert-manager.io/cluster-issuer: letsencrypt-production
-        traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
+        traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd,kube-system-local-network-only@kubernetescrd
     # Resource limits for Raspberry Pi CM5
     longhornManager:
       resources:

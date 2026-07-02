@@ -60,7 +60,7 @@ spec:
         enabled: true
         ingressClassName: traefik
         annotations:
-          traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
+          traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd,kube-system-local-network-only@kubernetescrd
         hosts:
           - prometheus.ronaldlokers.nl
         tls:
