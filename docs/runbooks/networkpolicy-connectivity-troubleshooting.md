@@ -82,8 +82,11 @@ Allowing egress traffic:
 
 **Fix**: Add DNS policy to namespace
 ```bash
-# Apply the allow-dns policy
-kubectl apply -f infrastructure/configs/base/network-policies/allow-dns.yaml
+# Apply the allow-dns policy. App namespaces (commafeed, homepage, immich,
+# linkding, nightscout, ntfy, pgadmin, speedtest) own theirs in
+# apps/base/<app>/network-policies.yaml; database and monitoring's live in
+# infrastructure/configs/base/network-policies/allow-dns.yaml
+kubectl apply -f apps/base/<app>/network-policies.yaml
 
 # Or manually create:
 cat <<EOF | kubectl apply -f -
@@ -132,8 +135,9 @@ kubectl describe networkpolicy -n <source-namespace> | grep -A 20 "Allowing egre
 **Fix**: Add namespace and port to egress policy
 
 ```bash
-# Edit the policy file
-vim infrastructure/configs/base/network-policies/allow-<source>-to-<dest>.yaml
+# Edit the policy file. Most app egress rules live with the app itself:
+vim apps/base/<source>/network-policies.yaml
+# Cross-cutting egress (database, monitoring) stays in infrastructure/configs/base/network-policies/
 
 # Or patch inline:
 kubectl patch networkpolicy <policy-name> -n <namespace> --type='json' -p='[
@@ -174,8 +178,10 @@ kubectl describe networkpolicy -n <dest-namespace> | grep -A 20 "Allowing ingres
 **Fix**: Add namespace to ingress policy
 
 ```bash
-# Edit destination namespace policy
-vim infrastructure/configs/base/network-policies/allow-ingress-to-<dest>.yaml
+# Edit destination namespace policy. Most app ingress rules live with the app itself:
+vim apps/base/<dest>/network-policies.yaml
+# Traefik ingress to monitoring (Grafana) stays in
+# infrastructure/configs/base/network-policies/allow-ingress-to-apps.yaml
 
 # Ensure ingress allows from source namespace
 ```
@@ -501,10 +507,10 @@ If this runbook doesn't resolve the issue:
 1. Check war story for similar scenarios: `docs/war-stories/networkpolicy-connectivity-debugging.md`
 2. Review full network security documentation: `docs/network-security.md`
 3. Search cluster logs for related errors: `kubectl logs -n flux-system <kustomize-controller>`
-4. Review recent Git commits for policy changes: `git log --oneline infrastructure/configs/base/network-policies/`
+4. Review recent Git commits for policy changes: `git log --oneline apps/base/*/network-policies.yaml infrastructure/configs/base/network-policies/`
 
 ---
 
-**Last Updated**: 2026-02-26
+**Last Updated**: 2026-07-02
 **Maintainer**: Infrastructure Team
 **Related Runbooks**: PostgreSQL Cluster Disaster Recovery, Loki Ring Unhealthy Instances

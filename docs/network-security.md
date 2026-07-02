@@ -57,60 +57,56 @@ Our implementation follows **zero-trust principles**:
                   └─────────────┘
 ```
 
+## Where Policies Live
+
+NetworkPolicies are split across two layers, matching the repo's base/overlay convention:
+
+- **`apps/base/<app>/network-policies.yaml`** — everything owned by a single application: its default-deny pair, DNS egress, Traefik ingress, homepage ingress, Prometheus scrape ingress, database egress, internet egress, and any app-internal rules (e.g. Immich's Valkey/ML sidecars). This file is a `kustomization.yaml` resource alongside the app's `namespace.yaml`, `deployment.yaml`, etc., so the policy's lifecycle is tied to the app: it only renders in an environment if the app itself is deployed there (e.g. ntfy and speedtest are production-only, so their policies never render on staging).
+- **`infrastructure/configs/base/network-policies/`** — cross-cutting policies that don't belong to one app: the `database` and `monitoring` namespaces' own default-deny/DNS/ingress/egress rules, the database's `allow-apps-ingress` rule, and Prometheus's bulk scrape-egress rule.
+
+Two shared labels on each app's `Namespace` (set in `apps/base/<app>/namespace.yaml`) let the cross-cutting policies reference "all apps" without enumerating names:
+
+- `homelab.io/app: "true"` — every app namespace. Used by homepage's egress-to-apps rule and Prometheus's scrape-egress rule.
+- `homelab.io/needs-database: "true"` — only the apps that talk to PostgreSQL (all apps except homepage and ntfy). Used by the database namespace's `allow-apps-ingress` rule.
+
 ## Implemented NetworkPolicies
 
-### 1. Default Deny (`default-deny-all.yaml`)
+### 1. Default Deny
 
 **Purpose**: Establish zero-trust baseline by denying all ingress and egress traffic in every namespace.
 
-**Applied to**:
-- linkding
-- homepage
-- nightscout
-- pgadmin
-- commafeed
-- speedtest
-- immich
-- ntfy
-- database
-- monitoring
+**Applied to**: every app namespace (own copy in `apps/base/<app>/network-policies.yaml`) plus `database` and `monitoring` (in `infrastructure/configs/base/network-policies/default-deny-all.yaml`).
 
 **Note**: `external-services` namespace contains only Service resources (no pods), so NetworkPolicies are not needed there.
 
 **Impact**: Without this, all pods can communicate freely. With this, all traffic must be explicitly allowed.
 
-### 2. Allow DNS (`allow-dns.yaml`)
+### 2. Allow DNS
 
 **Purpose**: Enable DNS resolution for all pods (required for service discovery).
 
 **Traffic allowed**:
 - All pods → CoreDNS (kube-system) on port 53 (UDP/TCP)
 
+**Location**: each app's own `allow-dns` rule lives in `apps/base/<app>/network-policies.yaml`; `database` and `monitoring`'s copies stay in `infrastructure/configs/base/network-policies/allow-dns.yaml`.
+
 **Why needed**: Without DNS, pods can't resolve service names like `postgresql-cluster.database.svc.cluster.local`.
 
-### 3. Allow Ingress to Apps (`allow-ingress-to-apps.yaml`)
+### 3. Allow Ingress to Apps
 
 **Purpose**: Enable external access to applications via Traefik ingress controller.
 
 **Traffic allowed**:
-- Traefik (kube-system) → Application pods in:
-  - linkding
-  - homepage
-  - nightscout
-  - pgadmin
-  - commafeed
-  - speedtest
-  - immich
-  - ntfy
-  - monitoring (Grafana only)
+- Traefik (kube-system) → each app's pods (rule lives in that app's `apps/base/<app>/network-policies.yaml`)
+- Traefik (kube-system) → monitoring (Grafana only; stays in `infrastructure/configs/base/network-policies/allow-ingress-to-apps.yaml`)
 
 **Why needed**: User requests come through Traefik, which must reach app pods to serve content.
 
-### 4. Allow Apps to Database (`allow-apps-to-database.yaml`)
+### 4. Allow Apps to Database
 
 **Purpose**: Enable database connectivity for applications.
 
-**Traffic allowed**:
+**Traffic allowed** (each app's `allow-database-egress` rule lives in its own `apps/base/<app>/network-policies.yaml`):
 - linkding → database:5432 (PostgreSQL)
 - nightscout → database:5432, database:27017 (PostgreSQL + FerretDB)
 - pgadmin → database:5432 (PostgreSQL)
@@ -118,33 +114,35 @@ Our implementation follows **zero-trust principles**:
 - speedtest → database:5432 (PostgreSQL)
 - immich → database:5432 (PostgreSQL)
 
-**Ingress to database namespace**:
-- From all app namespaces listed above
+**Ingress to database namespace** (`infrastructure/configs/base/network-policies/allow-apps-to-database.yaml`):
+- From any namespace labeled `homelab.io/needs-database: "true"` — currently the six apps above. homepage and ntfy don't carry this label and have no path to the database.
 
 **Why needed**: Applications persist data in PostgreSQL databases.
 
-### 5. Allow Monitoring (`allow-monitoring.yaml`)
+### 5. Allow Monitoring
 
 **Purpose**: Enable Prometheus to scrape metrics from all services.
 
 **Traffic allowed**:
-- Prometheus (monitoring) → All application pods (metrics endpoints)
-- Prometheus (monitoring) → Database pods (PostgreSQL metrics)
+- Prometheus (monitoring) → any namespace labeled `homelab.io/app: "true"`, plus the `database` namespace explicitly (`infrastructure/configs/base/network-policies/allow-prometheus-to-app-namespaces.yaml`)
+- Each app also carries a matching `allow-prometheus-scraping` ingress rule in its own `apps/base/<app>/network-policies.yaml` (NetworkPolicy ingress/egress must be permitted on both sides)
 - Promtail/Fluentd → Loki (log ingestion)
 - Internal monitoring stack communication (Grafana ↔ Prometheus ↔ Alertmanager ↔ Loki)
 
+(The last three stay in `infrastructure/configs/base/network-policies/allow-monitoring.yaml`, along with the database namespace's own `allow-prometheus-scraping` ingress rule.)
+
 **Why needed**: Without this, Prometheus can't collect metrics and monitoring is blind.
 
-### 6. Allow Egress to Internet (`allow-egress-internet.yaml`)
+### 6. Allow Egress to Internet
 
 **Purpose**: Enable applications to reach external services (APIs, webhooks, RSS feeds, etc.).
 
-**Traffic allowed**:
+**Traffic allowed** (each app's `allow-internet-egress` rule lives in its own `apps/base/<app>/network-policies.yaml`; pgadmin has none since it needs no internet access):
 - All application pods → Internet (0.0.0.0/0) on ports 80, 443
 - **Excludes** private networks: 172.16.0.0/12, 192.168.0.0/16 (10.0.0.0/8 varies per namespace)
 - **Homepage** → Internet including 10.0.0.0/8 on ports 80, 443, 8006 (for Proxmox at 10.0.1.10)
-- Database namespace → Internet on port 443 (Backblaze B2 backups)
-- Monitoring namespace → Internet on ports 80, 443 (webhooks, external queries)
+- Database namespace → Internet on port 443 (Backblaze B2 backups; stays in `infrastructure/configs/base/network-policies/allow-egress-internet.yaml`)
+- Monitoring namespace → Internet on ports 80, 443 (webhooks, external queries; same base file)
 
 **Why needed**:
 - Immich: Download ML models, fetch metadata
@@ -159,12 +157,15 @@ Our implementation follows **zero-trust principles**:
 
 **Security note**: Private networks are excluded to prevent pods from reaching internal infrastructure directly.
 
-### 7. Allow Homepage to Apps (`allow-homepage-to-apps.yaml`)
+### 7. Allow Homepage to Apps
 
 **Purpose**: Enable Homepage dashboard to connect to internal services for status widgets.
 
+**Location**: the egress side (`allow-homepage-to-apps-egress`) lives in `apps/base/homepage/network-policies.yaml`; the ingress side (`allow-homepage-ingress`) lives in each destination app's own `apps/base/<app>/network-policies.yaml`.
+
 **Traffic allowed**:
-- Homepage → Internal services in namespaces:
+- Homepage → any namespace labeled `homelab.io/app: "true"` (ports 80, 443, 2283, 3000, 3003, 8006, 8080) plus kube-system explicitly (Traefik)
+- Per-app ingress rules further restrict which ports each app actually accepts from homepage:
   - immich (ports 2283, 3003)
   - speedtest (port 80)
   - linkding (port 80)
@@ -172,8 +173,7 @@ Our implementation follows **zero-trust principles**:
   - commafeed (port 80)
   - ntfy (port 80)
   - pgadmin (port 80)
-  - kube-system (Traefik)
-  - monitoring (Grafana on ports 80, 3000)
+  - monitoring/Grafana (ports 80, 3000; stays in `infrastructure/configs/base/network-policies/allow-monitoring.yaml`)
 
 **Why needed**: Homepage widgets query service APIs to show status, metrics, and health information on the dashboard.
 
@@ -197,9 +197,11 @@ Our implementation follows **zero-trust principles**:
 
 **Security note**: Limited to database namespace only. Required for operator functionality.
 
-### 9. Allow Immich Internal Communication (`allow-immich-internal.yaml`)
+### 9. Allow Immich Internal Communication
 
 **Purpose**: Enable Immich microservices to communicate within the same namespace.
+
+**Location**: `apps/base/immich/network-policies.yaml`, alongside Immich's other app-owned rules.
 
 **Traffic allowed**:
 - Immich server → Valkey (Redis) on port 6379 (within immich namespace)
@@ -269,11 +271,28 @@ Our implementation follows **zero-trust principles**:
 
 ## Adding a New Application
 
-When deploying a new application, you need to update NetworkPolicies:
+Everything a new app needs lives in one file next to it — you generally do **not** touch `infrastructure/configs/base/network-policies/` at all. This keeps the policy's lifecycle tied to the app: it only renders in environments where the app itself is deployed (see `apps/staging/kustomization.yaml` vs `apps/production/kustomization.yaml`).
 
-### 1. Add namespace to default-deny
+### 1. Label the namespace
 
-Edit `infrastructure/configs/base/network-policies/default-deny-all.yaml`:
+In `apps/base/your-new-app/namespace.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: your-new-app
+  labels:
+    homelab.io/app: "true"
+    # Only add this if the app talks to PostgreSQL:
+    homelab.io/needs-database: "true"
+```
+
+`homelab.io/app` makes the namespace a valid destination for homepage's status checks and a valid Prometheus scrape target automatically — no other file needs editing for those two things. `homelab.io/needs-database` opens the database namespace's ingress rule to it.
+
+### 2. Create `apps/base/your-new-app/network-policies.yaml`
+
+Combine the pieces the app actually needs:
 
 ```yaml
 ---
@@ -296,13 +315,6 @@ spec:
   podSelector: {}
   policyTypes:
     - Egress
-```
-
-### 2. Add DNS allow rule
-
-Edit `infrastructure/configs/base/network-policies/allow-dns.yaml`:
-
-```yaml
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -323,14 +335,8 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-```
-
-### 3. Allow ingress from Traefik (if app has ingress)
-
-Edit `infrastructure/configs/base/network-policies/allow-ingress-to-apps.yaml`:
-
-```yaml
 ---
+# Only if the app is exposed via Ingress:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -348,41 +354,27 @@ spec:
           podSelector:
             matchLabels:
               app.kubernetes.io/name: traefik
-```
-
-### 4. Allow database access (if app uses PostgreSQL)
-
-Edit `infrastructure/configs/base/network-policies/allow-apps-to-database.yaml`:
-
-```yaml
 ---
+# Only if the app should show up on the homepage dashboard:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-database-egress
+  name: allow-homepage-ingress
   namespace: your-new-app
 spec:
   podSelector: {}
   policyTypes:
-    - Egress
-  egress:
-    - to:
+    - Ingress
+  ingress:
+    - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: database
+              kubernetes.io/metadata.name: homepage
       ports:
         - protocol: TCP
-          port: 5432
-```
-
-And update the database namespace ingress rule to include your new app.
-
-### 5. Allow Prometheus scraping (if app has metrics)
-
-Edit `infrastructure/configs/base/network-policies/allow-monitoring.yaml`:
-
-```yaml
+          port: 80  # match your app's actual port
 ---
+# Only if the app exposes Prometheus metrics:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -400,14 +392,27 @@ spec:
           podSelector:
             matchLabels:
               app.kubernetes.io/name: prometheus
-```
-
-### 6. Allow internet egress (if app needs external APIs)
-
-Edit `infrastructure/configs/base/network-policies/allow-egress-internet.yaml`:
-
-```yaml
 ---
+# Only if the app uses PostgreSQL (pair with homelab.io/needs-database label above):
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-database-egress
+  namespace: your-new-app
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: database
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# Only if the app calls out to the internet:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -431,6 +436,12 @@ spec:
         - protocol: TCP
           port: 443
 ```
+
+### 3. Register the file
+
+Add `network-policies.yaml` to `apps/base/your-new-app/kustomization.yaml`'s `resources` list, next to `namespace.yaml`, `deployment.yaml`, etc.
+
+That's it — no edits to `infrastructure/configs/base/network-policies/` or `infrastructure/configs/production/` are needed unless the new namespace is `database`- or `monitoring`-adjacent infrastructure rather than a user-facing app.
 
 ## Troubleshooting
 
@@ -632,11 +643,11 @@ We've implemented a **zero-trust network architecture** using Kubernetes Network
 - ✅ **Namespace isolation** to prevent lateral movement
 - ✅ **Egress control** to limit external communication
 - ✅ **Monitoring enabled** via Prometheus scraping
-- ✅ **Production-ready** applied to both staging and production
+- ✅ **Production-ready**, with app-owned policies deployed only where each app actually runs (e.g. ntfy and speedtest are production-only and never render on staging)
 
 This significantly hardens the cluster against network-based attacks while maintaining full functionality of all applications.
 
 ---
 
-**Last Updated**: 2026-02-26
+**Last Updated**: 2026-07-02
 **Related Documents**: `docs/security.md`, `docs/architecture.md`

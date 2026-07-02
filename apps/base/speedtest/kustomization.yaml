@@ -5,3 +5,4 @@ resources:
   - deployment.yaml
   - pvc.yaml
   - service.yaml
+  - network-policies.yaml

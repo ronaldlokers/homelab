@@ -13,46 +13,11 @@ spec:
   policyTypes:
     - Egress
   egress:
-    # Allow Prometheus to scrape linkding namespace
+    # Any homelab app namespace (see homelab.io/app label on each apps/base/*/namespace.yaml)
     - to:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: linkding
-    # Allow Prometheus to scrape homepage namespace
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: homepage
-    # Allow Prometheus to scrape nightscout namespace
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: nightscout
-    # Allow Prometheus to scrape pgadmin namespace
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: pgadmin
-    # Allow Prometheus to scrape commafeed namespace
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: commafeed
-    # Allow Prometheus to scrape speedtest namespace
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: speedtest
-    # Allow Prometheus to scrape immich namespace
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: immich
-    # Allow Prometheus to scrape ntfy namespace
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: ntfy
+              homelab.io/app: "true"
     # Allow Prometheus to scrape database namespace
     - to:
         - namespaceSelector:

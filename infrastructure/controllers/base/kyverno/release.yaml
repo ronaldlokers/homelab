@@ -68,8 +68,9 @@ spec:
           cpu: 50m
           memory: 128Mi
 
-    # Start with validation failure action as audit
-    # Once policies are tested, can change to enforce
+    # Exclude system namespaces from admission webhook coverage.
+    # Note: audit vs enforce is set per-policy via spec.validationFailureAction
+    # on ClusterPolicy resources, not here.
     config:
       webhooks:
         namespaceSelector:

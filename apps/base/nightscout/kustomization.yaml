@@ -5,3 +5,4 @@ resources:
   - ferretdb-deployment.yaml
   - nightscout-deployment.yaml
   - nightscout-service.yaml
+  - network-policies.yaml
