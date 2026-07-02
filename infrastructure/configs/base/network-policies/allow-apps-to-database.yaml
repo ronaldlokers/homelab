@@ -102,25 +102,6 @@ spec:
         - protocol: TCP
           port: 5432
 ---
-# Allow speedtest to connect to PostgreSQL in database namespace
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-database-egress
-  namespace: speedtest
-spec:
-  podSelector: {}
-  policyTypes:
-    - Egress
-  egress:
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: database
-      ports:
-        - protocol: TCP
-          port: 5432
----
 # Allow immich to connect to PostgreSQL in database namespace
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

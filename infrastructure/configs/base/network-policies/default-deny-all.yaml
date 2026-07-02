@@ -109,28 +109,6 @@ spec:
   policyTypes:
     - Egress
 ---
-# Default deny all ingress traffic in speedtest namespace
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-deny-ingress
-  namespace: speedtest
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
----
-# Default deny all egress traffic in speedtest namespace
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-deny-egress
-  namespace: speedtest
-spec:
-  podSelector: {}
-  policyTypes:
-    - Egress
----
 # Default deny all ingress traffic in immich namespace
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -148,28 +126,6 @@ kind: NetworkPolicy
 metadata:
   name: default-deny-egress
   namespace: immich
-spec:
-  podSelector: {}
-  policyTypes:
-    - Egress
----
-# Default deny all ingress traffic in ntfy namespace
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-deny-ingress
-  namespace: ntfy
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
----
-# Default deny all egress traffic in ntfy namespace
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-deny-egress
-  namespace: ntfy
 spec:
   podSelector: {}
   policyTypes:

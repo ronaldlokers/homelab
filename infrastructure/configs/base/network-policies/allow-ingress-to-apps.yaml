@@ -94,50 +94,12 @@ spec:
             matchLabels:
               app.kubernetes.io/name: traefik
 ---
-# Allow ingress from Traefik (kube-system) to speedtest pods
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-ingress-from-traefik
-  namespace: speedtest
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: traefik
----
 # Allow ingress from Traefik (kube-system) to immich pods
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-ingress-from-traefik
   namespace: immich
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: traefik
----
-# Allow ingress from Traefik (kube-system) to ntfy pods
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-ingress-from-traefik
-  namespace: ntfy
 spec:
   podSelector: {}
   policyTypes:
