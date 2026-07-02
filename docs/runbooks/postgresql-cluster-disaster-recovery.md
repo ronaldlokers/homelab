@@ -213,8 +213,10 @@ kubectl describe cluster -n database postgres-cluster
 ### Step 5: Verify data restoration
 
 ```bash
-# Connect to primary pod
-kubectl exec -it -n database postgres-cluster-1 -- psql -U postgres
+# Connect to primary pod - find the current primary first, since CNPG
+# reassigns pod ordinals on failover/replica recreation
+PRIMARY_POD=$(kubectl get pods -n database -l cnpg.io/cluster=postgres-cluster,role=primary -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -it -n database "$PRIMARY_POD" -- psql -U postgres
 
 # Inside psql:
 \l              # List databases - should see application databases
@@ -237,7 +239,8 @@ SELECT COUNT(*) FROM bookmarks;  # Check data exists
 
 - [ ] All expected databases exist
       ```bash
-      kubectl exec -n database postgres-cluster-1 -- psql -U postgres -c '\l'
+      PRIMARY_POD=$(kubectl get pods -n database -l cnpg.io/cluster=postgres-cluster,role=primary -o jsonpath='{.items[0].metadata.name}')
+      kubectl exec -n database "$PRIMARY_POD" -- psql -U postgres -c '\l'
       ```
 
 - [ ] Application data is present
@@ -368,8 +371,10 @@ bootstrap:
 # 1. Ensure staging has backups
 kubectl get backup -n database --context=staging
 
-# 2. Note current data state
-kubectl exec -n database postgres-cluster-1 --context=staging -- \
+# 2. Note current data state (find the current primary first, since CNPG
+#    reassigns pod ordinals on failover/replica recreation)
+PRIMARY_POD=$(kubectl get pods -n database --context=staging -l cnpg.io/cluster=postgres-cluster,role=primary -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n database "$PRIMARY_POD" --context=staging -- \
   psql -U postgres -c "SELECT COUNT(*) FROM linkding.bookmarks;"
 
 # 3. Delete the cluster
@@ -378,8 +383,10 @@ kubectl delete cluster -n database postgres-cluster --context=staging
 # 4. Wait for recreation
 kubectl get cluster -n database --context=staging -w
 
-# 5. Verify data restored
-kubectl exec -n database postgres-cluster-1 --context=staging -- \
+# 5. Verify data restored (re-check the primary - it may be a different pod
+#    name after recovery)
+PRIMARY_POD=$(kubectl get pods -n database --context=staging -l cnpg.io/cluster=postgres-cluster,role=primary -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n database "$PRIMARY_POD" --context=staging -- \
   psql -U postgres -c "SELECT COUNT(*) FROM linkding.bookmarks;"
 
 # Compare counts - should match!

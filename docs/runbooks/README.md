@@ -66,6 +66,11 @@ A **runbook** is an action-oriented guide for handling specific incidents. Unlik
   - **Severity**: High
   - **Time to Fix**: 15-30 minutes
 
+- [**PostgreSQL Replica NetworkPolicy Dataplane Sync**](postgres-replica-networkpolicy-dataplane-sync.md)
+  - **Symptoms**: Reprovisioned CNPG replica crash-loops with "connection refused" to the K8s API despite correct-looking NetworkPolicy config
+  - **Severity**: High
+  - **Time to Fix**: 20-40 minutes
+
 ### Monitoring & Logging Issues
 
 - [**Loki Ring Errors: Too Many Unhealthy Instances**](loki-ring-unhealthy-instances.md)
@@ -91,6 +96,23 @@ A **runbook** is an action-oriented guide for handling specific incidents. Unlik
   - **Symptoms**: Can't test versions independently per environment
   - **Severity**: Low (maintainability)
   - **Time to Fix**: 30-60 minutes
+
+- [**Flux HelmRelease Stuck in Terminal-Error State**](flux-helmrelease-terminal-failure.md)
+  - **Symptoms**: `Ready: False` indefinitely, `flux reconcile` never actually retries
+  - **Severity**: Medium (usually status-only, but blocks all future automated reconciliation)
+  - **Time to Fix**: 5 minutes
+
+- [**Single-Replica Deployment Wedged After Switching to Recreate Strategy**](deployment-recreate-strategy-stuck-rollout.md)
+  - **Symptoms**: Kustomization blocked with `spec.strategy.rollingUpdate: Forbidden`, or pod stuck `ContainerCreating` on a routine image bump
+  - **Severity**: High
+  - **Time to Fix**: 15-20 minutes
+
+### Resource & Node Issues
+
+- [**Staging Cluster Frozen by Disk Pressure**](staging-disk-pressure-docker-cleanup.md)
+  - **Symptoms**: All Flux Kustomizations stuck reconciling, `flux-system` pods `Pending`
+  - **Severity**: High
+  - **Time to Fix**: 15-30 minutes
 
 ## Runbook Structure
 
@@ -197,7 +219,7 @@ When you encounter a new issue:
 
 ### Converting War Stories to Runbooks
 
-We have 9 detailed war stories that can be converted. Use this process:
+We have 15 detailed war stories that can be converted. Use this process:
 
 1. Read the war story completely
 2. Copy the runbook template (see `TEMPLATE.md`)
@@ -311,6 +333,6 @@ Other teams' runbooks for inspiration:
 
 ---
 
-**Runbook Count**: 10 complete
-**Last Updated**: 2026-02-26
+**Runbook Count**: 14 complete
+**Last Updated**: 2026-07-02
 **Maintained By**: homelab operations (that's you!)

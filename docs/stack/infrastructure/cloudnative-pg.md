@@ -48,8 +48,11 @@ A PostSync job (`grant-documentdb-permissions`) runs automatically after the clu
 # Get the app password from the secret
 APP_PASSWORD=$(kubectl get secret -n database postgres-cluster-app -o jsonpath='{.data.password}' | base64 -d)
 
-# Reset the password in PostgreSQL
-kubectl exec -n database postgres-cluster-1 -- psql -U postgres -c "ALTER USER app WITH PASSWORD '${APP_PASSWORD}';"
+# Reset the password in PostgreSQL (find the current primary pod first -
+# CNPG reassigns pod ordinals on failover/replica recreation, so don't
+# hardcode a specific instance number)
+PRIMARY_POD=$(kubectl get pods -n database -l cnpg.io/cluster=postgres-cluster,role=primary -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n database "$PRIMARY_POD" -- psql -U postgres -c "ALTER USER app WITH PASSWORD '${APP_PASSWORD}';"
 ```
 
 **Features**:
@@ -81,8 +84,10 @@ kubectl exec -n database postgres-cluster-1 -- psql -U postgres -c "ALTER USER a
 
 **Connection**:
 ```bash
-# Connect to primary (read-write)
-kubectl exec -it -n database postgres-cluster-1 -- psql -U postgres
+# Connect to primary (read-write) - find the current primary pod first,
+# since CNPG reassigns pod ordinals on failover/replica recreation
+PRIMARY_POD=$(kubectl get pods -n database -l cnpg.io/cluster=postgres-cluster,role=primary -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -it -n database "$PRIMARY_POD" -- psql -U postgres
 
 # Get credentials
 kubectl get secret -n database postgres-cluster-app -o jsonpath='{.data.password}' | base64 -d

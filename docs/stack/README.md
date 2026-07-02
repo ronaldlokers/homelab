@@ -6,6 +6,7 @@ This document provides detailed information about all components running in the 
 - Infrastructure
   - [cert-manager](./infrastructure/cert-manager.md)
   - [CloudNative-PG](./infrastructure/cloudnative-pg.md)
+  - [Kyverno](./infrastructure/kyverno.md)
   - [Longhorn](./infrastructure/longhorn.md)
   - [MetalLB](./infrastructure/metallb.md)
   - [Traefik](./infrastructure/traefik.md)
@@ -33,6 +34,7 @@ This document provides detailed information about all components running in the 
 | MetalLB | ❌ | ✅ | Network load balancer |
 | Longhorn | ❌ | ✅ | Distributed storage |
 | CloudNative-PG | ✅ | ✅ | PostgreSQL operator |
+| Kyverno | ✅ (deployed, no policies yet) | ❌ | Admission policy engine |
 | Homepage | ✅ | ✅ | Application dashboard |
 | Linkding | ✅ | ✅ | Bookmark manager |
 | Nightscout | ✅ | ✅ | CGM remote monitoring |

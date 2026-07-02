@@ -18,14 +18,14 @@ The repository follows a structured layout separating concerns by layers:
 │   │   └── production/
 │   └── configs/              # Infrastructure configuration
 │       ├── base/
-│       │   ├── network-policies/  # NetworkPolicy definitions
+│       │   ├── network-policies/  # Cross-cutting NetworkPolicies (database, monitoring)
 │       │   ├── cert-manager/
 │       │   ├── cloudnative-pg/
 │       │   └── traefik/
 │       ├── staging/
 │       └── production/
 ├── apps/                     # Application deployments
-│   ├── base/
+│   ├── base/                 # Each app dir includes its own network-policies.yaml
 │   ├── staging/
 │   └── production/
 ├── monitoring/               # Observability stack
