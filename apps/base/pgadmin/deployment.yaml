@@ -4,6 +4,8 @@ metadata:
   name: pgadmin4
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: pgadmin4
