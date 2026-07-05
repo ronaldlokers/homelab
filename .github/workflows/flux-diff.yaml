@@ -1,0 +1,101 @@
+name: Flux diff
+
+# Renders the full Flux tree (Kustomizations + HelmReleases) for the PR and
+# base branches with flate, then posts the rendered diff as a sticky PR
+# comment per cluster.
+#
+# Note: flate's built-in changed-only diff (--base/--path-orig) does not
+# attribute edits under apps/base/** to the consuming overlay Kustomizations
+# (flate 0.4.x), so this workflow does a full-tree render of both refs and
+# diffs the output instead.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: flux-diff-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flux-diff:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cluster: [staging, production]
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          path: pr
+
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          path: base
+
+      - name: Install flate
+        uses: home-operations/flate/action@v0.4.10
+        with:
+          cache: true
+          # The action defaults `base` to the repo's default branch, which
+          # exports FLATE_BASE=main and flips every flate call into
+          # changed-only mode. We render full-tree on purpose (see header),
+          # and the shallow `pr` checkout has no main ref to resolve anyway.
+          base: ""
+
+      - name: Test PR tree
+        run: flate test all --no-progress --path pr/clusters/${{ matrix.cluster }}
+
+      - name: Render both trees
+        run: |
+          flate build all --no-progress --path pr/clusters/${{ matrix.cluster }} > render-pr.yaml
+          # A base branch that fails to render must not block the PR that
+          # fixes it. flate still emits the render for everything that did
+          # reconcile, so diff against that and flag it in the comment.
+          if ! flate build all --no-progress --path base/clusters/${{ matrix.cluster }} > render-base.yaml; then
+            echo "::warning::${{ matrix.cluster }}: base branch failed to render; diffing against its partial output"
+            touch base-render-failed
+          fi
+
+      - name: Diff rendered output
+        id: diff
+        run: |
+          set +e
+          diff -u render-base.yaml render-pr.yaml > cluster.diff
+          rc=$?
+          set -e
+          [ "$rc" -gt 1 ] && exit "$rc"
+          echo "changed=$([ "$rc" -eq 1 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Flux diff — \`${{ matrix.cluster }}\`"
+            if [ -f base-render-failed ]; then
+              echo "> [!WARNING]"
+              echo "> The base branch failed to render fully; this diff is against its partial output."
+              echo
+            fi
+            if [ "$rc" -eq 1 ]; then
+              echo '```diff'
+              head -c 60000 cluster.diff
+              echo '```'
+              if [ "$(wc -c < cluster.diff)" -gt 60000 ]; then
+                echo "_Diff truncated at 60 kB — full diff in the workflow logs._"
+              fi
+            else
+              echo "No rendered changes."
+            fi
+          } > comment.md
+          cat comment.md >> "$GITHUB_STEP_SUMMARY"
+          cat cluster.diff
+
+      - name: Comment on PR
+        uses: mshick/add-pr-comment@v2
+        with:
+          message-id: flux-diff-${{ matrix.cluster }}
+          message-path: comment.md
