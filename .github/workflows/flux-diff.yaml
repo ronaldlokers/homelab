@@ -43,6 +43,11 @@ jobs:
         uses: home-operations/flate/action@v0.4.10
         with:
           cache: true
+          # The action defaults `base` to the repo's default branch, which
+          # exports FLATE_BASE=main and flips every flate call into
+          # changed-only mode. We render full-tree on purpose (see header),
+          # and the shallow `pr` checkout has no main ref to resolve anyway.
+          base: ""
 
       - name: Test PR tree
         run: flate test all --no-progress --path pr/clusters/${{ matrix.cluster }}
