@@ -1,0 +1,25 @@
+name: Validate manifests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        uses: jdx/mise-action@v2
+        with:
+          install_args: kustomize kubeconform
+
+      - name: Validate manifests
+        run: ./scripts/validate.sh
