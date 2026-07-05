@@ -55,7 +55,13 @@ jobs:
       - name: Render both trees
         run: |
           flate build all --no-progress --path pr/clusters/${{ matrix.cluster }} > render-pr.yaml
-          flate build all --no-progress --path base/clusters/${{ matrix.cluster }} > render-base.yaml
+          # A base branch that fails to render must not block the PR that
+          # fixes it. flate still emits the render for everything that did
+          # reconcile, so diff against that and flag it in the comment.
+          if ! flate build all --no-progress --path base/clusters/${{ matrix.cluster }} > render-base.yaml; then
+            echo "::warning::${{ matrix.cluster }}: base branch failed to render; diffing against its partial output"
+            touch base-render-failed
+          fi
 
       - name: Diff rendered output
         id: diff
@@ -69,6 +75,11 @@ jobs:
 
           {
             echo "### Flux diff — \`${{ matrix.cluster }}\`"
+            if [ -f base-render-failed ]; then
+              echo "> [!WARNING]"
+              echo "> The base branch failed to render fully; this diff is against its partial output."
+              echo
+            fi
             if [ "$rc" -eq 1 ]; then
               echo '```diff'
               head -c 60000 cluster.diff
