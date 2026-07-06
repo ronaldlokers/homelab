@@ -23,9 +23,17 @@ metadata:
   labels:
     release: kube-prometheus-stack
 spec:
+  # Match every CNPG cluster's pods, not just postgres-cluster — the old
+  # exact match meant immich-cluster was never scraped (no metrics, and
+  # alerts filtering on cnpg_io_cluster silently matched nothing).
   selector:
-    matchLabels:
-      cnpg.io/cluster: postgres-cluster
+    matchExpressions:
+      - key: cnpg.io/cluster
+        operator: Exists
+  # Copy the cluster name onto every series as cnpg_io_cluster — the
+  # label the PrometheusRules select on.
+  podTargetLabels:
+    - cnpg.io/cluster
   podMetricsEndpoints:
     - port: metrics
       interval: 30s
