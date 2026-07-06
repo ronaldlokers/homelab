@@ -37,6 +37,8 @@ spec:
             component: database
 
         # Alert on continuous archiving status
+        # (cnpg_io_cluster comes from podTargetLabels on the
+        # cloudnative-pg-clusters PodMonitor)
         - alert: PostgreSQLContinuousArchivingFailed
           annotations:
             summary: "PostgreSQL continuous archiving has failed on {{ $labels.cnpg_io_cluster }}"
@@ -46,6 +48,37 @@ spec:
             unless
             cnpg_collector_last_collection_error{cnpg_io_cluster=~"postgres-cluster|immich-cluster"} == 0
           for: 20m
+          labels:
+            severity: critical
+            component: database
+
+    - name: postgres_backup_alerts
+      rules:
+        # WAL archiving without a base backup provides zero recoverability:
+        # firstRecoverabilityPoint stays empty and PITR is impossible. This
+        # happened silently to immich-cluster for 4 months — see
+        # docs/war-stories/cnpg-invisible-backup-gap.md. Only the primary
+        # reports a non-zero timestamp, hence max by cluster.
+        - alert: PostgreSQLBackupTooOld
+          annotations:
+            summary: "Last base backup of {{ $labels.cnpg_io_cluster }} is older than 26 hours"
+            description: "Cluster {{ $labels.cnpg_io_cluster }} has a daily ScheduledBackup but its newest base backup is older than 26h. Check the ScheduledBackup and recent Backup objects in the database namespace."
+          expr: |
+            (time() - max by (cnpg_io_cluster) (cnpg_collector_last_available_backup_timestamp) > 26 * 3600)
+            and
+            (max by (cnpg_io_cluster) (cnpg_collector_last_available_backup_timestamp) > 0)
+          for: 30m
+          labels:
+            severity: critical
+            component: database
+
+        - alert: PostgreSQLBackupNeverTaken
+          annotations:
+            summary: "Cluster {{ $labels.cnpg_io_cluster }} has no base backup at all"
+            description: "No base backup has ever completed for {{ $labels.cnpg_io_cluster }} — it is not recoverable from object storage regardless of WAL archiving. Create a ScheduledBackup (with immediate: true) for it."
+          expr: |
+            max by (cnpg_io_cluster) (cnpg_collector_last_available_backup_timestamp) == 0
+          for: 6h
           labels:
             severity: critical
             component: database
