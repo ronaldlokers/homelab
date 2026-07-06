@@ -19,9 +19,33 @@ spec:
       containers:
         - name: linkding
           ports:
-            - containerPort: 9090
+            - name: http
+              containerPort: 9090
           envFrom:
             - secretRef:
                 name: linkding-container-env
           securityContext:
             allowPrivilegeEscalation: false
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

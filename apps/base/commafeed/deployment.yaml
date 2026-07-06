@@ -20,7 +20,30 @@ spec:
         - name: commafeed
           image: athou/commafeed:latest-postgresql
           ports:
-            - containerPort: 8082
+            - name: http
+              containerPort: 8082
+          # CommaFeed exposes no dedicated health endpoint (/q/health is 404
+          # on this image), so probe the web root.
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
           volumeMounts:
             - name: commafeed-data
               mountPath: /data

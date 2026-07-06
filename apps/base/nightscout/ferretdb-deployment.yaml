@@ -18,9 +18,39 @@ spec:
           ports:
             - containerPort: 27017
               name: mongodb
+            - containerPort: 8088
+              name: debug
           env:
             - name: FERRETDB_TELEMETRY
               value: "disable"
+            # Expose the debug listener (default binds loopback only) so
+            # kubelet can reach /debug/livez and /debug/readyz; readyz also
+            # verifies the PostgreSQL backend connection.
+            - name: FERRETDB_DEBUG_ADDR
+              value: ":8088"
+          livenessProbe:
+            httpGet:
+              path: /debug/livez
+              port: debug
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /debug/readyz
+              port: debug
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
 ---
 apiVersion: v1
 kind: Service
