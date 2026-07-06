@@ -10,3 +10,11 @@ patches:
     target:
       kind: Deployment
       name: pgadmin4
+  # Base PVC uses Longhorn, which only exists in production.
+  - patch: |
+      - op: replace
+        path: /spec/storageClassName
+        value: local-path
+    target:
+      kind: PersistentVolumeClaim
+      name: pgadmin4
