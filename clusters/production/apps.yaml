@@ -8,7 +8,11 @@ spec:
     - name: infrastructure-configs
   interval: 1m0s
   retryInterval: 1m
-  timeout: 5m
+  # wait: true makes a failing app rollout mark this Kustomization not-Ready,
+  # which feeds the Flux -> ntfy error alerts. Immich's multi-component
+  # rollout needs more than the default window.
+  timeout: 10m
+  wait: true
   sourceRef:
     kind: GitRepository
     name: flux-system

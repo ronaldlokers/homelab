@@ -6,7 +6,11 @@ metadata:
 spec:
   interval: 1m0s
   retryInterval: 1m
-  timeout: 5m
+  # wait: true gates readiness on all HelmReleases being installed and
+  # healthy; controller installs (Longhorn, CNPG) can take a while on a
+  # fresh cluster, hence the longer timeout.
+  timeout: 10m
+  wait: true
   sourceRef:
     kind: GitRepository
     name: flux-system
@@ -27,7 +31,10 @@ spec:
     - name: infrastructure-controllers
   interval: 1m0s
   retryInterval: 1m
-  timeout: 5m
+  # PostgreSQL cluster bootstrap (or disaster-recovery restore from B2)
+  # must complete before this Kustomization reports Ready.
+  timeout: 15m
+  wait: true
   sourceRef:
     kind: GitRepository
     name: flux-system
