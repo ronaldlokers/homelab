@@ -104,6 +104,50 @@ spec:
         - protocol: TCP
           port: 80
 ---
+# Allow Flux notification-controller to publish alerts to ntfy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-flux-notifications-ingress
+  namespace: ntfy
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: flux-system
+          podSelector:
+            matchLabels:
+              app: notification-controller
+      ports:
+        - protocol: TCP
+          port: 80
+---
+# Allow Alertmanager to publish alerts to ntfy (webhook receiver)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alertmanager-ingress
+  namespace: ntfy
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alertmanager
+      ports:
+        - protocol: TCP
+          port: 80
+---
 # Allow Prometheus to scrape ntfy pods
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

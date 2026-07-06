@@ -5,6 +5,7 @@ resources:
   - cert-manager
   - cloudnative-pg
   - external-services
+  - flux-alerts
   - metallb
   - traefik-default-cert.yaml
   - traefik-https-redirect-middleware.yaml

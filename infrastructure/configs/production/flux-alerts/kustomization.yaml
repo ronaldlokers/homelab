@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base/flux-alerts
+patches:
+  - target:
+      kind: Provider
+      name: ntfy
+    patch: |
+      - op: replace
+        path: /spec/address
+        value: "http://ntfy.ntfy.svc.cluster.local/flux?tpl=yes&t=Flux+production+{{.severity}}:+{{.involvedObject.kind}}/{{.involvedObject.name}}&m={{.message}}&priority=high&tags=warning"
+  - target:
+      kind: Alert
+      name: flux-errors
+    patch: |
+      - op: add
+        path: /spec/eventSources/-
+        value:
+          kind: HelmRelease
+          name: "*"
+          namespace: longhorn-system
+      - op: add
+        path: /spec/eventSources/-
+        value:
+          kind: HelmRelease
+          name: "*"
+          namespace: metallb-system
