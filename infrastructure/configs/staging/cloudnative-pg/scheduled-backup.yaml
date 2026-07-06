@@ -1,11 +1,27 @@
+---
+# NOTE: CNPG ScheduledBackup cron has SIX fields (leading seconds).
+# A five-field "0 2 * * *" means "minute 2 of every hour", not daily —
+# that bug ran hourly backups for months.
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
   name: postgres-cluster-daily-backup
   namespace: database
 spec:
-  schedule: "0 2 * * *"  # Daily at 2 AM
+  schedule: "0 0 2 * * *" # Daily at 2:00 AM
   backupOwnerReference: self
   cluster:
     name: postgres-cluster
-  immediate: true  # Take first backup immediately
+  immediate: true # Take first backup immediately
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: immich-cluster-daily-backup
+  namespace: database
+spec:
+  schedule: "0 30 2 * * *" # Daily at 2:30 AM (staggered after postgres-cluster)
+  backupOwnerReference: self
+  cluster:
+    name: immich-cluster
+  immediate: true # Take first backup immediately
