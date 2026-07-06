@@ -20,5 +20,15 @@ data:
     # login
     enable-login: true
 
+    # access control: users and default access (deny-all) are provisioned
+    # via NTFY_AUTH_* env vars from the SOPS secret. These ACL entries allow
+    # anonymous publishing (never reading) to the alerting topics so
+    # Alertmanager and Flux notification-controller can post without
+    # credentials. Switch to a provisioned token if these topics ever
+    # attract spam.
+    auth-access:
+      - "everyone:alerts:write-only"
+      - "everyone:flux:write-only"
+
     # metrics for prometheus
     enable-metrics: true

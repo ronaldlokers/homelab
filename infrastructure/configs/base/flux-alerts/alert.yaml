@@ -1,0 +1,31 @@
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Alert
+metadata:
+  name: flux-errors
+  namespace: flux-system
+spec:
+  providerRef:
+    name: ntfy
+  eventSeverity: error
+  eventSources:
+    - kind: GitRepository
+      name: "*"
+    - kind: Kustomization
+      name: "*"
+    # HelmRelease events are emitted in each release's namespace and
+    # cross-namespace references must be listed explicitly — add an entry
+    # here (or in the environment overlay) when adding a HelmRelease in a
+    # new namespace.
+    - kind: HelmRelease
+      name: "*"
+      namespace: cert-manager
+    - kind: HelmRelease
+      name: "*"
+      namespace: cnpg-system
+    - kind: HelmRelease
+      name: "*"
+      namespace: monitoring
+    - kind: HelmRelease
+      name: "*"
+      namespace: immich

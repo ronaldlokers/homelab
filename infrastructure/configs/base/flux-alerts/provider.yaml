@@ -1,0 +1,14 @@
+---
+# Sends Flux events to ntfy via its generic webhook endpoint.
+# ntfy inline templating (?tpl=yes) formats the title/message from the JSON
+# event body posted by notification-controller; '+' encodes spaces.
+# Base targets the public ntfy URL (used by staging, which has no in-cluster
+# ntfy); production patches this to the in-cluster service URL.
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Provider
+metadata:
+  name: ntfy
+  namespace: flux-system
+spec:
+  type: generic
+  address: "https://ntfy.ronaldlokers.nl/flux?tpl=yes&t=Flux+staging+{{.severity}}:+{{.involvedObject.kind}}/{{.involvedObject.name}}&m={{.message}}&priority=high&tags=warning"
