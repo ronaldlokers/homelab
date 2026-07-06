@@ -1,0 +1,23 @@
+---
+# Allow Alertmanager to deliver alert notifications to the ntfy webhook.
+# Complements allow-alertmanager-ingress on the ntfy side; without this,
+# monitoring's default-deny-egress rejects the connection.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alertmanager-to-ntfy
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ntfy
+      ports:
+        - protocol: TCP
+          port: 80
