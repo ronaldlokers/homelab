@@ -6,7 +6,10 @@ metadata:
 spec:
   interval: 1m0s
   retryInterval: 1m
-  timeout: 5m
+  # kube-prometheus-stack is a large release; allow it time to become
+  # healthy before dependents reconcile.
+  timeout: 10m
+  wait: true
   sourceRef:
     kind: GitRepository
     name: flux-system

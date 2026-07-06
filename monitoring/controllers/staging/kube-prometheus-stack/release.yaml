@@ -35,7 +35,7 @@ spec:
         enabled: true
         ingressClassName: traefik
         annotations:
-          cert-manager.io/cluster-issuer: letsencrypt-production
+          cert-manager.io/cluster-issuer: letsencrypt-staging
           traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
         hosts:
           - grafana.staging.ronaldlokers.nl
