@@ -33,6 +33,31 @@ spec:
               mountPath: /app/config
             - name: logs
               mountPath: /app/config/logs
+          # homepage validates the Host header and rejects pod-IP requests
+          # (400), so probes must send an allowed Host. "localhost:3000" is
+          # always allowed regardless of HOMEPAGE_ALLOWED_HOSTS.
+          livenessProbe:
+            httpGet:
+              path: /api/healthcheck
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost:3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/healthcheck
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost:3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
           resources:
             requests:
               cpu: 10m

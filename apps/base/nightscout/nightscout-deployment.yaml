@@ -16,7 +16,38 @@ spec:
         - name: nightscout
           image: nightscout/cgm-remote-monitor:15.0.7
           ports:
-            - containerPort: 1337
+            - name: http
+              containerPort: 1337
+          # Nightscout binds to the pod IP (it uses $HOSTNAME as bind
+          # address), not loopback — kubelet probes target the pod IP, so
+          # this works; exec/port-forward against localhost does not.
+          startupProbe:
+            httpGet:
+              path: /api/v1/status
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          livenessProbe:
+            httpGet:
+              path: /api/v1/status
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/v1/status
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           env:
             - name: DISPLAY_UNITS
               value: "mmol/L"

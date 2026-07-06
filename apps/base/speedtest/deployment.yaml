@@ -33,6 +33,37 @@ spec:
             - name: SPEEDTEST_SERVERS
               value: 6554,61186,52857
 
+          # LinuxServer s6 init + Laravel bootstrap can take a while on
+          # first start; the startup probe allows up to 2 minutes.
+          startupProbe:
+            httpGet:
+              path: /api/healthcheck
+              port: 80
+            periodSeconds: 5
+            failureThreshold: 24
+          livenessProbe:
+            httpGet:
+              path: /api/healthcheck
+              port: 80
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/healthcheck
+              port: 80
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # CPU limit is deliberately 1 full core: throttling during a
+          # speedtest run would skew the measured results.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
           volumeMounts:
             - mountPath: /config
               name: speedtest-config
