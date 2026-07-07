@@ -194,14 +194,19 @@ This will:
 
 Each environment uses its own age encryption key for SOPS. Create the secret in each cluster:
 
+Keys live in `~/.config/sops/age/keys.txt` (backed up in Proton Pass); each
+cluster gets only its own key:
+
 ```bash
-# For staging (staging-age.key stored in Proton Pass)
-cat staging-age.key | kubectl --context=staging create secret generic sops-age \
+# For staging
+grep -A1 "^# staging" ~/.config/sops/age/keys.txt | grep AGE-SECRET-KEY | \
+  kubectl --context=staging create secret generic sops-age \
   --namespace=flux-system \
   --from-file=age.agekey=/dev/stdin
 
-# For production (production-age.key stored in Proton Pass)
-cat production-age.key | kubectl --context=production create secret generic sops-age \
+# For production
+grep -A1 "^# production" ~/.config/sops/age/keys.txt | grep AGE-SECRET-KEY | \
+  kubectl --context=production create secret generic sops-age \
   --namespace=flux-system \
   --from-file=age.agekey=/dev/stdin
 ```

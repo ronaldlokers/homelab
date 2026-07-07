@@ -12,10 +12,22 @@ Flux automatically decrypts secrets during deployment using the cluster's age ke
 
 Each environment has its own SOPS configuration and age encryption key for security isolation:
 
-| Environment | Key File | Public Key | Storage |
-|------------|----------|------------|---------|
-| Staging | `staging-age.key` | `age1uq9nturwsx36q045qtrm85lkg8qmzpgk9srduqesxs2ahjurw53sp9rhm6` | Proton Pass |
-| Production | `production-age.key` | `age1hh6cdyljk2ks5mkmxqx6g65c7a8rgndy5p2s2d7w2gvqx4h53ggqtwr7rh` | Proton Pass |
+| Environment | Public Key | Backup |
+|------------|------------|---------|
+| Staging | `age1uq9nturwsx36q045qtrm85lkg8qmzpgk9srduqesxs2ahjurw53sp9rhm6` | Proton Pass |
+| Production | `age1hh6cdyljk2ks5mkmxqx6g65c7a8rgndy5p2s2d7w2gvqx4h53ggqtwr7rh` | Proton Pass |
+
+Both private keys live in SOPS's default key file `~/.config/sops/age/keys.txt`
+(one key per line, preceded by a `# staging` / `# production` comment) — **never
+inside the repository working tree**, where a `git add -f`, a careless
+`.gitignore` edit, or a directory tarball could leak them. SOPS reads this file
+automatically, so no `SOPS_AGE_KEY_FILE` export is needed and decryption works
+for both environments transparently.
+
+In the devcontainer, `~/.config/sops` is a named Docker volume (see
+`.devcontainer.json`), so the keys survive container rebuilds. The volume
+starts empty the first time: paste both keys from Proton Pass into
+`~/.config/sops/age/keys.txt` once (`chmod 600`).
 
 **Important**:
 - Private keys are stored in Proton Pass (not in Git)
@@ -89,16 +101,21 @@ This secret contains:
 
 Age private key for decrypting SOPS-encrypted secrets.
 
+Each cluster's secret must contain **only its own** key (extracted from
+`~/.config/sops/age/keys.txt` by its comment marker):
+
 **Create for staging**:
 ```bash
-cat staging-age.key | kubectl --context=staging create secret generic sops-age \
+grep -A1 "^# staging" ~/.config/sops/age/keys.txt | grep AGE-SECRET-KEY | \
+  kubectl --context=staging create secret generic sops-age \
   --namespace=flux-system \
   --from-file=age.agekey=/dev/stdin
 ```
 
 **Create for production**:
 ```bash
-cat production-age.key | kubectl --context=production create secret generic sops-age \
+grep -A1 "^# production" ~/.config/sops/age/keys.txt | grep AGE-SECRET-KEY | \
+  kubectl --context=production create secret generic sops-age \
   --namespace=flux-system \
   --from-file=age.agekey=/dev/stdin
 ```
@@ -263,7 +280,7 @@ Created by kube-prometheus-stack:
 
 ## Working with SOPS Secrets
 
-**Prerequisites**: Before working with SOPS secrets, ensure you have the private age key available. The key file should be in the repository root (e.g., `staging-age.key` or `production-age.key`).
+**Prerequisites**: The private age keys must be present in `~/.config/sops/age/keys.txt` (see [Encryption Keys](#encryption-keys)). SOPS finds them automatically — no environment variables required.
 
 ### Encrypting a New Secret
 
@@ -290,12 +307,8 @@ sops --age=$AGE_PUBLIC --encrypt --encrypted-regex '^(data|stringData)$' --in-pl
 ### Editing an Encrypted Secret
 
 ```bash
-# For staging
-export SOPS_AGE_KEY_FILE=/workspaces/homelab/staging-age.key
-sops path/to/secret.yaml
-
-# For production
-export SOPS_AGE_KEY_FILE=/workspaces/homelab/production-age.key
+# Works for both environments — SOPS picks the right key from
+# ~/.config/sops/age/keys.txt automatically
 sops path/to/secret.yaml
 ```
 
