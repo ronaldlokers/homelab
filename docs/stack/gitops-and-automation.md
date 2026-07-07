@@ -6,7 +6,7 @@ This document covers the tools used for GitOps and automation in the homelab.
 
 [Flux](https://fluxcd.io/) is the GitOps continuous delivery tool that manages the entire cluster state.
 
-**Version**: v2.7.5
+**Version**: managed by Renovate (see `clusters/*/flux-system/`)
 
 **Components**:
 - **source-controller**: Fetches artifacts from Git repositories and Helm repositories
@@ -22,10 +22,12 @@ This document covers the tools used for GitOps and automation in the homelab.
 5. SOPS-encrypted secrets are decrypted using the age key
 
 **Configuration**:
-- **Sync interval**: Every 10 minutes (configurable per Kustomization)
+- **Sync interval**: Git is polled every minute; Kustomizations reconcile every minute (the flux-system one every 10)
 - **Retry behavior**: Automatic retries with exponential backoff
 - **Prune**: Removes resources deleted from Git
-- **Health checks**: Waits for resources to become healthy before proceeding
+- **Health checks**: All Kustomizations set `wait: true` — dependents (`dependsOn`) wait for dependencies to be *healthy*, not just applied
+
+**Alerting**: `Provider`/`Alert` resources in `infrastructure/configs/*/flux-alerts/` send error-severity events (failed reconciliations, unhealthy rollouts) from notification-controller to ntfy — production via the in-cluster service, staging via the public URL. Titles are templated with ntfy's inline templating (`?tpl=yes`).
 
 **Reconciliation**:
 ```bash
@@ -52,7 +54,8 @@ flux get helmreleases --context=production
 **Configuration**:
 - Runs in `renovate` namespace
 - Uses GitHub personal access token for API access
-- Configured via `.github/renovate.json` in the repository
+- Configured via `renovate.json` at the repository root
+- The `flux` manager handles HelmRelease chart versions; the `kubernetes` and `kustomize` managers handle image tags (all versions are pinned per environment in the overlays, with base pins as fallbacks)
 - Creates PRs for dependency updates
 
 **How it works**:
@@ -64,6 +67,14 @@ flux get helmreleases --context=production
 
 **Workflow**:
 1. Renovate creates PR
-2. Review changes (optionally test in staging)
-3. Merge PR
-4. Flux automatically applies changes to the cluster
+2. CI validates and renders the change (see below)
+3. Review changes (optionally test in staging)
+4. Merge PR
+5. Flux automatically applies changes to the cluster
+
+## CI Validation
+
+Two GitHub Actions workflows gate every PR:
+
+- **`validate.yaml`** runs `scripts/validate.sh`: `kustomize build` on every overlay piped through [kubeconform](https://github.com/yannh/kubeconform) with Kubernetes, Flux, and CRD-catalog schemas (SOPS-encrypted Secrets are skipped). Also runnable locally before pushing.
+- **`flux-diff.yaml`** renders the full Flux tree (Kustomizations *and* HelmReleases, with real charts) for both the PR and base branch using [flate](https://github.com/home-operations/flate), runs `flate test all` on the PR tree, and posts the rendered diff as a sticky PR comment per cluster. This is what catches breaking chart upgrades — e.g. values-schema changes — before merge. It deliberately renders full-tree rather than using flate's changed-only mode, which misses edits under `apps/base/**` (flate ≤0.4.x); a base-branch render failure is non-fatal so a broken main never blocks the PR that fixes it.

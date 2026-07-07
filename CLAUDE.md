@@ -8,7 +8,7 @@ This is a production-grade GitOps-managed Kubernetes homelab running two environ
 - **Staging**: k3d cluster (1 server + 3 agents) in a Proxmox VM at 10.0.40.52
 - **Production**: HA K3s cluster (3 control plane nodes) on Raspberry Pi CM5 modules at 10.0.40.100 (MetalLB VIP)
 
-The entire infrastructure is declaratively configured and managed by Flux CD, with automatic reconciliation every 10 minutes.
+The entire infrastructure is declaratively configured and managed by Flux CD; new commits are picked up and applied within about a minute.
 
 ## User Context
 
@@ -108,22 +108,16 @@ kubectl describe pod -n <namespace> <pod-name> --context=production
 
 ### SOPS Secret Management
 
-**Prerequisites**: Private age keys are stored in Proton Pass (not in this repository). Export the key file path before working with secrets.
+**Prerequisites**: Both private age keys live in SOPS's default key file `~/.config/sops/age/keys.txt` (backed up in Proton Pass, never in the repository). SOPS finds them automatically — no `SOPS_AGE_KEY_FILE` export needed. In the devcontainer, `~/.config/sops` is a persistent named volume; if it's ever empty (first use after adding the volume), re-provision `keys.txt` from Proton Pass (see `docs/security.md`).
 
-**Edit encrypted secret**:
+**Edit encrypted secret** (either environment):
 ```bash
-# Staging
-export SOPS_AGE_KEY_FILE=/workspaces/homelab/staging-age.key
 sops apps/staging/linkding/linkding-container-env-secret.yaml
-
-# Production
-export SOPS_AGE_KEY_FILE=/workspaces/homelab/production-age.key
 sops apps/production/linkding/linkding-container-env-secret.yaml
 ```
 
 **View encrypted secret**:
 ```bash
-export SOPS_AGE_KEY_FILE=/workspaces/homelab/production-age.key
 sops --decrypt path/to/secret.yaml
 ```
 
@@ -165,9 +159,10 @@ flux bootstrap github \
   --personal
 ```
 
-**Create sops-age secret** (required after bootstrap):
+**Create sops-age secret** (required after bootstrap; each cluster gets only its own key):
 ```bash
-cat production-age.key | kubectl --context=production create secret generic sops-age \
+grep -A1 "^# production" ~/.config/sops/age/keys.txt | grep AGE-SECRET-KEY | \
+  kubectl --context=production create secret generic sops-age \
   --namespace=flux-system \
   --from-file=age.agekey=/dev/stdin
 ```
@@ -225,7 +220,7 @@ All resources follow **base/overlay pattern**:
 
 ### Key Technologies
 
-- **GitOps**: Flux CD v2.7.5 (automatic reconciliation every 10 minutes)
+- **GitOps**: Flux CD (version managed by Renovate; new commits applied within about a minute)
 - **Configuration**: Kustomize (base/overlay pattern) + Helm (via Flux HelmRelease CRDs)
 - **Secrets**: SOPS + age encryption (environment-specific keys)
 - **Storage**: Longhorn (production) with 3-replica HA, local-path (staging)
@@ -244,7 +239,7 @@ All resources follow **base/overlay pattern**:
 4. **Linkding** - Bookmark manager
 5. **Nightscout** - CGM remote monitoring (uses FerretDB for MongoDB compatibility)
 6. **ntfy** - Notification service with web push and iOS support (production only)
-7. **pgAdmin** - PostgreSQL administration (production only)
+7. **pgAdmin** - PostgreSQL administration
 8. **Speedtest Tracker** - Internet speed history with Grafana integration (production only)
 
 ### PostgreSQL Architecture
@@ -253,7 +248,7 @@ CloudNative-PG operator manages PostgreSQL clusters:
 - **Cluster Configuration**: 3 instances (1 primary + 2 replicas)
 - **High Availability**: Automatic failover
 - **Extensions**: DocumentDB extension for MongoDB compatibility (used by Nightscout via FerretDB)
-- **Backups**: Daily automated backups to Backblaze B2 with 30-day retention (production)
+- **Backups**: Daily automated backups to Backblaze B2 (7-day retention in production, 14-day in staging)
 - **WAL Archiving**: Continuous for point-in-time recovery (PITR)
 - **Disaster Recovery**: Bootstrap recovery mode for automatic restoration
 
@@ -288,7 +283,7 @@ External request → DNS → Load Balancer IP → Traefik → Service → Pod
 
 1. **Edit configuration files** in your working directory
 2. **Commit and push** to the main branch
-3. **Flux automatically reconciles** within 10 minutes
+3. **Flux automatically reconciles** within about a minute
 4. **Or force immediate sync**: `flux reconcile kustomization flux-system --context=production`
 
 ### Adding a New Application
@@ -364,16 +359,16 @@ flux resume kustomization <name> --context=production
 
 ### Secrets Security
 
-- **NEVER commit private age keys** - they are stored in Proton Pass
+- **NEVER commit private age keys** — they live in `~/.config/sops/age/keys.txt` (outside the repo) with Proton Pass as backup
 - **Verify encryption** before committing secrets (check that `data`/`stringData` fields are encrypted)
 - **Use correct environment key** - staging and production have separate keys
 - **Only `data` and `stringData` fields are encrypted** - metadata remains readable
 
 ### Deployment Timing
 
-- Flux reconciles every 10 minutes automatically
+- Git is polled every minute; Kustomizations reconcile every minute (the flux-system one every 10)
 - Manual reconciliation is instant: `flux reconcile kustomization flux-system`
-- Some resources depend on others - check `dependsOn` in Kustomization files
+- Some resources depend on others - check `dependsOn` in Kustomization files; all Kustomizations use `wait: true`, so dependents wait for dependencies to be *healthy*, not just applied
 - Infrastructure must be ready before applications deploy
 
 ### Resource Constraints

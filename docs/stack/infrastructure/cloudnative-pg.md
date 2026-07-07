@@ -28,20 +28,16 @@ The cluster uses PostgreSQL 17 with the DocumentDB extension installed, which pr
 - Optimized MongoDB-like operations at the database level
 - Required for Nightscout (via FerretDB) to function properly
 
-**Automatic Credential and Permission Management**:
+**DocumentDB Permissions**:
 
-A PostSync job (`grant-documentdb-permissions`) runs automatically after the cluster is created or updated to ensure proper configuration:
+The DocumentDB extension and the `app` user's grants (`documentdb_admin_role`, privileges on the `documentdb_*` schemas) exist in the running clusters and are carried along by backups, so any recovery-bootstrapped cluster gets them automatically. A *fresh* (initdb) bootstrap would not get them: when creating a cluster from scratch, wire the grant SQL into `bootstrap.initdb.postInitSQLRefs` (DocumentDB grants, in the `postgres` database) or `postInitApplicationSQL` (immich extensions). The SQL lives in git history (`infrastructure/configs/*/cloudnative-pg/grant-*-job.yaml`, removed 2026-07-06).
 
-1. **DocumentDB Extension Setup**: Creates the DocumentDB extension and all required schemas
-2. **Role Assignment**: Grants the `documentdb_admin_role` to the `app` user (required for FerretDB operations like SET ROLE)
-3. **Schema Permissions**: Grants necessary privileges on all DocumentDB schemas (documentdb_api, documentdb_core, documentdb_data, etc.)
-4. **Password Synchronization**: Resets the `app` user password to match the `postgres-cluster-app` secret
+The one-shot grant Jobs that used to live here were removed: `grant-documentdb-permissions` never completed (it connected as `postgres` without a password, which CNPG forbids by default), and `grant-immich-extensions` re-ran every ~6 minutes forever because Flux recreates TTL-deleted Jobs. Don't add one-shot Jobs with `ttlSecondsAfterFinished` to a Flux-reconciled tree.
 
-**Why Password Synchronization is Important**:
+**Password Synchronization after Restore**:
 - When restoring from backup, user passwords come from the backup data
 - Application secrets may have different passwords than the restored backup
-- The job ensures passwords are synchronized after every cluster deployment or restore
-- This prevents authentication failures in applications (linkding, FerretDB) after disaster recovery
+- If applications (linkding, FerretDB) fail to authenticate after a disaster recovery, reset the `app` password manually (below)
 
 **Manual Password Reset** (if needed):
 ```bash
@@ -99,9 +95,9 @@ CloudNative-PG uses Barman for automated backups to Backblaze B2 object storage.
 
 **Backup Configuration**:
 - **Storage**: Backblaze B2 (`s3://homelab-postgres-backups/`)
-- **Schedule**:
-  - Staging: Daily at 2 AM
-  - Production: Daily at 3 AM
+- **Schedule** (one `ScheduledBackup` per cluster; note CNPG cron has **six fields** with leading seconds — `"0 3 * * *"` means hourly at :03, a bug that ran for months):
+  - Staging: postgres-cluster daily at 2:00, immich-cluster at 2:30
+  - Production: postgres-cluster daily at 3:00, immich-cluster at 3:30
 - **Retention**:
   - Staging: 14 days
   - Production: 7 days (optimized for homelab cost efficiency)
@@ -112,7 +108,7 @@ CloudNative-PG uses Barman for automated backups to Backblaze B2 object storage.
   - immich-cluster: `production-2026-03-immich/`
 
 **How Backups Work**:
-1. Scheduled backup runs daily via CronJob
+1. A `ScheduledBackup` resource creates a `Backup` object daily per cluster
 2. Full backup of database cluster uploaded to B2
 3. WAL (Write-Ahead Log) files continuously archived
 4. Old backups automatically deleted per retention policy
@@ -262,7 +258,21 @@ Three critical alerts monitor database health and prevent failures:
    - **Purpose**: Monitors overall archiving health via CNPG operator metrics
    - **Action**: Check operator logs and B2 connectivity
 
-These alerts provide early detection of archiving issues before they cause PVC fill-up and database crashes. See [WAL Archiving Failure War Story](/docs/war-stories/postgres-wal-archiving-failure-pvc-fillup.md) for the incident that led to implementing these alerts.
+4. **PostgreSQLBackupTooOld**
+   - **Trigger**: Newest base backup older than 26 hours (per cluster)
+   - **Severity**: Critical
+   - **Purpose**: Catches a broken or missing ScheduledBackup — WAL archiving without a recent base backup degrades recoverability
+   - **Action**: Check the ScheduledBackup and recent Backup objects in the database namespace
+
+5. **PostgreSQLBackupNeverTaken**
+   - **Trigger**: A scraped cluster has no base backup at all (for 6 hours)
+   - **Severity**: Critical
+   - **Purpose**: A cluster with zero base backups is unrecoverable from object storage regardless of WAL archiving — this happened silently to immich-cluster for 4 months
+   - **Action**: Create a ScheduledBackup with `immediate: true`
+
+These alerts provide early detection of archiving and backup issues before they cause data-loss exposure or PVC fill-up. See the [WAL Archiving Failure](/docs/war-stories/postgres-wal-archiving-failure-pvc-fillup.md) and [Invisible Backup Gap](/docs/war-stories/cnpg-invisible-backup-gap.md) war stories for the incidents behind them.
+
+**Metrics plumbing**: the `cloudnative-pg-clusters` PodMonitor (monitoring/servicemonitors) matches *any* pod with a `cnpg.io/cluster` label and copies that label onto every series as `cnpg_io_cluster` via `podTargetLabels` — the alert expressions select on it. An earlier exact-match selector silently left immich-cluster unscraped and the label nonexistent.
 
 **Checking Alert Status**:
 ```bash

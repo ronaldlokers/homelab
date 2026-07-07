@@ -82,7 +82,7 @@ Flux monitors this repository and automatically applies changes in the following
    - kube-prometheus-stack with Grafana
    - Dashboards loaded after stack is ready
 
-Dependencies are enforced through Kustomization `dependsOn` fields to ensure correct ordering.
+Dependencies are enforced through Kustomization `dependsOn` fields, and every Kustomization sets `wait: true` — dependents wait for their dependencies to be *healthy* (kstatus), not merely applied. A failing rollout marks its Kustomization not-Ready and triggers a Flux → ntfy alert.
 
 ## Hardware
 
@@ -327,7 +327,7 @@ Full high-availability setup:
 - **Method**: Barman via CloudNative-PG operator
 - **Type**: Physical backups + WAL archiving
 - **Frequency**: Daily automated backups
-- **Retention**: 14 days (staging), 30 days (production)
+- **Retention**: 14 days (staging), 7 days (production)
 
 **Architecture**:
 ```
