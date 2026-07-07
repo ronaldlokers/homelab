@@ -24,13 +24,16 @@ inside the repository working tree**, where a `git add -f`, a careless
 automatically, so no `SOPS_AGE_KEY_FILE` export is needed and decryption works
 for both environments transparently.
 
-In the devcontainer, `~/.config/sops` is a named Docker volume (see
-`.devcontainer.json`), so the keys survive container rebuilds. The volume
-starts empty the first time: paste both keys from Proton Pass into
-`~/.config/sops/age/keys.txt` once (`chmod 600`).
+`keys.txt` is provisioned by the dotfiles repo
+(github.com/ronaldlokers/dotfiles): it is stored there age-encrypted with a
+dedicated dotfiles key and decrypted on `chezmoi apply`, which prompts once
+per machine for the dotfiles passphrase. Container rebuilds therefore need no
+manual key handling; Proton Pass holds the passphrase and both raw keys as
+the disaster-recovery backup.
 
 **Important**:
-- Private keys are stored in Proton Pass (not in Git)
+- Private keys are stored in Proton Pass and, age-encrypted, in the dotfiles
+  repo — never in plaintext in any repository
 - Public keys are used in `.sops.yaml` configuration files
 - Each environment can only decrypt its own secrets
 
