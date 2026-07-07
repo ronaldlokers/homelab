@@ -9,3 +9,9 @@ resources:
 patchesStrategicMerge:
   - deployment-patch.yaml
   - ferretdb-deployment-patch.yaml
+
+images:
+  - name: nightscout/cgm-remote-monitor
+    newTag: 15.0.7
+  - name: ghcr.io/ferretdb/ferretdb
+    newTag: 2.7.0

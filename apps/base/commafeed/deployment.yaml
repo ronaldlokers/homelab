@@ -18,7 +18,7 @@ spec:
         fsGroup: 65534 # Nobody user/group
       containers:
         - name: commafeed
-          image: athou/commafeed:latest-postgresql
+          image: athou/commafeed:7.1.0-postgresql
           ports:
             - name: http
               containerPort: 8082

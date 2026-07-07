@@ -9,3 +9,7 @@ patches:
     target:
       kind: Deployment
       name: commafeed
+
+images:
+  - name: athou/commafeed
+    newTag: 7.1.0-postgresql
