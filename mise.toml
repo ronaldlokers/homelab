@@ -15,3 +15,12 @@ age = "latest"
 
 [env]
 MISE_ENV_FILE = ".env"
+# krew installs kubectl plugins (e.g. kubectl-cnpg) into ~/.krew/bin
+_.path = ["~/.krew/bin"]
+
+[hooks]
+postinstall = "mise exec -- krew install cnpg"
+
+[settings]
+# hooks are still experimental in mise
+experimental = true
