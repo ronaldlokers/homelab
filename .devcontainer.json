@@ -3,7 +3,13 @@
   "features": {
     "ghcr.io/devcontainers-extra/features/neovim-homebrew:1": {}
   },
-  "onCreateCommand": "sudo chsh -s /usr/bin/zsh $USER",
+  "onCreateCommand": "sudo chsh -s /usr/bin/zsh $USER && sudo chown -R $USER: /home/vscode/.config/sops",
+  // Persist the SOPS age keys (~/.config/sops/age/keys.txt) across container
+  // rebuilds. The volume starts empty on first use: re-provision keys.txt
+  // from Proton Pass once (see docs/security.md).
+  "mounts": [
+    "source=sops-age-keys,target=/home/vscode/.config/sops,type=volume"
+  ],
   "settings": {
     "terminal.integrated.defaultProfile.linux": "zsh",
     "terminal.integrated.profiles.linux": {
