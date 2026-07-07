@@ -8,3 +8,7 @@ resources:
 patchesStrategicMerge:
   - configmap-patch.yaml
   - deployment-patch.yaml
+
+images:
+  - name: binwiederhier/ntfy
+    newTag: v2.25

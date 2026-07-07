@@ -8,3 +8,7 @@ resources:
 patches:
   - path: config-patch.yaml
   - path: deployment-patch.yaml
+
+images:
+  - name: ghcr.io/gethomepage/homepage
+    newTag: v1.13.2

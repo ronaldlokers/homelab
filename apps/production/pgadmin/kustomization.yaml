@@ -11,3 +11,7 @@ patches:
     target:
       kind: Deployment
       name: pgadmin4
+
+images:
+  - name: dpage/pgadmin4
+    newTag: "9.16"
