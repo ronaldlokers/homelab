@@ -24,6 +24,7 @@ These stories document actual problems, debugging processes, and solutions. They
 - **[Switching to Recreate Strategy Couldn't Fix Itself Through Git Alone](deployment-recreate-strategy-ssa-conflict.md)** - A server-side-apply edge case where a stale, API-server-defaulted field blocked a Deployment strategy change until a one-time imperative patch
 - **[A HelmRelease Stuck "Failed" for Seven Months While Its Pods Ran Fine](flux-helmrelease-terminal-failure.md)** - Flux's terminal-error circuit breaker silently blocking all future reconciliation attempts
 - **[A PostgreSQL Replica That Wouldn't Come Back](postgres-replica-networkpolicy-dataplane-sync.md)** - Ruling out a wrong node-flakiness hypothesis with a controlled A/B test, then finding a stale NetworkPolicy dataplane sync as the real cause
+- **[The Photo Database That Had Backups — Except It Didn't](cnpg-invisible-backup-gap.md)** - Four months of zero recoverability behind green dashboards: WAL archiving without a base backup, an hourly "daily" cron, an exact-match PodMonitor, and alerts selecting a label that never existed
 
 ### Applications
 

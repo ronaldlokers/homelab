@@ -152,7 +152,7 @@ Two shared labels on each app's `Namespace` (set in `apps/base/<app>/namespace.y
 - Commafeed: Fetch RSS feeds
 - Linkding: Fetch bookmark metadata
 - Homepage: Check external service status
-- Alertmanager: Send webhook notifications
+- Alertmanager: Send webhook notifications to external services (in-cluster ntfy delivery is covered by its own policy, see §11)
 - PostgreSQL: Backup to Backblaze B2
 
 **Security note**: Private networks are excluded to prevent pods from reaching internal infrastructure directly.
@@ -234,6 +234,18 @@ Two shared labels on each app's `Namespace` (set in `apps/base/<app>/namespace.y
 - **Replication**: Multiple write replicas share workload
 
 **Security note**: Only Loki write components need S3 access. Read components fetch from S3 through write components.
+
+### 11. Alerting Paths to ntfy
+
+**Purpose**: Deliver Alertmanager and Flux notifications to the in-cluster ntfy service.
+
+**Traffic allowed**:
+- Alertmanager pods (monitoring) → ntfy on port 80 — egress side in `infrastructure/configs/base/network-policies/allow-alertmanager-to-ntfy.yaml`, ingress side (`allow-alertmanager-ingress`) in `apps/base/ntfy/network-policies.yaml`
+- Flux notification-controller (flux-system) → ntfy on port 80 — ingress side (`allow-flux-notifications-ingress`) in `apps/base/ntfy/network-policies.yaml`; flux-system has a blanket egress allow, so no egress rule is needed there
+
+**Why needed**: Both alert pipelines POST webhooks to ntfy. Because monitoring has `default-deny-egress` with per-pod-label exceptions and ntfy has default-deny ingress, the path needs an allow on **both ends** — a missing one fails as `connection refused` (kube-router rejects) and the pipeline dies silently. That exact failure went unnoticed until 2026-07-06.
+
+**Security note**: Rules are scoped to the specific pods (`app.kubernetes.io/name: alertmanager`, `app: notification-controller`), not whole namespaces.
 
 ## Traffic Flows
 

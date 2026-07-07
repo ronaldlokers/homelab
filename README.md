@@ -103,7 +103,7 @@ Runs in a Sipeed NanoCluster with Raspberry Pi CM5 modules:
 ### GitOps Workflow
 
 1. Push changes to Git repository
-2. Flux detects changes within 10 minutes (or instant with manual reconciliation)
+2. Flux detects changes within about a minute (or instantly with manual reconciliation)
 3. Flux applies changes to the cluster
 4. Health checks ensure successful deployment
 

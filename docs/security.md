@@ -181,8 +181,8 @@ Backblaze B2 object storage credentials for PostgreSQL backups.
 **Backup Details**:
 - **Bucket**: `homelab-postgres-backups`
 - **Paths**: `staging/` and `production/` subdirectories
-- **Retention**: 14 days (staging), 30 days (production)
-- **Schedule**: Daily automated backups
+- **Retention**: 14 days (staging), 7 days (production)
+- **Schedule**: Daily automated backups per cluster (`ScheduledBackup` resources for both postgres-cluster and immich-cluster)
 
 **Security Notes**:
 - Credentials encrypted with SOPS
