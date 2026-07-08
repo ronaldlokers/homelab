@@ -2,12 +2,12 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: speedtest
 resources:
-  - ../../base/speedtest
-  - ingress.yaml
-  - speedtest-env-secret.yaml
-patchesStrategicMerge:
-  - deployment-patch.yaml
+- ../../base/speedtest
+- ingress.yaml
+- speedtest-env-secret.yaml
 
 images:
-  - name: lscr.io/linuxserver/speedtest-tracker
-    newTag: 1.14.5
+- name: lscr.io/linuxserver/speedtest-tracker
+  newTag: 1.14.5
+patches:
+- path: deployment-patch.yaml

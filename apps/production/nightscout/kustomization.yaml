@@ -2,16 +2,16 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: nightscout
 resources:
-  - ../../base/nightscout/
-  - nightscout-env-secret.yaml
-  - ferretdb-url-secret.yaml
-  - ingress.yaml
-patchesStrategicMerge:
-  - deployment-patch.yaml
-  - ferretdb-deployment-patch.yaml
+- ../../base/nightscout/
+- nightscout-env-secret.yaml
+- ferretdb-url-secret.yaml
+- ingress.yaml
 
 images:
-  - name: nightscout/cgm-remote-monitor
-    newTag: 15.0.7
-  - name: ghcr.io/ferretdb/ferretdb
-    newTag: 2.7.0
+- name: nightscout/cgm-remote-monitor
+  newTag: 15.0.7
+- name: ghcr.io/ferretdb/ferretdb
+  newTag: 2.7.0
+patches:
+- path: deployment-patch.yaml
+- path: ferretdb-deployment-patch.yaml
