@@ -10,14 +10,25 @@ set -euo pipefail
 # SOPS-encrypted Secrets carry a top-level `sops:` field that fails strict
 # validation, so Secrets are skipped entirely.
 kubeconform_flags=("-skip=Secret")
+# raw.githubusercontent.com rate-limits shared CI egress IPs (429s), and this
+# loop invokes kubeconform once per kustomization dir, so the same core-k8s
+# schema (ConfigMap, Secret, ...) would otherwise be re-fetched over the
+# network for every app. -cache makes each unique schema download once per
+# run. Local/cached locations are also checked before any network location:
+# Flux CRD schemas are already downloaded above, so "default" (upstream
+# kubeconform's yannh/kubernetes-json-schema raw lookup) is last, as fallback
+# for core Kubernetes kinds only.
 kubeconform_config=(
   "-strict"
   "-ignore-missing-schemas"
-  "-schema-location" "default"
+  "-cache" "/tmp/kubeconform-schema-cache"
   "-schema-location" "/tmp/flux-crd-schemas"
   "-schema-location" "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
+  "-schema-location" "default"
   "-summary"
 )
+
+mkdir -p /tmp/kubeconform-schema-cache
 
 if [[ ! -d /tmp/flux-crd-schemas/master-standalone-strict ]]; then
   echo "INFO - Downloading Flux OpenAPI schemas"
