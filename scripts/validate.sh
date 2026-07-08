@@ -4,25 +4,27 @@
 #
 # Prerequisites: kustomize, kubeconform
 # Flux CRD schemas are downloaded to /tmp/flux-crd-schemas on each run.
+# Core Kubernetes schemas are downloaded to /tmp/k8s-json-schemas on each run.
 
 set -euo pipefail
 
 # SOPS-encrypted Secrets carry a top-level `sops:` field that fails strict
 # validation, so Secrets are skipped entirely.
 kubeconform_flags=("-skip=Secret")
-# raw.githubusercontent.com rate-limits shared CI egress IPs (429s), and this
-# loop invokes kubeconform once per kustomization dir, so the same core-k8s
-# schema (ConfigMap, Secret, ...) would otherwise be re-fetched over the
-# network for every app. -cache makes each unique schema download once per
-# run. Local/cached locations are also checked before any network location:
-# Flux CRD schemas are already downloaded above, so "default" (upstream
-# kubeconform's yannh/kubernetes-json-schema raw lookup) is last, as fallback
-# for core Kubernetes kinds only.
+# kubeconform's "default" schema location fetches one file per resource from
+# raw.githubusercontent.com, which rate-limits (429) shared CI egress IPs —
+# and this script invokes kubeconform once per kustomization dir, so the same
+# core-k8s schema (ConfigMap, Secret, ...) would otherwise be re-fetched over
+# the network for every app. Both schema sets below are instead bulk-fetched
+# once up front (git/tarball, not per-file HTTP) so validation runs fully
+# offline; "default" is kept only as a last-resort fallback. -cache also
+# makes any resource ultimately served by "default" download once per run.
 kubeconform_config=(
   "-strict"
   "-ignore-missing-schemas"
   "-cache" "/tmp/kubeconform-schema-cache"
   "-schema-location" "/tmp/flux-crd-schemas"
+  "-schema-location" "/tmp/k8s-json-schemas"
   "-schema-location" "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
   "-schema-location" "default"
   "-summary"
@@ -35,6 +37,13 @@ if [[ ! -d /tmp/flux-crd-schemas/master-standalone-strict ]]; then
   mkdir -p /tmp/flux-crd-schemas/master-standalone-strict
   curl -sL https://github.com/fluxcd/flux2/releases/latest/download/crd-schemas.tar.gz |
     tar zxf - -C /tmp/flux-crd-schemas/master-standalone-strict
+fi
+
+if [[ ! -d /tmp/k8s-json-schemas/master-standalone-strict ]]; then
+  echo "INFO - Downloading core Kubernetes OpenAPI schemas"
+  git clone --depth 1 --filter=blob:none --sparse -q \
+    https://github.com/yannh/kubernetes-json-schema.git /tmp/k8s-json-schemas
+  git -C /tmp/k8s-json-schemas sparse-checkout set master-standalone-strict
 fi
 
 echo "INFO - Validating cluster manifests"
