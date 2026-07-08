@@ -20,6 +20,8 @@ _.path = ["~/.krew/bin"]
 
 [hooks]
 postinstall = "mise exec -- krew install cnpg"
+# self-heal when mise.toml changes after container creation; no-op is fast
+enter = "mise install -q"
 
 [settings]
 # hooks are still experimental in mise
