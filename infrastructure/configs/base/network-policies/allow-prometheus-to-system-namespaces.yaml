@@ -53,22 +53,46 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: cert-manager
-    # Allow Prometheus to scrape node IPs for node-exporter (hostPort 9100)
+    # Allow Prometheus to scrape node IPs directly for hostNetwork-bound
+    # targets. namespaceSelector egress rules only match traffic to pod IPs,
+    # so anything bound to the node's own IP is invisible to those rules
+    # above: kubelet has no pod at all, and metallb-speaker runs with
+    # hostNetwork: true, making its "pod IP" the node IP too. Node-exporter
+    # (9100) already needed this same workaround; kubelet (10250) and
+    # metallb-speaker (7472 metrics, 7473 frr-metrics) need it too.
     - to:
         - ipBlock:
             cidr: 10.0.40.101/32
       ports:
         - protocol: TCP
           port: 9100
+        - protocol: TCP
+          port: 10250
+        - protocol: TCP
+          port: 7472
+        - protocol: TCP
+          port: 7473
     - to:
         - ipBlock:
             cidr: 10.0.40.102/32
       ports:
         - protocol: TCP
           port: 9100
+        - protocol: TCP
+          port: 10250
+        - protocol: TCP
+          port: 7472
+        - protocol: TCP
+          port: 7473
     - to:
         - ipBlock:
             cidr: 10.0.40.103/32
       ports:
         - protocol: TCP
           port: 9100
+        - protocol: TCP
+          port: 10250
+        - protocol: TCP
+          port: 7472
+        - protocol: TCP
+          port: 7473
