@@ -14,27 +14,33 @@ data:
       header: "Homelab Status (staging)"
 
     endpoints:
+      # Staging apps use the Let's Encrypt *staging* issuer (untrusted CA), so
+      # skip TLS verification here. Cert-expiry checks are dropped for these —
+      # meaningless on throwaway staging certs. Kept on real external targets.
       - name: linkding
         group: homelab
         url: "https://linkding.staging.ronaldlokers.nl/health"
         interval: 60s
+        client:
+          insecure: true
         conditions:
           - "[STATUS] == 200"
-          - "[CERTIFICATE_EXPIRATION] > 240h"
       - name: immich
         group: homelab
         url: "https://immich.staging.ronaldlokers.nl/api/server/ping"
         interval: 60s
+        client:
+          insecure: true
         conditions:
           - "[STATUS] == 200"
-          - "[CERTIFICATE_EXPIRATION] > 240h"
       - name: mealie
         group: homelab
         url: "https://mealie.staging.ronaldlokers.nl/api/app/about"
         interval: 60s
+        client:
+          insecure: true
         conditions:
           - "[STATUS] == 200"
-          - "[CERTIFICATE_EXPIRATION] > 240h"
       - name: lokilabs-healthz
         group: external
         url: "https://lokilabs.nl/api/healthz"
