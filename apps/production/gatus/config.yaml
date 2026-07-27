@@ -1,0 +1,73 @@
+metrics: true
+
+# Persist check history across restarts (production). Connects as the shared
+# `app` role via trust auth (empty password), same as every other app.
+storage:
+  type: postgres
+  path: "postgres://app@postgres-cluster-rw.database.svc.cluster.local:5432/gatus?sslmode=disable"
+
+ui:
+  title: "Homelab Status"
+  header: "Homelab Status"
+
+endpoints:
+  - name: linkding
+    group: homelab
+    url: "https://linkding.ronaldlokers.nl/health"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+  - name: immich
+    group: homelab
+    url: "https://immich.ronaldlokers.nl/api/server/ping"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+  - name: mealie
+    group: homelab
+    url: "https://mealie.ronaldlokers.nl/api/app/about"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+  - name: ntfy
+    group: homelab
+    url: "https://ntfy.ronaldlokers.nl/v1/health"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+  - name: lokilabs-healthz
+    group: external
+    url: "https://lokilabs.nl/api/healthz"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+  - name: proxmox
+    group: infrastructure
+    url: "https://proxmox.ronaldlokers.nl"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+
+# ---------------------------------------------------------------------------
+# ntfy alerting — production runs ntfy, but it is auth deny-all, so Gatus needs
+# a dedicated publish token. To enable: create an ntfy user/token for gatus with
+# write access to the topic, store it in a SOPS secret, inject it as
+# ${NTFY_TOKEN} via env, uncomment below, and add `alerts: [{type: ntfy}]` to
+# the endpoints you want alerting on.
+# ---------------------------------------------------------------------------
+# alerting:
+#   ntfy:
+#     url: "https://ntfy.ronaldlokers.nl"
+#     topic: "homelab-gatus"
+#     token: "${NTFY_TOKEN}"
+#     priority: 3
+#     default-alert:
+#       failure-threshold: 3
+#       success-threshold: 2
+#       send-on-resolved: true
