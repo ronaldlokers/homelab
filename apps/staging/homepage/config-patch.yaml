@@ -50,10 +50,6 @@ data:
             icon: gatus.png
             href: https://gatus.staging.ronaldlokers.nl
             description: Uptime monitoring
-        - Gatus:
-            icon: gatus.png
-            href: https://gatus.staging.ronaldlokers.nl
-            description: Uptime monitoring
             widget:
               type: gatus
               url: http://gatus.gatus.svc.cluster.local:8080
