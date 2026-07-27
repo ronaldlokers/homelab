@@ -39,6 +39,14 @@ spec:
     initdb:
       database: app
       owner: app
+      # A fresh initdb DB has no extensions; on production these come from the
+      # restore. FerretDB (nightscout) needs the DocumentDB extension, which
+      # must live in the "postgres" DB (pg_cron is pinned there). postInitSQL
+      # runs as superuser against the postgres DB at bootstrap; grant the app
+      # user the documentdb role so FerretDB can use documentdb_api.
+      postInitSQL:
+        - CREATE EXTENSION IF NOT EXISTS documentdb CASCADE;
+        - GRANT documentdb_admin_role TO app;
 
   storage:
     size: 10Gi
