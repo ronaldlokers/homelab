@@ -1,0 +1,33 @@
+# Production Gatus checks in-cluster services directly (the external VIP isn't
+# reachable pod->VIP from inside), so it needs egress to the monitored app
+# namespaces on their service ports, plus the Proxmox backend host. External
+# targets on 443 (lokilabs) are covered by the base allow-egress-monitoring.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-internal-targets
+  namespace: gatus
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              homelab.io/app: "true"
+      ports:
+        - protocol: TCP
+          port: 9090 # linkding
+        - protocol: TCP
+          port: 2283 # immich-server
+        - protocol: TCP
+          port: 9000 # mealie
+        - protocol: TCP
+          port: 80 # ntfy (health check + alert publishing)
+    - to:
+        - ipBlock:
+            cidr: 10.0.40.20/32
+      ports:
+        - protocol: TCP
+          port: 8006 # proxmox backend

@@ -5,6 +5,7 @@ resources:
   - ../../base/gatus/
   - ingress.yaml
   - network-policy-database.yaml
+  - network-policy-egress.yaml
   - gatus-alerting-secret.yaml
 patches:
   - path: deployment-patch.yaml
