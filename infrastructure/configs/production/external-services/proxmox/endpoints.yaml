@@ -5,7 +5,7 @@ metadata:
   namespace: external-services
 subsets:
   - addresses:
-      - ip: 10.0.1.10
+      - ip: 10.0.40.20
     ports:
       - name: https
         port: 8006
