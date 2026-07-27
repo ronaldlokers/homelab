@@ -25,6 +25,12 @@ data:
               key: qvnCcXWT9a8SShkZCHvtgCl3SW9Ta6QLcuCBTqJD94
               version: 2
 
+    - Food:
+        - Mealie:
+            icon: mealie.png
+            href: https://mealie.staging.ronaldlokers.nl
+            description: Recipe manager
+
     - Health:
         - Nightscout:
             icon: nightscout.png
