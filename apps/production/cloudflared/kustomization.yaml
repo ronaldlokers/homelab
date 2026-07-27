@@ -5,5 +5,4 @@ resources:
   - namespace.yaml
   - deployment.yaml
   - network-policies.yaml
-  # cloudflared-token secret (SOPS) is added once the Cloudflare tunnel token
-  # is available; the Deployment references it via secretKeyRef.
+  - cloudflared-token-secret.yaml
