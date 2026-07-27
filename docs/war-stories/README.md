@@ -31,6 +31,7 @@ These stories document actual problems, debugging processes, and solutions. They
 - [Immich Ingress and Version Management](immich-helm-migration.md) - Moving from separate Ingress resources to Helm-managed configuration
 - [HPA Not Working Without Resource Requests](hpa-resource-requests.md) - Why HPAs show `<unknown>` CPU metrics
 - **[Restoring a Mealie Backup: Superuser, Version Match, and a Login Loop](mealie-postgres-restore-superuser.md)** - Four cascading failures behind one "restore my backup", from `ALTER USER mealie` (wrong role) to a JWT secret swapped in by the restore
+- **[Deploying an In-Cluster Monitor to Production: The VIP It Couldn't Reach and the Database Gate](gatus-production-vip-and-database-gate.md)** - Gatus passed in staging then failed every check in production: a pod that couldn't reach its own MetalLB VIP, plus a label-gated database namespace blocking Postgres storage
 
 ## Lessons Learned
 
@@ -76,6 +77,10 @@ These stories document actual problems, debugging processes, and solutions. They
 40. **Database backups are often version-locked** - Mealie restores a raw schema without migrating; restore into the matching app version, then let startup migrations move data forward
 41. **A restore that deletes-before-importing can lock you out** - An aborted restore leaves an empty, admin-less app; an empty users table + pod restart re-seeds the default admin
 42. **Restart apps after a DB restore** - Secrets/keys shipped inside the backup (e.g. Mealie's JWT signing key) desync a running process until it reloads
+43. **Don't monitor in-cluster services through your own external VIP** - Resolve them by internal ClusterIP DNS; the MetalLB VIP round-trip tests the LB hairpin, not the service, and may not work pod → own-VIP at all
+44. **Staging (k3d) can't surface MetalLB/LB-hairpin behaviour** - A monitor that passes in staging can still fail every check in production because the load-balancer implementation is fundamentally different
+45. **A one-shot curl succeeding doesn't prove sustained connectivity** - Same-node/same-namespace curl reaching a VIP while a long-lived pod can't is the contradiction that rules out node/ETP/policy as the cause
+46. **Label-gated namespaces bite promotions, not first deploys** - Production's `database` namespace admits only `homelab.io/needs-database` namespaces; Postgres storage silently fails without the label
 
 ## Contributing Your Own War Stories
 
