@@ -1,0 +1,81 @@
+metrics: true
+
+# Persist check history across restarts (production). Connects as the shared
+# `app` role via trust auth (empty password), same as every other app.
+storage:
+  type: postgres
+  path: "postgres://app@postgres-cluster-rw.database.svc.cluster.local:5432/gatus?sslmode=disable"
+
+ui:
+  title: "Homelab Status"
+  header: "Homelab Status"
+
+# Alerts publish to the ntfy topic "homelab-gatus". The publish token is
+# injected as ${NTFY_TOKEN} from the SOPS-encrypted `gatus-alerting` secret
+# (see deployment-patch.yaml). Subscribe to that topic in the ntfy app.
+alerting:
+  ntfy:
+    url: "https://ntfy.ronaldlokers.nl"
+    topic: "homelab-gatus"
+    token: "${NTFY_TOKEN}"
+    priority: 3
+    default-alert:
+      failure-threshold: 3
+      success-threshold: 2
+      send-on-resolved: true
+
+endpoints:
+  - name: linkding
+    group: homelab
+    url: "https://linkding.ronaldlokers.nl/health"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+    alerts:
+      - type: ntfy
+  - name: immich
+    group: homelab
+    url: "https://immich.ronaldlokers.nl/api/server/ping"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+    alerts:
+      - type: ntfy
+  - name: mealie
+    group: homelab
+    url: "https://mealie.ronaldlokers.nl/api/app/about"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+    alerts:
+      - type: ntfy
+  - name: ntfy
+    group: homelab
+    url: "https://ntfy.ronaldlokers.nl/v1/health"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+    alerts:
+      - type: ntfy
+  - name: lokilabs-healthz
+    group: external
+    url: "https://lokilabs.nl/api/healthz"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+    alerts:
+      - type: ntfy
+  - name: proxmox
+    group: infrastructure
+    url: "https://proxmox.ronaldlokers.nl"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+    alerts:
+      - type: ntfy
