@@ -7,6 +7,7 @@ resources:
   - external-services
   - flux-alerts
   - metallb
+  - tailscale
   - traefik-default-cert.yaml
   - traefik-https-redirect-middleware.yaml
   - traefik-local-network-only-middleware.yaml
