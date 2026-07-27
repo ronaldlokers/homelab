@@ -48,6 +48,13 @@ data:
         conditions:
           - "[STATUS] == 200"
           - "[CERTIFICATE_EXPIRATION] > 240h"
+      - name: proxmox
+        group: infrastructure
+        url: "https://proxmox.ronaldlokers.nl"
+        interval: 60s
+        conditions:
+          - "[STATUS] == 200"
+          - "[CERTIFICATE_EXPIRATION] > 240h"
 
     # ---------------------------------------------------------------------------
     # Push / heartbeat (dead-man's-switch) template — config-as-code ready.
