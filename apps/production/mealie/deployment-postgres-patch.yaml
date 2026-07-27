@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mealie
+spec:
+  strategy:
+    type: Recreate
+  template:
+    spec:
+      containers:
+        - name: mealie
+          image: ghcr.io/mealie-recipes/mealie:v3.21.0
+          env:
+            - name: DB_ENGINE
+              value: "postgres"
+            - name: POSTGRES_SERVER
+              value: "postgres-cluster-rw.database.svc.cluster.local"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: "mealie"
+            - name: POSTGRES_USER
+              value: "app"
+            - name: POSTGRES_PASSWORD
+              value: ""
+            - name: BASE_URL
+              value: "https://mealie.ronaldlokers.nl"
+            - name: TZ
+              value: "Europe/Amsterdam"
+            - name: ALLOW_SIGNUP
+              value: "false"
+            - name: PUID
+              value: "911"
+            - name: PGID
+              value: "911"
+          volumeMounts:
+            - name: mealie-data
+              mountPath: "/app/data"
+      volumes:
+        - name: mealie-data
+          persistentVolumeClaim:
+            claimName: mealie-data
