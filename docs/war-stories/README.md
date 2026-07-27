@@ -30,6 +30,7 @@ These stories document actual problems, debugging processes, and solutions. They
 
 - [Immich Ingress and Version Management](immich-helm-migration.md) - Moving from separate Ingress resources to Helm-managed configuration
 - [HPA Not Working Without Resource Requests](hpa-resource-requests.md) - Why HPAs show `<unknown>` CPU metrics
+- **[Restoring a Mealie Backup: Superuser, Version Match, and a Login Loop](mealie-postgres-restore-superuser.md)** - Four cascading failures behind one "restore my backup", from `ALTER USER mealie` (wrong role) to a JWT secret swapped in by the restore
 
 ## Lessons Learned
 
@@ -71,6 +72,10 @@ These stories document actual problems, debugging processes, and solutions. They
 36. **A/B tests with throwaway resources are cheap and decisive** - Two pods on the same node, one variable changed, settles a hypothesis in under a minute
 37. **CNPG doesn't reuse instance ordinals by design** - A "missing" `postgres-cluster-1` after recreation isn't data loss, it's intentional identity separation
 38. **Never hardcode a specific database instance ordinal in scripts or docs** - Discover the current primary dynamically via its role label instead
+39. **App backup/restore assumes a dedicated DB user** - In a shared-`app` CNPG cluster, "make the app user a superuser" elevates every database at once; scope and revert the grant deliberately
+40. **Database backups are often version-locked** - Mealie restores a raw schema without migrating; restore into the matching app version, then let startup migrations move data forward
+41. **A restore that deletes-before-importing can lock you out** - An aborted restore leaves an empty, admin-less app; an empty users table + pod restart re-seeds the default admin
+42. **Restart apps after a DB restore** - Secrets/keys shipped inside the backup (e.g. Mealie's JWT signing key) desync a running process until it reloads
 
 ## Contributing Your Own War Stories
 
