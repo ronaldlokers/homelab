@@ -10,6 +10,20 @@ ui:
   title: "Homelab Status"
   header: "Homelab Status"
 
+# Alerts publish to the ntfy topic "homelab-gatus". The publish token is
+# injected as ${NTFY_TOKEN} from the SOPS-encrypted `gatus-alerting` secret
+# (see deployment-patch.yaml). Subscribe to that topic in the ntfy app.
+alerting:
+  ntfy:
+    url: "https://ntfy.ronaldlokers.nl"
+    topic: "homelab-gatus"
+    token: "${NTFY_TOKEN}"
+    priority: 3
+    default-alert:
+      failure-threshold: 3
+      success-threshold: 2
+      send-on-resolved: true
+
 endpoints:
   - name: linkding
     group: homelab
@@ -18,6 +32,8 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[CERTIFICATE_EXPIRATION] > 240h"
+    alerts:
+      - type: ntfy
   - name: immich
     group: homelab
     url: "https://immich.ronaldlokers.nl/api/server/ping"
@@ -25,6 +41,8 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[CERTIFICATE_EXPIRATION] > 240h"
+    alerts:
+      - type: ntfy
   - name: mealie
     group: homelab
     url: "https://mealie.ronaldlokers.nl/api/app/about"
@@ -32,6 +50,8 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[CERTIFICATE_EXPIRATION] > 240h"
+    alerts:
+      - type: ntfy
   - name: ntfy
     group: homelab
     url: "https://ntfy.ronaldlokers.nl/v1/health"
@@ -39,6 +59,8 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[CERTIFICATE_EXPIRATION] > 240h"
+    alerts:
+      - type: ntfy
   - name: lokilabs-healthz
     group: external
     url: "https://lokilabs.nl/api/healthz"
@@ -46,6 +68,8 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[CERTIFICATE_EXPIRATION] > 240h"
+    alerts:
+      - type: ntfy
   - name: proxmox
     group: infrastructure
     url: "https://proxmox.ronaldlokers.nl"
@@ -53,21 +77,5 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[CERTIFICATE_EXPIRATION] > 240h"
-
-# ---------------------------------------------------------------------------
-# ntfy alerting — production runs ntfy, but it is auth deny-all, so Gatus needs
-# a dedicated publish token. To enable: create an ntfy user/token for gatus with
-# write access to the topic, store it in a SOPS secret, inject it as
-# ${NTFY_TOKEN} via env, uncomment below, and add `alerts: [{type: ntfy}]` to
-# the endpoints you want alerting on.
-# ---------------------------------------------------------------------------
-# alerting:
-#   ntfy:
-#     url: "https://ntfy.ronaldlokers.nl"
-#     topic: "homelab-gatus"
-#     token: "${NTFY_TOKEN}"
-#     priority: 3
-#     default-alert:
-#       failure-threshold: 3
-#       success-threshold: 2
-#       send-on-resolved: true
+    alerts:
+      - type: ntfy

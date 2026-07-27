@@ -5,6 +5,9 @@ resources:
   - ../../base/gatus/
   - ingress.yaml
   - network-policy-database.yaml
+  - gatus-alerting-secret.yaml
+patches:
+  - path: deployment-patch.yaml
 # Replace the base (staging) Gatus config with the production one: postgres
 # storage + production URLs. behavior:replace swaps the base generator's content
 # and recomputes the hash, so the deployment's volume ref tracks it.
