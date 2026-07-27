@@ -33,12 +33,12 @@ spec:
                   service:
                     identifier: main
                     port: 2283
-            # Private-only host: resolves to the VIP via the wildcard DNS record
-            # (not proxied through Cloudflare Tunnel), so it's reachable over
-            # LAN/tailnet with no Cloudflare 100MB upload cap. Point the Immich
-            # app here for uploading large videos; keep immich.ronaldlokers.nl
-            # (public via the tunnel) for sharing/viewing.
-            - host: immich-internal.ronaldlokers.nl
+            # Private-only host under the *.private.ronaldlokers.nl zone: resolves
+            # to the VIP (private DNS wildcard), never proxied through Cloudflare
+            # Tunnel, so it's reachable over LAN/tailnet with no 100MB upload cap.
+            # Point the Immich app here for uploading large videos; keep
+            # immich.ronaldlokers.nl (public via the tunnel) for sharing/viewing.
+            - host: immich.private.ronaldlokers.nl
               paths:
                 - path: /
                   pathType: Prefix
@@ -49,7 +49,7 @@ spec:
             - secretName: wildcard-ronaldlokers-nl-tls
               hosts:
                 - immich.ronaldlokers.nl
-                - immich-internal.ronaldlokers.nl
+                - immich.private.ronaldlokers.nl
     machine-learning:
       persistence:
         cache:
