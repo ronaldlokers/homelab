@@ -98,3 +98,38 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+---
+# Allow mealie to fetch recipes from external URLs (recipe import).
+# Excludes internal/reserved IPv4 ranges so the scraper can't be pointed at
+# cluster, LAN, or link-local/metadata services (SSRF guard). The ipBlock
+# except filters on the resolved destination IP, so it also defeats DNS
+# rebinding for these ranges. IPv6 egress needs no rule here: nothing grants
+# an IPv6 allow, so default-deny-egress already blocks it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-internet-egress
+  namespace: mealie
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8        # RFC1918 private
+              - 172.16.0.0/12     # RFC1918 private
+              - 192.168.0.0/16    # RFC1918 private
+              - 169.254.0.0/16    # link-local / cloud metadata
+              - 127.0.0.0/8       # loopback
+              - 100.64.0.0/10     # CGNAT (RFC6598)
+              - 192.0.0.0/24      # IETF protocol assignments
+              - 198.18.0.0/15     # benchmarking
+              - 224.0.0.0/4       # multicast
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
