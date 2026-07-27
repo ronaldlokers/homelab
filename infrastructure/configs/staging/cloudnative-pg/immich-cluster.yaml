@@ -31,6 +31,15 @@ spec:
     initdb:
       database: app
       owner: app
+      # A fresh initdb DB has no extensions; on production these come from the
+      # restore. Immich connects to the "immich" database (created by its
+      # Database resource from template1), so seed the extensions into
+      # template1 and the immich DB inherits them at creation time. Without
+      # this, immich migrations can't build their schema on a rebuild.
+      postInitTemplateSQL:
+        - CREATE EXTENSION IF NOT EXISTS vchord CASCADE;
+        - CREATE EXTENSION IF NOT EXISTS cube;
+        - CREATE EXTENSION IF NOT EXISTS earthdistance;
 
   storage:
     size: 20Gi
