@@ -47,7 +47,11 @@ spec:
   backup:
     retentionPolicy: "14d"
     barmanObjectStore:
-      destinationPath: "s3://homelab-postgres-backups/staging/"
+      # Fresh timeline. The old "staging/" prefix accumulates WALs and trips
+      # barman "Expected empty archive" on restart/failover/rebuild (a fresh
+      # initdb cluster must archive into an empty prefix). Bump this date on
+      # each staging rebuild, or purge the path.
+      destinationPath: "s3://homelab-postgres-backups/staging-2026-07/"
       endpointURL: "https://s3.eu-central-003.backblazeb2.com"
       s3Credentials:
         accessKeyId:
