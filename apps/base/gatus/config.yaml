@@ -1,0 +1,76 @@
+metrics: true
+
+storage:
+  type: memory
+
+ui:
+  title: "Homelab Status — Staging"
+  header: "Homelab Status (staging)"
+
+endpoints:
+  # Staging apps use the Let's Encrypt *staging* issuer (untrusted CA), so
+  # skip TLS verification here. Cert-expiry checks are dropped for these —
+  # meaningless on throwaway staging certs. Kept on real external targets.
+  - name: linkding
+    group: homelab
+    url: "https://linkding.staging.ronaldlokers.nl/health"
+    interval: 60s
+    client:
+      insecure: true
+    conditions:
+      - "[STATUS] == 200"
+  - name: immich
+    group: homelab
+    url: "https://immich.staging.ronaldlokers.nl/api/server/ping"
+    interval: 60s
+    client:
+      insecure: true
+    conditions:
+      - "[STATUS] == 200"
+  - name: mealie
+    group: homelab
+    url: "https://mealie.staging.ronaldlokers.nl/api/app/about"
+    interval: 60s
+    client:
+      insecure: true
+    conditions:
+      - "[STATUS] == 200"
+  - name: lokilabs-healthz
+    group: external
+    url: "https://lokilabs.nl/api/healthz"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+  - name: proxmox
+    group: infrastructure
+    url: "https://proxmox.ronaldlokers.nl"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+
+# ---------------------------------------------------------------------------
+# Push / heartbeat (dead-man's-switch) template — config-as-code ready.
+# Uncomment and provide HEARTBEAT_TOKEN via a SOPS secret (env substitution)
+# to enable. Left disabled so an unpinged endpoint doesn't false-alert.
+# ---------------------------------------------------------------------------
+# external-endpoints:
+#   - name: example-cronjob
+#     group: heartbeats
+#     token: "${HEARTBEAT_TOKEN}"
+#     heartbeat:
+#       interval: 30m
+#     conditions:
+#       - "[STATUS] == 200"
+
+# ---------------------------------------------------------------------------
+# Alerting via ntfy — staging has no in-cluster ntfy (production-only), so this
+# is a ready template pointing at the production instance. Add a topic/token
+# (SOPS) and per-endpoint `alerts:` blocks to enable.
+# ---------------------------------------------------------------------------
+# alerting:
+#   ntfy:
+#     url: "https://ntfy.ronaldlokers.nl"
+#     topic: "homelab-gatus-staging"
+#     priority: 3
