@@ -1,13 +1,42 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "kubernetes": {
-    "fileMatch": [
-      "\\.yaml$"
+    "managerFilePatterns": [
+      "/\\.yaml$/"
     ]
   },
   "flux": {
-    "fileMatch": [
-      "(^|/)(apps|infrastructure|monitoring|clusters)/.+\\.yaml$"
+    "managerFilePatterns": [
+      "/(^|/)(apps|infrastructure|monitoring|clusters)/.+\\.yaml$/"
     ]
-  }
+  },
+  "customManagers": [
+    {
+      "description": "Chart versions pinned per environment in overlay kustomize patches. The flux manager only sees spec.chart.spec.version in the base HelmRelease, and these patches override it — so without this, Renovate raises PRs against a value neither cluster actually renders.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^infrastructure/controllers/(staging|production)/.+/kustomization\\.yaml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+) registryUrl=(?<registryUrl>\\S+)\\s+value: \"(?<currentValue>[^\"]+)\""
+      ]
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Keep staging and production bumps in separate PRs so an upgrade can soak on staging before it is promoted.",
+      "matchManagers": ["custom.regex"],
+      "matchFileNames": ["infrastructure/controllers/staging/**"],
+      "additionalBranchPrefix": "staging-",
+      "commitMessageSuffix": "(staging)"
+    },
+    {
+      "description": "Promoting to production is a deliberate step, so these wait for approval on the dependency dashboard rather than opening a PR on their own.",
+      "matchManagers": ["custom.regex"],
+      "matchFileNames": ["infrastructure/controllers/production/**"],
+      "additionalBranchPrefix": "production-",
+      "commitMessageSuffix": "(production)",
+      "dependencyDashboardApproval": true
+    }
+  ]
 }
