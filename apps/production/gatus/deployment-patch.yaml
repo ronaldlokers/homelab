@@ -1,0 +1,14 @@
+# Inject the ntfy publish token (from the SOPS-encrypted gatus-alerting secret)
+# as NTFY_TOKEN, which Gatus substitutes into ${NTFY_TOKEN} in its config.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gatus
+spec:
+  template:
+    spec:
+      containers:
+        - name: gatus
+          envFrom:
+            - secretRef:
+                name: gatus-alerting

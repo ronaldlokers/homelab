@@ -1,0 +1,15 @@
+# Subnet router: advertises the LAN (10.0.40.0/24) into the tailnet so tailnet
+# devices can reach cluster services by their existing *.ronaldlokers.nl names
+# (public DNS already returns the private VIP 10.0.40.100). The route is
+# auto-approved via the tailnet ACL autoApprovers for tag:k8s-prod.
+apiVersion: tailscale.com/v1alpha1
+kind: Connector
+metadata:
+  name: homelab-subnet-router
+spec:
+  hostname: homelab-prod-router
+  tags:
+    - "tag:k8s-prod"
+  subnetRouter:
+    advertiseRoutes:
+      - "10.0.40.0/24"

@@ -1,0 +1,19 @@
+# Production-only: Gatus uses postgres storage, so it needs egress to the
+# database namespace. (Staging uses in-memory storage and has no such rule.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-database-egress
+  namespace: gatus
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: database
+      ports:
+        - protocol: TCP
+          port: 5432

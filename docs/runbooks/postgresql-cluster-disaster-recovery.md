@@ -40,6 +40,41 @@ PostgreSQL clusters can bootstrap in two modes:
 
 **If your cluster uses `initdb` mode in production, any accidental deletion results in permanent data loss**, even though backups exist.
 
+### The recover-from ≠ archive-to rule (important)
+
+A recovered cluster **must not archive its WAL into the same object-store path it
+just recovered from**. CloudNativePG runs `barman-cloud-check-wal-archive` before
+the first WAL push and refuses a destination that already contains a WAL history,
+failing with:
+
+```
+barman-cloud-check-wal-archive ... ERROR: WAL archive check failed for server <name>: Expected empty archive
+```
+
+This is a safety feature: two cluster generations writing to one WAL timeline
+corrupts point-in-time recovery. The fix is to keep the **recovery source** and
+the **archive destination** on distinct paths. This repo does that with dated
+`destinationPath` prefixes, e.g.:
+
+| Path role | Example |
+|-----------|---------|
+| Recover **from** (`externalClusters[].barmanObjectStore`) | `s3://…/production-2026-03/` |
+| Archive **to** (`backup.barmanObjectStore`) | `s3://…/production-2026-07/` |
+
+**On every real DR / cluster rebuild:**
+1. Point `externalClusters[].destinationPath` at the **current** live archive
+   prefix (the one the cluster was most recently backing up to). A committed
+   recovery source goes stale the moment the live cluster keeps archiving — do
+   not assume the value in git is still the latest.
+2. Set `backup.barmanObjectStore.destinationPath` to a **new** dated prefix
+   (bump the month/date). This becomes the recovered cluster's fresh timeline.
+3. After recovery, trigger a `Backup` so a base backup exists on the new prefix
+   before relying on it for PITR.
+
+> The `serverName` under `externalClusters` identifies the source server inside
+> that prefix; keep it matching the cluster name of the generation you are
+> restoring.
+
 ## Immediate Actions
 
 ### If Cluster Was Just Deleted
@@ -92,14 +127,25 @@ bootstrap:
   recovery:
     source: clusterBackup
 
+# Recover FROM the current live archive prefix...
 externalClusters:
   - name: clusterBackup
     barmanObjectStore:
-      destinationPath: "s3://homelab-postgres-backups/production/"
+      destinationPath: "s3://homelab-postgres-backups/production-2026-03/"
       serverName: postgres-cluster
       endpointURL: "https://s3.eu-central-003.backblazeb2.com"
       # ... credentials
+
+# ...and archive TO a new, distinct prefix (see "recover-from ≠ archive-to" above).
+backup:
+  barmanObjectStore:
+    destinationPath: "s3://homelab-postgres-backups/production-2026-07/"
+    # ... credentials
 ```
+
+> ⚠️ Do **not** set both `destinationPath`s to the same prefix — recovery will
+> fail with "Expected empty archive". The old single-`production/` examples in
+> earlier revisions of this runbook predate the dated-prefix scheme.
 
 ### 2. Check if backups exist
 
@@ -438,7 +484,7 @@ For the full narrative of how this issue was discovered and fixed, see: [`docs/w
 
 ---
 
-**Last Updated**: 2026-01-07
+**Last Updated**: 2026-07-27
 **Tested On**: Production PostgreSQL cluster
 **Success Rate**: 100% (tested in staging)
 **Commit**: `c762b4b` - Initial fix

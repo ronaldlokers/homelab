@@ -9,6 +9,8 @@ resources:
   - postgres-alerts.yaml
   - scheduled-backup.yaml
   - commafeed-database.yaml
+  - gatus-database.yaml
   - linkding-database.yaml
+  - mealie-database.yaml
   - nightscout-database.yaml
   - speedtest-database.yaml

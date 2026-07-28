@@ -4,7 +4,9 @@ metadata:
   name: postgres-cluster
   namespace: database
 spec:
-  instances: 3
+  # Staging runs on a single-host k3d box: 1 instance is enough (no real node
+  # HA to gain here). Production keeps 3 in its own overlay.
+  instances: 1
 
   # Use DocumentDB-enabled PostgreSQL image for FerretDB v2.x (ARM64-compatible)
   imageName: 'ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0'
@@ -37,6 +39,14 @@ spec:
     initdb:
       database: app
       owner: app
+      # A fresh initdb DB has no extensions; on production these come from the
+      # restore. FerretDB (nightscout) needs the DocumentDB extension, which
+      # must live in the "postgres" DB (pg_cron is pinned there). postInitSQL
+      # runs as superuser against the postgres DB at bootstrap; grant the app
+      # user the documentdb role so FerretDB can use documentdb_api.
+      postInitSQL:
+        - CREATE EXTENSION IF NOT EXISTS documentdb CASCADE;
+        - GRANT documentdb_admin_role TO app;
 
   storage:
     size: 10Gi
@@ -45,7 +55,11 @@ spec:
   backup:
     retentionPolicy: "14d"
     barmanObjectStore:
-      destinationPath: "s3://homelab-postgres-backups/staging/"
+      # Fresh timeline. The old "staging/" prefix accumulates WALs and trips
+      # barman "Expected empty archive" on restart/failover/rebuild (a fresh
+      # initdb cluster must archive into an empty prefix). Bump this date on
+      # each staging rebuild, or purge the path.
+      destinationPath: "s3://homelab-postgres-backups/staging-2026-07/"
       endpointURL: "https://s3.eu-central-003.backblazeb2.com"
       s3Credentials:
         accessKeyId:

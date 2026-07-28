@@ -25,6 +25,12 @@ data:
               key: IeLyIEuyA5bSzy2Sfotk7MFTemWg3uOQ7JdimY88
               version: 2
 
+    - Food:
+        - Mealie:
+            icon: mealie.png
+            href: https://mealie.ronaldlokers.nl
+            description: Recipe manager
+
     - Health:
         - Nightscout:
             icon: nightscout.png
@@ -44,6 +50,13 @@ data:
             icon: prometheus.png
             href: https://prometheus.ronaldlokers.nl
             description: Metrics collection and storage
+        - Gatus:
+            icon: gatus.png
+            href: https://gatus.ronaldlokers.nl
+            description: Uptime monitoring
+            widget:
+              type: gatus
+              url: http://gatus.gatus.svc.cluster.local:8080
         - Ntfy:
             icon: ntfy.png
             href: https://ntfy.ronaldlokers.nl
