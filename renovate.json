@@ -24,6 +24,15 @@
   ],
   "packageRules": [
     {
+      "description": "These base HelmReleases are version-overridden by every consuming overlay, so their spec.chart.spec.version is never rendered. Left enabled, the flux manager would keep raising PRs against it that change nothing in either cluster — the exact no-op this config exists to stop. The overlay pins are tracked by the custom manager above instead.",
+      "matchManagers": ["flux"],
+      "matchFileNames": [
+        "infrastructure/controllers/base/cert-manager/**",
+        "infrastructure/controllers/base/cloudnative-pg/**"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Keep staging and production bumps in separate PRs so an upgrade can soak on staging before it is promoted.",
       "matchManagers": ["custom.regex"],
       "matchFileNames": ["infrastructure/controllers/staging/**"],
