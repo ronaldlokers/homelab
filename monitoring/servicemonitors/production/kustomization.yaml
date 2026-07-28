@@ -3,7 +3,6 @@ kind: Kustomization
 resources:
   - traefik-podmonitor.yaml
   - cert-manager-servicemonitors.yaml
-  - metallb-podmonitors.yaml
   - flux-podmonitors.yaml
   - cloudnativepg-podmonitors.yaml
   - speedtest-servicemonitor.yaml
