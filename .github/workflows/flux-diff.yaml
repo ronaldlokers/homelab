@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
   pull-requests: write
 
 concurrency:
@@ -42,6 +43,19 @@ jobs:
           ref: ${{ github.base_ref }}
           path: base
 
+      # Renders pull the immich chart from ghcr.io on every run
+      # (apps/base/immich/repository.yaml is an OCI HelmRepository). Anonymous
+      # pulls share a low per-IP quota that GitHub-hosted runners routinely
+      # exhaust, surfacing mid-render as `429 toomanyrequests`. Authenticating
+      # lifts the quota; flate falls back to ~/.docker/config.json, which is
+      # what this step writes.
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install flate
         uses: home-operations/flate/action@v0.4.10
         with:
@@ -53,15 +67,15 @@ jobs:
           base: ""
 
       - name: Test PR tree
-        run: flate test all --no-progress --path pr/clusters/${{ matrix.cluster }}
+        run: .github/scripts/retry.sh flate test all --no-progress --path pr/clusters/${{ matrix.cluster }}
 
       - name: Render both trees
         run: |
-          flate build all --no-progress --path pr/clusters/${{ matrix.cluster }} > render-pr.yaml
+          .github/scripts/retry.sh bash -c 'flate build all --no-progress --path pr/clusters/${{ matrix.cluster }} > render-pr.yaml'
           # A base branch that fails to render must not block the PR that
           # fixes it. flate still emits the render for everything that did
           # reconcile, so diff against that and flag it in the comment.
-          if ! flate build all --no-progress --path base/clusters/${{ matrix.cluster }} > render-base.yaml; then
+          if ! .github/scripts/retry.sh bash -c 'flate build all --no-progress --path base/clusters/${{ matrix.cluster }} > render-base.yaml'; then
             echo "::warning::${{ matrix.cluster }}: base branch failed to render; diffing against its partial output"
             touch base-render-failed
           fi

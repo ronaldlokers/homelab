@@ -27,6 +27,7 @@ jobs:
           path: |
             /tmp/kubeconform-schema-cache
             /tmp/flux-crd-schemas
+            /tmp/k8s-json-schemas
           key: kubeconform-schemas-${{ github.run_id }}
           restore-keys: |
             kubeconform-schemas-
