@@ -24,9 +24,12 @@ concurrency:
 jobs:
   flux-diff:
     runs-on: ubuntu-latest
-    # Renders fetch chart sources over the network; a stalled connection
-    # must fail the job quickly instead of blocking the PR for hours.
-    timeout-minutes: 10
+    # Renders fetch chart sources over the network; a stalled connection must
+    # fail the job quickly instead of blocking the PR for hours. retry.sh now
+    # bounds each individual attempt, so this is only the backstop for the
+    # worst case where every attempt of every render stalls (~14 min) rather
+    # than the primary defence it used to be.
+    timeout-minutes: 18
     strategy:
       fail-fast: false
       matrix:

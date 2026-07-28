@@ -17,20 +17,35 @@
 
 set -euo pipefail
 
-max_attempts="${RETRY_MAX_ATTEMPTS:-4}"
+max_attempts="${RETRY_MAX_ATTEMPTS:-3}"
 delay="${RETRY_INITIAL_DELAY:-5}"
+# Each attempt gets its own deadline. The common failure here is not a fast
+# error but a *stall*: a chart fetch that never returns, which a plain retry
+# loop would wait on forever and which would otherwise burn the whole job
+# timeout for a single hung attempt. A render that normally takes ~15s and has
+# gone quiet for 90s is not going to recover, so kill it and retry instead.
+attempt_timeout="${RETRY_TIMEOUT:-90}"
 
 for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
-  if "$@"; then
+  rc=0
+  timeout --kill-after=10s "${attempt_timeout}" "$@" || rc=$?
+  if (( rc == 0 )); then
     exit 0
   fi
 
-  if (( attempt == max_attempts )); then
-    echo "::error::Failed after ${max_attempts} attempts: $*"
-    exit 1
+  # 124 = timeout sent TERM, 137 = it had to follow up with KILL.
+  if (( rc == 124 || rc == 137 )); then
+    reason="timed out after ${attempt_timeout}s"
+  else
+    reason="exited ${rc}"
   fi
 
-  echo "::warning::Attempt ${attempt}/${max_attempts} failed, retrying in ${delay}s: $*"
+  if (( attempt == max_attempts )); then
+    echo "::error::Failed after ${max_attempts} attempts (last: ${reason}): $*"
+    exit "${rc}"
+  fi
+
+  echo "::warning::Attempt ${attempt}/${max_attempts} ${reason}, retrying in ${delay}s: $*"
   sleep "${delay}"
   delay=$(( delay * 2 ))
 done
