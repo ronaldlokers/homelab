@@ -67,15 +67,15 @@ jobs:
           base: ""
 
       - name: Test PR tree
-        run: .github/scripts/retry.sh flate test all --no-progress --path pr/clusters/${{ matrix.cluster }}
+        run: pr/.github/scripts/retry.sh flate test all --no-progress --path pr/clusters/${{ matrix.cluster }}
 
       - name: Render both trees
         run: |
-          .github/scripts/retry.sh bash -c 'flate build all --no-progress --path pr/clusters/${{ matrix.cluster }} > render-pr.yaml'
+          pr/.github/scripts/retry.sh bash -c 'flate build all --no-progress --path pr/clusters/${{ matrix.cluster }} > render-pr.yaml'
           # A base branch that fails to render must not block the PR that
           # fixes it. flate still emits the render for everything that did
           # reconcile, so diff against that and flag it in the comment.
-          if ! .github/scripts/retry.sh bash -c 'flate build all --no-progress --path base/clusters/${{ matrix.cluster }} > render-base.yaml'; then
+          if ! pr/.github/scripts/retry.sh bash -c 'flate build all --no-progress --path base/clusters/${{ matrix.cluster }} > render-base.yaml'; then
             echo "::warning::${{ matrix.cluster }}: base branch failed to render; diffing against its partial output"
             touch base-render-failed
           fi

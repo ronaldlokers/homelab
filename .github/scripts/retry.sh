@@ -6,6 +6,10 @@
 # flux-diff is a required status check, that flake blocks the merge outright
 # rather than just looking untidy, so the network-bound calls are wrapped.
 #
+# Invoked as `pr/.github/scripts/retry.sh` — flux-diff checks the repo out
+# into `pr/` and `base/` rather than the workspace root, so there is no
+# `.github/` at the cwd this runs from.
+#
 # Commands that write a render to a file must be passed as `bash -c '... > f'`
 # so each attempt truncates the file itself; a redirect applied by the caller
 # is opened once and would concatenate a failed attempt's partial output with
