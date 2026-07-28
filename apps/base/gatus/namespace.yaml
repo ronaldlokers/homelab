@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gatus
+  labels:
+    homelab.io/app: "true"
+    # Production Gatus uses postgres storage; this label opens the database
+    # namespace's allow-apps-ingress gate. Staging uses memory storage and
+    # simply doesn't connect — the label is harmless there.
+    homelab.io/needs-database: "true"

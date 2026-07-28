@@ -61,7 +61,12 @@ spec:
             matchLabels:
               app.kubernetes.io/name: traefik
 ---
-# Allow linkding to fetch metadata from bookmarked URLs
+# Allow linkding to fetch metadata/favicons from bookmarked URLs.
+# Excludes internal/reserved IPv4 ranges so a bookmarked URL can't be used to
+# reach cluster, LAN, or link-local/metadata services (SSRF guard). The ipBlock
+# except filters on the resolved destination IP, so it also defeats DNS
+# rebinding for these ranges. IPv6 egress needs no rule here: nothing grants an
+# IPv6 allow, so default-deny-egress already blocks it.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -76,9 +81,15 @@ spec:
         - ipBlock:
             cidr: 0.0.0.0/0
             except:
-              - 10.0.0.0/8
-              - 172.16.0.0/12
-              - 192.168.0.0/16
+              - 10.0.0.0/8        # RFC1918 private
+              - 172.16.0.0/12     # RFC1918 private
+              - 192.168.0.0/16    # RFC1918 private
+              - 169.254.0.0/16    # link-local / cloud metadata
+              - 127.0.0.0/8       # loopback
+              - 100.64.0.0/10     # CGNAT (RFC6598)
+              - 192.0.0.0/24      # IETF protocol assignments
+              - 198.18.0.0/15     # benchmarking
+              - 224.0.0.0/4       # multicast
       ports:
         - protocol: TCP
           port: 80
@@ -141,3 +152,22 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+---
+# Allow gatus to probe this app's health endpoint (production uptime monitoring)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gatus-ingress
+  namespace: linkding
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gatus
+      ports:
+        - protocol: TCP
+          port: 9090

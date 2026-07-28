@@ -25,28 +25,21 @@ spec:
       - host all streaming_replica all trust
       - host all postgres all md5
 
-  # Bootstrap from existing backup to restore data
-  # This ensures the cluster always restores from the latest backup if recreated
+  # Staging is disposable: initialize a fresh cluster, no restore.
+  # (Production restores from backup; see immich-cluster.yaml there.)
   bootstrap:
-    recovery:
-      source: clusterBackup
-
-  # Reference to backup location in B2
-  externalClusters:
-    - name: clusterBackup
-      barmanObjectStore:
-        destinationPath: "s3://homelab-postgres-backups/staging/immich/"
-        serverName: immich-cluster
-        endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-        s3Credentials:
-          accessKeyId:
-            name: b2-credentials
-            key: ACCESS_KEY_ID
-          secretAccessKey:
-            name: b2-credentials
-            key: ACCESS_SECRET_KEY
-        wal:
-          maxParallel: 8
+    initdb:
+      database: app
+      owner: app
+      # A fresh initdb DB has no extensions; on production these come from the
+      # restore. Immich connects to the "immich" database (created by its
+      # Database resource from template1), so seed the extensions into
+      # template1 and the immich DB inherits them at creation time. Without
+      # this, immich migrations can't build their schema on a rebuild.
+      postInitTemplateSQL:
+        - CREATE EXTENSION IF NOT EXISTS vchord CASCADE;
+        - CREATE EXTENSION IF NOT EXISTS cube;
+        - CREATE EXTENSION IF NOT EXISTS earthdistance;
 
   storage:
     size: 20Gi
@@ -55,7 +48,11 @@ spec:
   backup:
     retentionPolicy: "14d"
     barmanObjectStore:
-      destinationPath: "s3://homelab-postgres-backups/staging/immich/"
+      # Archive to a fresh timeline. A brand-new (initdb) cluster must not
+      # archive into a prefix that already holds another generation's WALs,
+      # or barman-cloud-check-wal-archive fails with "Expected empty archive".
+      # On a future staging rebuild, bump this date suffix (or purge the path).
+      destinationPath: "s3://homelab-postgres-backups/staging-2026-07-immich/"
       endpointURL: "https://s3.eu-central-003.backblazeb2.com"
       s3Credentials:
         accessKeyId:

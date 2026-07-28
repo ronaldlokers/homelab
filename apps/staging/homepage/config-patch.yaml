@@ -25,6 +25,12 @@ data:
               key: qvnCcXWT9a8SShkZCHvtgCl3SW9Ta6QLcuCBTqJD94
               version: 2
 
+    - Food:
+        - Mealie:
+            icon: mealie.png
+            href: https://mealie.staging.ronaldlokers.nl
+            description: Recipe manager
+
     - Health:
         - Nightscout:
             icon: nightscout.png
@@ -40,6 +46,13 @@ data:
               url: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local:80
               username: "{{HOMEPAGE_VAR_GRAFANA_USER}}"
               password: "{{HOMEPAGE_VAR_GRAFANA_PASSWORD}}"
+        - Gatus:
+            icon: gatus.png
+            href: https://gatus.staging.ronaldlokers.nl
+            description: Uptime monitoring
+            widget:
+              type: gatus
+              url: http://gatus.gatus.svc.cluster.local:8080
         - Flux:
             icon: flux-cd.png
             href: https://fluxcd.io/

@@ -1,0 +1,23 @@
+---
+# Staging overlay for the monitoring -> k8s API egress policy.
+# Same reasoning as the database patch: on k3d the API endpoint is the k3d
+# server container on the Docker network, not the production Pi nodes.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-k8s-api-egress
+  namespace: monitoring
+spec:
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
+    - to:
+        - ipBlock:
+            cidr: 172.16.0.0/12
+      ports:
+        - protocol: TCP
+          port: 6443

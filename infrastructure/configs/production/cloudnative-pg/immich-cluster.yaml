@@ -26,17 +26,20 @@ spec:
       - host all streaming_replica all trust
       - host all postgres all md5
 
-  # Start fresh - initialize new cluster
+  # Restore from backup on (re)creation so an accidental delete/rebuild does
+  # not lose the Immich database. Recovery reads the CURRENT generation's
+  # archive; the live cluster archives to a NEW timeline (see backup below),
+  # so recover-from and archive-to never share a WAL path.
+  # On a real DR, re-point this source at the then-current archive prefix.
   bootstrap:
-    initdb:
-      database: app
-      owner: app
+    recovery:
+      source: clusterBackup
 
-  # Reference to backup location in B2 (for bootstrap recovery only)
+  # Recovery source: the generation currently receiving backups.
   externalClusters:
     - name: clusterBackup
       barmanObjectStore:
-        destinationPath: "s3://homelab-postgres-backups/production/immich/"
+        destinationPath: "s3://homelab-postgres-backups/production-2026-03-immich/"
         serverName: immich-cluster
         endpointURL: "https://s3.eu-central-003.backblazeb2.com"
         s3Credentials:
@@ -56,7 +59,10 @@ spec:
   backup:
     retentionPolicy: "7d"
     barmanObjectStore:
-      destinationPath: "s3://homelab-postgres-backups/production-2026-03-immich/"
+      # Archive to a NEW timeline, distinct from the recovery source above, so
+      # a recovered cluster starts a clean WAL history (avoids the
+      # "Expected empty archive" collision). Bump this suffix on each DR.
+      destinationPath: "s3://homelab-postgres-backups/production-2026-07-immich/"
       endpointURL: "https://s3.eu-central-003.backblazeb2.com"
       s3Credentials:
         accessKeyId:

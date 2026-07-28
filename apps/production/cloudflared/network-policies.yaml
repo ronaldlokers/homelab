@@ -1,0 +1,99 @@
+---
+# Default deny all ingress in the cloudflared namespace (cloudflared is
+# outbound-only — it dials the Cloudflare edge, nothing connects in).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: cloudflared
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# Default deny all egress in the cloudflared namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: cloudflared
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+# Allow DNS queries to kube-system
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: cloudflared
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Allow egress to the Cloudflare edge (HTTPS + the QUIC/HTTP2 tunnel port 7844).
+# Internal/reserved ranges are excluded — cloudflared only ever talks outbound to
+# Cloudflare, so it should never reach cluster/LAN addresses on these ports.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cloudflare-edge-egress
+  namespace: cloudflared
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 7844
+        - protocol: UDP
+          port: 7844
+---
+# Allow egress to the origin services cloudflared fronts: ntfy and immich.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-origin-egress
+  namespace: cloudflared
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ntfy
+      ports:
+        - protocol: TCP
+          port: 80
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: immich
+      ports:
+        - protocol: TCP
+          port: 2283

@@ -1,0 +1,31 @@
+---
+# Staging overlay for the database -> k8s API egress policy.
+#
+# The base policy allows egress to the production control-plane node IPs
+# (10.0.40.101-103) on 6443. Staging runs on k3d, where the kubernetes
+# service endpoint is the k3d *server container* on the Docker network
+# (172.16.0.0/12, e.g. 172.18.0.2:6443), not the Pi nodes. NetworkPolicy is
+# evaluated on the post-DNAT endpoint IP, so without this the CNPG bootstrap
+# (initdb / recovery) cannot reach the API and clusters get stuck
+# "Setting up primary". Replace the prod IPs with the Docker network range.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-k8s-api-egress
+  namespace: database
+spec:
+  egress:
+    # kubernetes service ClusterIP (pre-DNAT, harmless to keep)
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
+    # k3d server container on the Docker network (post-DNAT API endpoint)
+    - to:
+        - ipBlock:
+            cidr: 172.16.0.0/12
+      ports:
+        - protocol: TCP
+          port: 6443
