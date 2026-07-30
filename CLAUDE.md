@@ -5,7 +5,7 @@ Guidance for Claude Code (claude.ai/code) working code this repo.
 ## Repository Overview
 
 Production-grade GitOps-managed Kubernetes homelab, two environments:
-- **Staging**: k3d cluster (1 server + 3 agents) in Proxmox VM at 10.0.40.52
+- **Staging**: k3d cluster (1 server + 1 agent) in Proxmox VM at 10.0.40.52
 - **Production**: HA K3s cluster (3 control plane nodes) on Raspberry Pi CM5 modules at 10.0.40.100 (MetalLB VIP)
 
 Infra declaratively configured, managed by Flux CD; new commits picked up + applied within ~1 minute.
