@@ -88,7 +88,7 @@ Dependencies are enforced through Kustomization `dependsOn` fields, and every Ku
 
 ### Staging Environment
 
-- **Platform**: Ubuntu Server VM running in Proxmox on MS-01 mini PC
+- **Platform**: Ubuntu Server VM running in Proxmox on `hightower` (Intel NUC7i3DNHE)
 - **k3d cluster**: 1 server node + 3 agent nodes (containerized)
 - **Storage**: VM disk storage
 
