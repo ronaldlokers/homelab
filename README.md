@@ -38,7 +38,7 @@ This repository contains the complete infrastructure and application configurati
 
 ### Staging
 
-Runs in Proxmox VM on MS-01 mini PC:
+Runs in a Proxmox VM on `hightower` (Intel NUC7i3DNHE):
 - **Platform**: k3d (K3s in Docker)
 - **Host**: Ubuntu Server VM with Docker
 - **IP**: 10.0.40.52

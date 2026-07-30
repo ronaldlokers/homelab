@@ -4,7 +4,7 @@ This guide walks through setting up both the staging and production Kubernetes c
 
 ## Staging Cluster (k3d)
 
-The staging cluster runs in k3d on an Ubuntu Server VM in Proxmox on the MS-01 mini PC.
+The staging cluster runs in k3d on an Ubuntu Server VM in Proxmox on `hightower` (Intel NUC7i3DNHE).
 
 ### Prerequisites
 
