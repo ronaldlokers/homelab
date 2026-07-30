@@ -18,7 +18,7 @@ This repository contains the complete infrastructure and application configurati
 
 | Environment | Nodes | Storage | Load Balancing | Version |
 |------------|-------|---------|----------------|---------|
-| **Staging** | 1 server + 3 agents (k3d) | local-path | k3d built-in | K3s v1.31.5 |
+| **Staging** | 1 server + 1 agent (k3d) | local-path | k3d built-in | K3s v1.31.5 |
 | **Production** | 3 control planes (HA) | Longhorn (3-replica) | MetalLB | K3s v1.33.6 |
 
 ### Services
