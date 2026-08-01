@@ -1,6 +1,6 @@
 # Migrate etcd from eMMC to NVMe
 
-**Status:** corrected 2026-08-01, not yet executed. Diagnosis + pre-flight 1/3/4 already done.
+**Status:** executed successfully on all 3 nodes, 2026-08-01. Kept for reference and for any future node rebuild.
 **Access:** `ssh ronald@<node>`, then `sudo` for every command below. `kubectl exec` does NOT work — Step 1 kills the kubelet it relies on.
 **Time:** ~30 min per node + 15 min monitoring. Three nodes.
 **Rule:** one node at a time. Two nodes down = quorum loss.
@@ -14,6 +14,21 @@
 | kube-srv-3 | 10.0.40.103 | /dev/mmcblk0p2 | 205G | 2,299ms | 27,170ms | 2,088 |
 
 etcd data size: 424M. NVMe has one partition, mounted at `/mnt/longhorn`.
+
+## Result (executed 2026-08-01)
+
+| node | warnings/hr before | warnings in 15 min after | ~per hour | reduction |
+|---|---|---|---|---|
+| kube-srv-1 | 1,833 | 2 | ~8 | 99.6% |
+| kube-srv-2 | 1,624 | 8 | ~32 | 98.0% |
+| kube-srv-3 | 2,088 | 12 | ~48 | 97.7% |
+
+All three verified on `/dev/nvme0n1p1[/etcd]`. kube-srv-2 was deliberately rebooted
+afterwards: the fstab bind mount re-established automatically, Longhorn rebuilt that
+node's replicas in ~7 minutes, and all 19 volumes returned to `attached`/`healthy`.
+
+Whole procedure ran without a cluster outage. Stopping the etcd leader (kube-srv-1,
+last) triggered a leader election as expected; the remaining two held quorum.
 
 ## Order — one node at a time, in this sequence
 
@@ -154,6 +169,21 @@ If the node will not return at all: restore from the pre-flight snapshot (k3s cl
 - [ ] after one stable week: `sudo rm -rf /var/lib/rancher/k3s/server/db/etcd.bak-*`
 - [ ] update this file's status header; update `docs/architecture.md` storage section
 
+## Execution notes (2026-08-01)
+
+- **Stopping k3s does not restart that node's pods.** `systemctl stop k3s` stops the
+  kubelet, but containers keep running under containerd, so pod ages stay unchanged and
+  make it look like the node never went down. Use the leader election in
+  `kubectl get events` as the signal instead.
+- **Rebooting a node degrades Longhorn temporarily.** Expect all 19 volumes to drop to
+  `degraded` and some pods to go `Unknown` while replicas rebuild. It recovered on its
+  own in ~7 minutes with no intervention. Do not panic and do not touch another node
+  during this window.
+- **The Flux `apps` kustomization briefly reports not ready** after each node restart,
+  gated on `infrastructure-configs` re-reconciling. It clears within a minute.
+- Warning counts in the first 15 minutes include k3s startup churn, so steady state is
+  lower than the numbers above.
+
 ## Notes
 
 **Why `/mnt/longhorn/etcd`, not `/mnt/nvme-etcd`:** the NVMe has one partition, already mounted at `/mnt/longhorn`. `/mnt/nvme-etcd` would be a directory on eMMC — the original runbook's path would have copied eMMC→eMMC and reported success. Longhorn only manages `replicas/` and `longhorn-disk.cfg`; `lost+found` has been untouched there since 2025-12-06. Trade-off: etcd shares the device with replica I/O. Accepted — contended NVMe beats uncontended eMMC.
@@ -169,4 +199,4 @@ If the node will not return at all: restore from the pre-flight snapshot (k3s cl
 - [Longhorn: bind mounts, not symlinks](https://longhorn.io/docs/1.12.0/nodes-and-volumes/nodes/multidisk/)
 
 ---
-**Last updated:** 2026-08-01 · **Tested:** diagnosis + pre-flight only; resolution steps unexecuted
+**Last updated:** 2026-08-01 · **Tested:** executed on all 3 production nodes 2026-08-01, including a reboot test
