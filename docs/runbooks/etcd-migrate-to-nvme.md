@@ -1,19 +1,21 @@
 # Migrate etcd from eMMC to NVMe
 
-**Status:** corrected 2026-08-01, not yet executed. Diagnosis + pre-flight 1/3/4 already done.
+**Status:** executed successfully on all three nodes 2026-08-01. Kept as the reference for a rebuilt or replaced node.
 **Access:** `ssh ronald@<node>`, then `sudo` for every command below. `kubectl exec` does NOT work — Step 1 kills the kubelet it relies on.
 **Time:** ~30 min per node + 15 min monitoring. Three nodes.
 **Rule:** one node at a time. Two nodes down = quorum loss.
 
-## Facts (measured 2026-08-01)
+## Result (measured 2026-08-01, before → after)
 
-| node | ip | etcd on | nvme free | apply p50 | apply max | warnings/hr |
-|---|---|---|---|---|---|---|
-| kube-srv-1 | 10.0.40.101 | /dev/mmcblk0p2 | 144G | 1,929ms | 25,099ms | 1,833 |
-| kube-srv-2 | 10.0.40.102 | /dev/mmcblk0p2 | 257G | 1,222ms | 18,853ms | 1,624 |
-| kube-srv-3 | 10.0.40.103 | /dev/mmcblk0p2 | 205G | 2,299ms | 27,170ms | 2,088 |
+| node | ip | etcd on | apply p50 | apply max | warnings/hr |
+|---|---|---|---|---|---|
+| kube-srv-1 | 10.0.40.101 | mmcblk0p2 → **nvme0n1p1** | 1,929ms → **<100ms** | 25,099ms → **none** | 1,833 → **0** |
+| kube-srv-2 | 10.0.40.102 | mmcblk0p2 → **nvme0n1p1** | 1,222ms → **<100ms** | 18,853ms → **none** | 1,624 → **0** |
+| kube-srv-3 | 10.0.40.103 | mmcblk0p2 → **nvme0n1p1** | 2,299ms → **<100ms** | 27,170ms → **none** | 2,088 → **0** |
 
-etcd data size: 424M. NVMe has one partition, mounted at `/mnt/longhorn`.
+"After" is a 5-minute idle window per node: zero `apply request took too long` entries, so no sample crossed etcd's 100ms threshold at all. etcd data size: 421M. NVMe has one partition, mounted at `/mnt/longhorn`.
+
+Post-migration state on every node: `sudo findmnt /var/lib/rancher/k3s/server/db/etcd` → `/dev/nvme0n1p1[/etcd]`, fstab bind entry present, 19/19 Longhorn volumes healthy. Reboot persistence confirmed on kube-srv-2.
 
 ## Order — one node at a time, in this sequence
 
@@ -146,13 +148,14 @@ If the node will not return at all: restore from the pre-flight snapshot (k3s cl
 
 ## After all three nodes
 
-- [ ] 3x `Ready`, `/healthz/etcd` = ok
-- [ ] `sudo findmnt` = `/dev/nvme0n1p1` on all three
-- [ ] warning count near zero on all three
-- [ ] 19 volumes healthy
-- [ ] reboot one node → bind mount re-establishes from fstab
-- [ ] after one stable week: `sudo rm -rf /var/lib/rancher/k3s/server/db/etcd.bak-*`
-- [ ] update this file's status header; update `docs/architecture.md` storage section
+- [x] 3x `Ready`, `/healthz/etcd` = ok
+- [x] `sudo findmnt` = `/dev/nvme0n1p1` on all three
+- [x] warning count near zero on all three — zero over 5 min idle
+- [x] 19 volumes healthy
+- [x] reboot one node → bind mount re-establishes from fstab — kube-srv-2, 2026-08-01
+- [ ] after one stable week (~2026-08-08): `sudo rm -rf /var/lib/rancher/k3s/server/db/etcd.bak-*` (369M each, on eMMC)
+- [x] update this file's status header; update `docs/architecture.md` storage section
+- [ ] add the `etcd_disk_wal_fsync_duration_seconds` p99 alert (see Follow-up below)
 
 ## Notes
 
@@ -160,7 +163,17 @@ If the node will not return at all: restore from the pre-flight snapshot (k3s cl
 
 **Why SSH, not `kubectl exec`:** Step 1 stops k3s → stops kubelet → `kubectl exec` to that node dies. Also observed returning empty output with exit 0 under etcd load.
 
-**Follow-up:** if etcd latency shows Longhorn contention, shrink `nvme0n1p1` for a dedicated `nvme0n1p2` (requires draining replicas per node first). Add alerting on `etcd_disk_wal_fsync_duration_seconds` p99 > 100ms from `127.0.0.1:2381`.
+**Expect a latency burst for ~7 minutes after a reboot — do not roll back for it.** Observed on kube-srv-2: boot at 18:12:37, then 200-330 `apply request took too long` per minute from 18:13 to 18:19, falling to 5-25/min by 18:20 and zero once settled. That is k3s rejoining the etcd cluster and every controller re-listing its watches, not a failed migration. Step 6's 15-minute monitoring window exists to cover exactly this — read the count at the *end* of it, not during.
+
+**Measure with `journalctl` over SSH, not with `kubectl debug` pods.** Spinning up privileged debug pods on all three nodes to inspect the mounts generates enough etcd write load to show up as the very latency you are trying to measure. A per-minute breakdown separates real latency from self-inflicted load, where a single aggregate count does not:
+
+```bash
+sudo journalctl -u k3s --since '40 min ago' --no-pager \
+  | grep 'apply request took too long' \
+  | grep -oP '^\w+ \d+ \d+:\d+' | uniq -c
+```
+
+**Follow-up:** no Longhorn contention observed post-migration (zero threshold breaches at idle), so the dedicated-partition split is not currently indicated. If latency does reappear, shrink `nvme0n1p1` for a dedicated `nvme0n1p2` (requires draining replicas per node first). Still outstanding: alerting on `etcd_disk_wal_fsync_duration_seconds` p99 > 100ms from `127.0.0.1:2381` — this issue was invisible to existing alerting because etcd never went down, it only got slow.
 
 ## Links
 
@@ -169,4 +182,4 @@ If the node will not return at all: restore from the pre-flight snapshot (k3s cl
 - [Longhorn: bind mounts, not symlinks](https://longhorn.io/docs/1.12.0/nodes-and-volumes/nodes/multidisk/)
 
 ---
-**Last updated:** 2026-08-01 · **Tested:** diagnosis + pre-flight only; resolution steps unexecuted
+**Last updated:** 2026-08-01 · **Tested:** fully executed on all three production nodes 2026-08-01
