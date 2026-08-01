@@ -1,10 +1,10 @@
-# Reloader (Staging Only)
+# Reloader
 
 [Reloader](https://github.com/stakater/Reloader) is a Kubernetes controller that watches ConfigMaps and Secrets and performs a rolling restart of the workloads that consume them.
 
 **Version**: chart 2.2.14 (appVersion v1.4.19)
 
-**Environment scope**: staging only (`infrastructure/controllers/staging/reloader/`). Production promotion is a deliberate follow-up, matching the [Kyverno](kyverno.md) pattern.
+**Environment scope**: staging and production. Staging came first and was validated there before promotion — see *Validation on staging* below.
 
 ## Why it exists
 
@@ -35,22 +35,43 @@ metadata:
     reloader.stakater.com/auto: "true"
 ```
 
-It is applied via a targeted patch in each app's overlay kustomization. Currently annotated on staging: `homepage`, `linkding`, `nightscout`, `ferretdb`, `pgadmin4`.
+It is applied via a targeted patch in each app's overlay kustomization.
 
-Not annotated, deliberately: `commafeed` and `mealie` reference no ConfigMap or Secret at all, and `gatus` on staging consumes only its hashed ConfigMap.
+| Environment | Annotated workloads |
+|---|---|
+| staging | `homepage`, `linkding`, `nightscout`, `ferretdb`, `pgadmin4` |
+| production | `cloudflared`, `gatus`, `homepage`, `linkding`, `ferretdb`, `nightscout`, `ntfy`, `pgadmin4`, `speedtest` |
+
+Not annotated, deliberately: `commafeed` and `mealie` reference no ConfigMap or Secret at all, and `gatus` on staging consumes only its hashed ConfigMap (production `gatus` additionally reads the `gatus-alerting` secret via `envFrom`, so it is annotated there).
+
+## Validation on staging
+
+Before promotion, a throwaway comment was appended to the staging `homepage` ConfigMap:
+
+- Reloader rolled the pod within ~10s onto a new ReplicaSet
+- Flux reverted the probe, and Reloader rolled again — correct behaviour
+- The final ReplicaSet stayed stable for 3 minutes across several Flux reconciles, 0 restarts
+
+The pod template carries Reloader's own annotation, which Flux leaves alone:
+
+```
+reloader.stakater.com/last-reloaded-from: {"type":"CONFIGMAP","name":"homepage",...}
+```
+
+This is the direct contrast with a manual `kubectl rollout restart`, which Flux reverts because the `restartedAt` annotation is not in git.
 
 ## Verifying
 
 ```bash
 # controller healthy
-flux get helmrelease reloader -n reloader --context=staging
+flux get helmrelease reloader -n reloader --context=production
 
 # which workloads are opted in
-kubectl get deploy -A --context=staging \
+kubectl get deploy -A --context=production \
   -o jsonpath='{range .items[?(@.metadata.annotations.reloader\.stakater\.com/auto=="true")]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}'
 
 # confirm the strategy actually in use
-kubectl logs -n reloader deploy/reloader --context=staging | head
+kubectl logs -n reloader deploy/reloader --context=production | head
 ```
 
 After editing a watched Secret, the consuming pod should roll within a few seconds and the new ReplicaSet should persist across the next Flux reconcile — if it does not, the strategy has regressed to the default.
