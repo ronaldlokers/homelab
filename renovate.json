@@ -46,6 +46,12 @@
       "additionalBranchPrefix": "production-",
       "commitMessageSuffix": "(production)",
       "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Longhorn only supports upgrading one minor at a time — 1.8.x to 1.9.x, then 1.9.x to 1.10.x, and so on. Left at the default, Renovate collapses every available minor into a single PR to the newest version (PR #48 proposed 1.8.2 -> 1.12.0, skipping three minors), which passes CI and looks routine while being an unsupported upgrade of the cluster's storage layer. separateMultipleMinor makes Renovate raise one PR per minor instead, so the supported path is the path of least resistance and each step can be soaked before the next.",
+      "matchPackageNames": ["longhorn"],
+      "separateMajorMinor": true,
+      "separateMultipleMinor": true
     }
   ]
 }
