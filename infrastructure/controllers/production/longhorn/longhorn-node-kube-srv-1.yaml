@@ -12,7 +12,11 @@ spec:
     ssd-disk:
       path: /mnt/longhorn
       allowScheduling: true
-      storageReserved: 0
+      # Reserve 10Gi so Longhorn never schedules replicas into the space etcd
+      # needs. etcd's data directory shares this filesystem (bind-mounted from
+      # /mnt/longhorn/etcd); a full disk here would stop etcd writing and take
+      # down the control plane.
+      storageReserved: 10737418240
   evictionRequested: false
   instanceManagerCPURequest: 0
   name: kube-srv-1
