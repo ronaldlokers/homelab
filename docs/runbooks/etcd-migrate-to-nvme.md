@@ -7,15 +7,23 @@
 
 ## Facts (measured 2026-08-01)
 
-| node | etcd on | nvme free | apply p50 | apply max | warnings/hr |
-|---|---|---|---|---|---|
-| kube-srv-1 | /dev/mmcblk0p2 | 144G | 1,929ms | 25,099ms | 1,833 |
-| kube-srv-2 | /dev/mmcblk0p2 | 257G | 1,222ms | 18,853ms | 1,624 |
-| kube-srv-3 | /dev/mmcblk0p2 | 205G | 2,299ms | 27,170ms | 2,088 |
+| node | ip | etcd on | nvme free | apply p50 | apply max | warnings/hr |
+|---|---|---|---|---|---|---|
+| kube-srv-1 | 10.0.40.101 | /dev/mmcblk0p2 | 144G | 1,929ms | 25,099ms | 1,833 |
+| kube-srv-2 | 10.0.40.102 | /dev/mmcblk0p2 | 257G | 1,222ms | 18,853ms | 1,624 |
+| kube-srv-3 | 10.0.40.103 | /dev/mmcblk0p2 | 205G | 2,299ms | 27,170ms | 2,088 |
 
 etcd data size: 424M. NVMe has one partition, mounted at `/mnt/longhorn`.
 
-**Order: kube-srv-2 → kube-srv-3 → kube-srv-1** (leader last; kube-srv-1 was leader on 2026-08-01).
+## Order — one node at a time, in this sequence
+
+```bash
+ssh root@10.0.40.102     # kube-srv-2  — start here (follower, most free space)
+ssh root@10.0.40.103     # kube-srv-3  — second     (follower)
+ssh root@10.0.40.101     # kube-srv-1  — last       (etcd leader on 2026-08-01)
+```
+
+Re-check the leader before the final node — it may have moved.
 
 ## Pre-flight
 
@@ -27,19 +35,26 @@ kubectl get --raw /healthz/etcd --context=production
 kubectl get nodes --context=production
 
 # 2. snapshots exist on target  -> expect ~5 files
-ssh root@<node> ls /var/lib/rancher/k3s/server/db/snapshots/
+ssh root@<target-ip> ls /var/lib/rancher/k3s/server/db/snapshots/
 
 # 3. longhorn reserved  -> expect 10737418240 on all nodes
 kubectl -n longhorn-system get nodes.longhorn.io --context=production \
   -o custom-columns='NODE:.metadata.name,RESERVED:.spec.disks.ssd-disk.storageReserved'
 
 # 4. confirm target is not the leader  -> expect 0
-ssh root@<node> "curl -s http://127.0.0.1:2381/metrics | grep '^etcd_server_is_leader '"
+ssh root@<target-ip> "curl -s http://127.0.0.1:2381/metrics | grep '^etcd_server_is_leader '"
+
+# ...or check all three at once:
+for ip in 10.0.40.101 10.0.40.102 10.0.40.103; do
+  echo -n "$ip leader="
+  ssh root@$ip "curl -s http://127.0.0.1:2381/metrics | grep '^etcd_server_is_leader ' | awk '{print \$2}'"
+done
 ```
 
 ## Procedure — repeat per node
 
-All commands via `ssh root@<node>` unless marked *(workstation)*.
+All commands run on the node via `ssh root@<target-ip>` unless marked *(workstation)*.
+Substitute the IP from the Order block above.
 
 ### 1. Stop k3s
 
