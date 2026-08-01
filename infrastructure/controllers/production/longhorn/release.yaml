@@ -28,6 +28,23 @@ spec:
       defaultDataPath: /mnt/longhorn
       backupTarget: "s3://longhorn-backups@us-east-1/"
       backupTargetCredentialSecret: "longhorn-s3-secret"
+      # Volume engines do not follow the manager version unless this is > 0,
+      # and it defaults to 0. The result was silent version drift: the manager
+      # went to 1.8.2 in #133 while 95 volume references stayed on engine
+      # v1.7.2, where they had been for 242 days across more than one manager
+      # upgrade. default-engine-image was already v1.8.2, so only *new* volumes
+      # picked it up and nothing surfaced the gap.
+      #
+      # That drift blocks the upgrade path. Longhorn supports live engine
+      # upgrade to v1.9.2 only from v1.8.x, so raising the manager to 1.9.2
+      # (PR #143) while engines sit on 1.7.2 leaves an offline upgrade —
+      # detaching every volume — as the only way to reconcile them.
+      #
+      # 1 upgrades one engine per node at a time, on healthy volumes only, so
+      # replicas rebuild sequentially rather than all at once. Longhorn skips
+      # degraded volumes entirely, which is why the 19/19 healthy precondition
+      # matters before this merges.
+      concurrentAutomaticEngineUpgradePerNodeLimit: 1
     # Configure default StorageClass with 3 replicas
     persistence:
       defaultClass: true
