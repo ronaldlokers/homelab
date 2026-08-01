@@ -6,6 +6,10 @@ metadata:
     recurring-job.longhorn.io/backup-daily: enabled
     recurring-job.longhorn.io/snapshot-daily: enabled
 spec:
+  # Stated explicitly: production annotates both local-path and longhorn as
+  # default StorageClasses, so an omitted class is a coin flip between
+  # node-local and replicated storage.
+  storageClassName: longhorn
   accessModes:
     - ReadWriteOnce
   resources:
