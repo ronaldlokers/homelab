@@ -47,6 +47,7 @@ spec:
         cache:
           enabled: true
           type: persistentVolumeClaim
+          accessMode: ReadWriteMany
           size: 10Gi
           storageClass: longhorn
 
