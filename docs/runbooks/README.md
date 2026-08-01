@@ -114,10 +114,16 @@ A **runbook** is an action-oriented guide for handling specific incidents. Unlik
   - **Severity**: High
   - **Time to Fix**: 15-30 minutes
 
-- [**Migrate etcd Data Directory from SD/eMMC to NVMe**](etcd-migrate-to-nvme.md) *(proposed, not yet executed)*
-  - **Symptoms**: etcd key reads taking multiple seconds instead of ~100ms; NetworkPolicy/controller changes taking minutes to days to propagate
+- [**Migrate etcd from eMMC to NVMe**](etcd-migrate-to-nvme.md) *(executed 2026-08-01 on all three production nodes)*
+  - **Symptoms**: etcd apply latency of 1,200-2,300ms p50 with 18-27s maxima; NetworkPolicy/controller changes taking minutes to days to propagate
   - **Severity**: Medium
-  - **Time to Fix**: ~15-30 minutes per node × 3 nodes, plus stability monitoring between each
+  - **Time to Fix**: ~30 minutes per node × 3 nodes, plus 15 minutes monitoring between each
+  - **Kept for**: a rebuilt or replaced node, which comes back with etcd on eMMC — this is host state, not GitOps state
+
+- [**Make journald Persistent Across Reboots**](journald-make-persistent.md) *(proposed, not yet executed)*
+  - **Symptoms**: `journalctl --boot=-1` returns nothing; node logs vanish on reboot because journald runs volatile on tmpfs
+  - **Severity**: Low — current logs still reach Loki via Alloy; this is about post-reboot forensics
+  - **Time to Fix**: ~5 minutes per node × 3 nodes, no k3s restart required
 
 ## Runbook Structure
 
