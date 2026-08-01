@@ -30,6 +30,30 @@ spec:
     kubeEtcd:
       enabled: false
 
+    # K3s runs the controller-manager, scheduler and kube-proxy inside the
+    # server process rather than as separately scrapeable components, so the
+    # jobs these expect never exist. Their alerts are absent(up{job="..."}),
+    # which is unconditionally true here — KubeControllerManagerDown,
+    # KubeSchedulerDown and KubeProxyDown were three standing criticals that
+    # could never clear and never indicated anything.
+    #
+    # Same reasoning as kubeEtcd above. Both halves are required: the component
+    # toggle stops a ServiceMonitor being created for an endpoint that does not
+    # exist, and the defaultRules toggle removes the absent() alert that fires
+    # regardless of whether a target was ever configured.
+    kubeControllerManager:
+      enabled: false
+    kubeScheduler:
+      enabled: false
+    kubeProxy:
+      enabled: false
+
+    defaultRules:
+      rules:
+        kubeControllerManager: false
+        kubeSchedulerAlerting: false
+        kubeProxy: false
+
     prometheus:
       prometheusSpec:
         # Without storageSpec the TSDB lives on an emptyDir, so every pod
