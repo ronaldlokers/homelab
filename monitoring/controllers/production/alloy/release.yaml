@@ -29,11 +29,18 @@ spec:
         name: alloy-config
         key: config.alloy
       mounts:
-        # loki.source.journal in config.alloy reads /var/log/journal from the
-        # host. Without this the DaemonSet mounts only the config, which is why
-        # the previous /var/log/syslog target could never have worked.
+        # loki.source.journal in config.alloy reads the host journal. Without
+        # these the DaemonSet mounts only the config, which is why the previous
+        # /var/log/syslog target could never have worked.
         varlog: true
         extra:
+          # The live journal is here, not under /var/log. journald runs volatile
+          # on these nodes: /var/log/journal exists but is empty, and the real
+          # files are /run/log/journal/<machine-id>/*.journal on tmpfs. Mounting
+          # only /var/log yields a healthy component reading an empty directory.
+          - name: runlog-journal
+            mountPath: /run/log/journal
+            readOnly: true
           # sdjournal resolves boot IDs against the host machine-id; without it
           # journal reads fail rather than silently degrade.
           - name: machine-id
@@ -43,6 +50,10 @@ spec:
       type: "daemonset"
       volumes:
         extra:
+          - name: runlog-journal
+            hostPath:
+              path: /run/log/journal
+              type: Directory
           - name: machine-id
             hostPath:
               path: /etc/machine-id

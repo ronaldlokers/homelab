@@ -42,13 +42,25 @@ loki.relabel "journal" {
 // including everything k3s writes. Pod logs were unaffected; they arrive via
 // loki.source.kubernetes below, which uses the Kubernetes API rather than files.
 //
-// Requires the host /var/log mount (alloy.mounts.varlog) and /etc/machine-id,
-// both set in release.yaml. Alloy runs as root, so no added privileges are
-// needed to read /var/log/journal (root:systemd-journal).
+// Requires the host /var/log and /run/log/journal mounts plus /etc/machine-id,
+// all set in release.yaml. Alloy runs as root, so no added privileges are
+// needed to read the journal (root:systemd-journal).
+//
+// "path" is deliberately unset. journald here runs in volatile mode: /var/log/journal
+// exists but is empty, and the live journal is /run/log/journal/<machine-id>/
+// on tmpfs. Hardcoding /var/log/journal reads an empty directory and silently
+// collects nothing -- a healthy component with target_lines_total stuck at 0.
+// With path unset, sdjournal resolves /run vs /var itself, so this keeps working
+// if journald is later switched to persistent storage.
+//
+// Volatile means the journal does not survive a reboot. Alerting is unaffected
+// (it reads current entries), but post-incident forensics across a reboot needs
+// journald made persistent on the nodes -- a host change, not a repo one.
 loki.source.journal "node_logs" {
-  path          = "/var/log/journal"
   // Bounds backfill on restart: without this Alloy would re-read the entire
   // retained journal and republish it to Loki as freshly-ingested lines.
+  // Loki rejects entries older than its out-of-order window regardless, so
+  // anything beyond that is dropped with a 400 rather than ingested.
   max_age       = "12h"
   relabel_rules = loki.relabel.journal.rules
   labels        = {
