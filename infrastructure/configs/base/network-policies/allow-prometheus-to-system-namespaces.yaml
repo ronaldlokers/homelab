@@ -59,7 +59,20 @@ spec:
     # above: kubelet has no pod at all, and metallb-speaker runs with
     # hostNetwork: true, making its "pod IP" the node IP too. Node-exporter
     # (9100) already needed this same workaround; kubelet (10250) and
-    # metallb-speaker (7472 metrics, 7473 frr-metrics) need it too.
+    # metallb-speaker (9120) need it too.
+    #
+    # 9120 replaces 7472/7473 here. MetalLB 0.16 dropped kube-rbac-proxy for
+    # native TLS and moved metrics to HTTPS on 9120 — see the comment in
+    # infrastructure/controllers/base/metallb/release.yaml. The chart-owned
+    # ServiceMonitor followed that move, but this policy did not, so all three
+    # speakers failed to scrape with "connection refused" while the port was
+    # open and answering 401 from the node itself. The metallb-controller was
+    # unaffected: it is an ordinary pod, so the namespaceSelector rule above
+    # covers it, which is why only the speaker targets went down.
+    #
+    # 7472/7473 are removed rather than left in place: 0.16 states the old HTTP
+    # endpoints "are no longer available", frr is disabled in the release, and
+    # the speaker was confirmed listening only on *:9120 and 127.0.0.1:17472.
     - to:
         - ipBlock:
             cidr: 10.0.40.101/32
@@ -69,9 +82,7 @@ spec:
         - protocol: TCP
           port: 10250
         - protocol: TCP
-          port: 7472
-        - protocol: TCP
-          port: 7473
+          port: 9120
     - to:
         - ipBlock:
             cidr: 10.0.40.102/32
@@ -81,9 +92,7 @@ spec:
         - protocol: TCP
           port: 10250
         - protocol: TCP
-          port: 7472
-        - protocol: TCP
-          port: 7473
+          port: 9120
     - to:
         - ipBlock:
             cidr: 10.0.40.103/32
@@ -93,6 +102,4 @@ spec:
         - protocol: TCP
           port: 10250
         - protocol: TCP
-          port: 7472
-        - protocol: TCP
-          port: 7473
+          port: 9120
