@@ -28,7 +28,24 @@ spec:
         create: false
         name: alloy-config
         key: config.alloy
+      mounts:
+        # loki.source.journal in config.alloy reads /var/log/journal from the
+        # host. Without this the DaemonSet mounts only the config, which is why
+        # the previous /var/log/syslog target could never have worked.
+        varlog: true
+        extra:
+          # sdjournal resolves boot IDs against the host machine-id; without it
+          # journal reads fail rather than silently degrade.
+          - name: machine-id
+            mountPath: /etc/machine-id
+            readOnly: true
     controller:
       type: "daemonset"
+      volumes:
+        extra:
+          - name: machine-id
+            hostPath:
+              path: /etc/machine-id
+              type: File
     serviceAccount:
       create: true
