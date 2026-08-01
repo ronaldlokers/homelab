@@ -110,6 +110,28 @@ loki.process "journal_metrics" {
         // regression actually registers.
         max_idle_duration = "24h"
       }
+
+      // Canary. Counts every k3s.service line, so unlike the counter above it
+      // increments continuously instead of only when etcd degrades.
+      //
+      // It exists because the etcd counter cannot otherwise be verified. Alloy
+      // registers a stage.metrics counter on FIRST INCREMENT, so while etcd is
+      // healthy loki_process_custom_k3s_etcd_apply_slow_total does not exist at
+      // all -- and a rule querying a metric that does not exist evaluates to
+      // empty and reports health=ok, exactly as a rule with a typo'd metric name
+      // would. There is no way to tell the two apart from a healthy cluster.
+      //
+      // This canary travels the identical code path and naming convention, so
+      // observing loki_process_custom_k3s_journal_lines_total confirms both. If
+      // it goes flat, EtcdApplyLatencyHigh is blind -- which alerts.yaml alerts
+      // on directly.
+      metric.counter {
+        name              = "k3s_journal_lines"
+        description       = "All k3s.service journal lines reaching the metrics pipeline; proves EtcdApplyLatencyHigh's path is live"
+        match_all         = true
+        action            = "inc"
+        max_idle_duration = "24h"
+      }
     }
   }
 }

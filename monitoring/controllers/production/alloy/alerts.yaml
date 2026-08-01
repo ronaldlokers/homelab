@@ -35,6 +35,35 @@ spec:
           labels:
             severity: warning
 
+        # Watches the alert above, because that alert cannot watch itself.
+        #
+        # EtcdApplyLatencyHigh queries a counter that only comes into existence
+        # on its first increment, so while etcd is healthy it queries a metric
+        # that does not exist. That evaluates to empty and reports health=ok --
+        # indistinguishable from the same rule with a misspelled metric name.
+        # It would sit green forever and fire nothing.
+        #
+        # The canary counter in config.alloy travels the same pipeline and the
+        # same loki_process_custom_ naming, but increments on every k3s.service
+        # line. If it is absent or flat, the etcd alert is blind and this fires
+        # instead. k3s logs constantly, so flat means broken, not quiet.
+        - alert: EtcdAlertPipelineBroken
+          annotations:
+            summary: "EtcdApplyLatencyHigh cannot fire — its metrics pipeline is dead"
+            description: >-
+              No k3s.service lines are reaching Alloy's metrics pipeline, so
+              EtcdApplyLatencyHigh would stay silent through a real etcd
+              regression. Check loki.process.journal_metrics in the Alloy
+              config, and confirm the unit label is still being set by
+              loki.relabel.journal — a relabel change would break the
+              {unit="k3s.service"} selector without breaking log delivery.
+          expr: |
+            absent(loki_process_custom_k3s_journal_lines_total)
+            or sum(rate(loki_process_custom_k3s_journal_lines_total[15m])) == 0
+          for: 30m
+          labels:
+            severity: warning
+
     - name: alloy_collection_health
       rules:
         # Detects the failure mode that hid the above for months: collection
