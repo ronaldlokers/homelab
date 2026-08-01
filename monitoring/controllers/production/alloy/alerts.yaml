@@ -15,14 +15,19 @@ spec:
         # See docs/war-stories/etcd-emmc-storage-latency.md.
         #
         # Counter is produced by loki.process.journal_metrics in config.alloy.
-        # Alloy prefixes custom metrics with loki_process_custom_ and appends
-        # _total, so the configured name "k3s_etcd_apply_slow" is exposed as
-        # loki_process_custom_k3s_etcd_apply_slow_total.
+        # Alloy prefixes custom metrics with loki_process_custom_ and does NOT
+        # append _total, despite what the Alloy docs state. Observed live:
+        #
+        #   loki_process_custom_k3s_journal_lines{...,node_name="kube-srv-2"} 2
+        #
+        # An earlier version of this rule trusted the documented _total suffix
+        # and queried a metric that does not exist. Aggregation is by node_name,
+        # not node -- that is the label the journal relabel rules actually set.
         - alert: EtcdApplyLatencyHigh
           annotations:
-            summary: "etcd apply latency is degraded on {{ $labels.node }}"
+            summary: "etcd apply latency is degraded on {{ $labels.node_name }}"
             description: >-
-              {{ $labels.node }} is logging {{ printf "%.2f" $value }} etcd
+              {{ $labels.node_name }} is logging {{ printf "%.2f" $value }} etcd
               "apply request took too long" warnings/sec. etcd is exceeding its
               100ms expected-duration. Baseline before the NVMe migration was
               ~0.45-0.58/sec per node; healthy is 0. Check that etcd is still
@@ -30,7 +35,7 @@ spec:
               should show /dev/nvme0n1p1. See
               docs/runbooks/etcd-migrate-to-nvme.md.
           expr: |
-            sum by (node) (rate(loki_process_custom_k3s_etcd_apply_slow_total[5m])) > 0.1
+            sum by (node_name) (rate(loki_process_custom_k3s_etcd_apply_slow[5m])) > 0.1
           for: 15m
           labels:
             severity: warning
@@ -58,8 +63,8 @@ spec:
               loki.relabel.journal — a relabel change would break the
               {unit="k3s.service"} selector without breaking log delivery.
           expr: |
-            absent(loki_process_custom_k3s_journal_lines_total)
-            or sum(rate(loki_process_custom_k3s_journal_lines_total[15m])) == 0
+            absent(loki_process_custom_k3s_journal_lines)
+            or sum(rate(loki_process_custom_k3s_journal_lines[15m])) == 0
           for: 30m
           labels:
             severity: warning
