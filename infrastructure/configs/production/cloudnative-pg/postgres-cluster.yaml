@@ -33,18 +33,41 @@ spec:
       - host all streaming_replica all trust
       - host all postgres all md5
 
-  # Bootstrap from existing backup to restore data
+  # Bootstrap from existing backup to restore data.
+  #
+  # This block only takes effect when the Cluster object is CREATED — i.e. if
+  # the cluster is deleted and Flux recreates it. That is exactly the scenario
+  # docs/war-stories/postgres-bootstrap-recovery.md exists for, so it has to be
+  # correct at all times even though it is inert day to day.
+  #
+  # It was not. Until now this recovered from "production/" with
+  # recoveryTarget.backupID pinned to "20260226T105921", while WAL has archived
+  # to "production-2026-03/" since 2026-03-05. A recreate would have restored a
+  # February snapshot from a prefix nothing has written to in five months — and
+  # reported Ready. No alert covers this because the config is valid and the
+  # cluster is healthy; only an actual restore test would surface it.
+  #
+  # The pin is removed so recovery targets the latest available backup, and the
+  # source now matches the prefix that is actually being written.
   bootstrap:
     recovery:
       source: clusterBackup
-      recoveryTarget:
-        backupID: "20260226T105921"
 
-  # Reference to backup location in B2 (for bootstrap recovery only)
+  # Reference to backup location in B2 (for bootstrap recovery only).
+  #
+  # NOTE: this now equals backup.barmanObjectStore.destinationPath below.
+  # immich-cluster.yaml deliberately keeps recover-from and archive-to on
+  # different prefixes so a recovered cluster starts a clean timeline. Doing the
+  # same here means bumping the archive prefix to a new generation, which moves
+  # the live WAL stream and leaves the new prefix without a base backup until
+  # the next ScheduledBackup runs. That is a deliberate operational step, not a
+  # side effect of fixing the stale pointer, so it is left for a follow-up —
+  # see the runbook. Recovering into the same prefix is safe for a single
+  # recovery; the constraint matters when recovering repeatedly.
   externalClusters:
     - name: clusterBackup
       barmanObjectStore:
-        destinationPath: "s3://homelab-postgres-backups/production/"
+        destinationPath: "s3://homelab-postgres-backups/production-2026-03/"
         serverName: postgres-cluster
         endpointURL: "https://s3.eu-central-003.backblazeb2.com"
         s3Credentials:
