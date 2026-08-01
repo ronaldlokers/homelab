@@ -8,7 +8,7 @@ spec:
   chart:
     spec:
       chart: kube-prometheus-stack
-      version: "79.9.0"
+      version: "88.0.1"
       sourceRef:
         kind: HelmRepository
         name: kube-prometheus-stack
@@ -32,6 +32,20 @@ spec:
 
     prometheus:
       prometheusSpec:
+        # Without storageSpec the TSDB lives on an emptyDir, so every pod
+        # restart discards it and the configured 10d retention never actually
+        # holds. Production carries ~353k active series at ~11.8k samples/sec,
+        # which is roughly 17GB over 10d; 30Gi leaves headroom for growth and
+        # compaction. Longhorn keeps 3 replicas, so this is ~90Gi of real disk.
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: longhorn
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 30Gi
+
         # Allow ServiceMonitors from any namespace
         serviceMonitorNamespaceSelector: {}
 

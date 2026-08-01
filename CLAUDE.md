@@ -5,7 +5,7 @@ Guidance for Claude Code (claude.ai/code) working code this repo.
 ## Repository Overview
 
 Production-grade GitOps-managed Kubernetes homelab, two environments:
-- **Staging**: k3d cluster (1 server + 3 agents) in Proxmox VM at 10.0.40.52
+- **Staging**: k3d cluster (1 server + 1 agent) in Proxmox VM at 10.0.40.52
 - **Production**: HA K3s cluster (3 control plane nodes) on Raspberry Pi CM5 modules at 10.0.40.100 (MetalLB VIP)
 
 Infra declaratively configured, managed by Flux CD; new commits picked up + applied within ~1 minute.
@@ -108,7 +108,7 @@ kubectl describe pod -n <namespace> <pod-name> --context=production
 
 ### SOPS Secret Management
 
-**Prerequisites**: Both private age keys live in SOPS's default key file `~/.config/sops/age/keys.txt` (backed up in Proton Pass, never in repo). SOPS finds them auto — no `SOPS_AGE_KEY_FILE` export needed. In devcontainer, `~/.config/sops` is persistent named volume; if empty (first use after adding volume), re-provision `keys.txt` from Proton Pass (see `docs/security.md`).
+**Prerequisites**: Both private age keys live in SOPS's default key file `~/.config/sops/age/keys.txt` (backed up in Proton Pass, never in repo). SOPS finds them auto — no `SOPS_AGE_KEY_FILE` export needed. In devcontainer, `~/.config/sops` is *not* persisted — it lives in the container's writable layer and a `devpod up --recreate` wipes it. It comes back from the dotfiles: DevPod is configured with `DOTFILES_URL=ronaldlokers/dotfiles` and `DOTFILES_SCRIPT=setup`, and that script runs `chezmoi init --apply`, which fetches `keys.txt` from Proton Pass via `pass-cli`. If the keys are missing, re-run the dotfiles setup rather than copying keys in by hand (see `docs/security.md`).
 
 **Edit encrypted secret** (either environment):
 ```bash

@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: gatus
+resources:
+  - ../../base/gatus/
+  - ingress.yaml
+  - network-policy-database.yaml
+  - network-policy-egress.yaml
+  - gatus-alerting-secret.yaml
+patches:
+  - path: deployment-patch.yaml
+  # Opt in to Reloader: roll this workload when a mounted ConfigMap or Secret
+  # changes. Without it a SOPS secret rotation applies cleanly and the pod keeps
+  # serving the old value, because env/envFrom are injected only at pod creation.
+  - target:
+      kind: Deployment
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: placeholder
+        annotations:
+          reloader.stakater.com/auto: "true"
+# Replace the base (staging) Gatus config with the production one: postgres
+# storage + production URLs. behavior:replace swaps the base generator's content
+# and recomputes the hash, so the deployment's volume ref tracks it.
+configMapGenerator:
+  - name: gatus-config
+    behavior: replace
+    files:
+      - config.yaml

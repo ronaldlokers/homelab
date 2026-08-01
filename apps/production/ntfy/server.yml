@@ -1,0 +1,44 @@
+# ntfy server configuration
+base-url: https://ntfy.ronaldlokers.nl
+
+# message cache
+cache-file: /var/cache/ntfy/cache.db
+cache-duration: 12h
+
+# behind Traefik: trust X-Forwarded-For so per-visitor limits key off the
+# real client IP instead of the ingress pod IP
+behind-proxy: true
+
+# enable web app
+enable-web-app: true
+
+# attachments — ntfy takes full control of attachment-cache-dir, so it is a
+# subdirectory of the volume rather than the volume root, which also holds
+# cache.db and webpush.db
+attachment-cache-dir: /var/cache/ntfy/attachments
+attachment-total-size-limit: 3G
+attachment-file-size-limit: 50M
+attachment-expiry-duration: 72h
+
+# per-visitor attachment limits (only meaningful with behind-proxy: true)
+visitor-attachment-total-size-limit: 500M
+visitor-attachment-daily-bandwidth-limit: 1G
+
+# web push (keys provided via environment variables)
+web-push-file: /var/cache/ntfy/webpush.db
+web-push-email-address: ronaldlokers@me.com
+web-push-expiry-warning-duration: "55d"
+web-push-expiry-duration: "60d"
+
+# upstream for IOS notifcations (token provided via environment variable)
+upstream-base-url: https://ntfy.sh
+
+# login
+enable-login: true
+
+# NOTE: access control lives in NTFY_AUTH_* env vars (deployment-patch /
+# SOPS secret) — an auth-access block here would be silently overridden
+# by the NTFY_AUTH_ACCESS env var.
+
+# metrics for prometheus
+enable-metrics: true

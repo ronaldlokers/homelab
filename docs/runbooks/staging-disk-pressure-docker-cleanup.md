@@ -91,7 +91,10 @@ sudo truncate -s 0 /var/lib/docker/containers/*/*-json.log
 **Why**: Months of routine image bumps (Renovate, etc.) leave every prior version cached inside each node's containerd state.
 
 ```bash
-for n in k3d-staging-server-0 k3d-staging-agent-0 k3d-staging-agent-1 k3d-staging-agent-2; do
+# Node list is derived, not hardcoded - staging's agent count has changed before.
+# The loadbalancer node is excluded deliberately; it has no containerd state.
+for n in $(k3d node list --no-headers \
+             | awk '$3 == "staging" && $2 ~ /^(server|agent)$/ {print $1}'); do
   docker exec "$n" crictl rmi --prune
 done
 ```

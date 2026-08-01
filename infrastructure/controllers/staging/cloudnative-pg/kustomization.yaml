@@ -7,7 +7,8 @@ patches:
   - patch: |
       - op: replace
         path: /spec/chart/spec/version
-        value: "0.23.0"
+        # renovate: datasource=helm depName=cloudnative-pg registryUrl=https://cloudnative-pg.github.io/charts
+        value: "0.29.0"
     target:
       kind: HelmRelease
       name: cloudnative-pg

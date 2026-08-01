@@ -7,7 +7,7 @@ spec:
   chart:
     spec:
       chart: immich
-      version: "0.10.3"
+      version: "0.13.1"
       sourceRef:
         kind: HelmRepository
         name: immich
@@ -47,6 +47,7 @@ spec:
         cache:
           enabled: true
           type: persistentVolumeClaim
+          accessMode: ReadWriteMany
           size: 10Gi
           storageClass: longhorn
 

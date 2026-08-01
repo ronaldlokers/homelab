@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+  - servicemonitor.yaml
+  - network-policies.yaml
+# Generate the ConfigMap with a content-hash name suffix so any change to
+# config.yaml produces a new name, which rolls the deployment automatically
+# (Gatus does not hot-reload a mounted ConfigMap — the symlink swap is missed).
+configMapGenerator:
+  - name: gatus-config
+    files:
+      - config.yaml

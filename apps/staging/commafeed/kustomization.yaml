@@ -9,7 +9,16 @@ patches:
     target:
       kind: Deployment
       name: commafeed
+  # The base PVC omits storageClassName, which would fall to the cluster
+  # default. Production annotates two StorageClasses as default, so state it.
+  - patch: |
+      - op: add
+        path: /spec/storageClassName
+        value: local-path
+    target:
+      kind: PersistentVolumeClaim
+      name: commafeed-data
 
 images:
   - name: athou/commafeed
-    newTag: 7.1.0-postgresql
+    newTag: 7.2.0-postgresql

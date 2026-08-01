@@ -4,4 +4,5 @@ resources:
   - cert-manager
   - cloudnative-pg
   - kyverno
+  - reloader
   - renovate

@@ -8,6 +8,9 @@ spec:
   chart:
     spec:
       chart: cloudnative-pg
+      # Inert: every overlay overrides this with its own version patch, so
+      # this value is never rendered. Change the pin in
+      # infrastructure/controllers/<env>/cloudnative-pg/kustomization.yaml.
       version: "0.23.0"
       sourceRef:
         kind: HelmRepository

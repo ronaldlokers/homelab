@@ -8,7 +8,7 @@ spec:
   chart:
     spec:
       chart: kube-prometheus-stack
-      version: "79.9.0"
+      version: "88.0.1"
       sourceRef:
         kind: HelmRepository
         name: kube-prometheus-stack
@@ -26,6 +26,21 @@ spec:
         target:
           kind: PrometheusRule
   values:
+    prometheus:
+      prometheusSpec:
+        # Without storageSpec the TSDB lives on an emptyDir, so every pod
+        # restart discards it and the configured 10d retention never actually
+        # holds. Staging carries ~122k active series; 10Gi covers 10d with
+        # room to spare.
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: local-path
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 10Gi
+
     grafana:
       adminPassword: ronald
       grafana.ini:

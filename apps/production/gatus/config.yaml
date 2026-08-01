@@ -1,0 +1,85 @@
+metrics: true
+
+# Persist check history across restarts (production). Connects as the shared
+# `app` role via trust auth (empty password), same as every other app.
+storage:
+  type: postgres
+  path: "postgres://app@postgres-cluster-rw.database.svc.cluster.local:5432/gatus?sslmode=disable"
+
+ui:
+  title: "Homelab Status"
+  header: "Homelab Status"
+
+# Alerts publish to the ntfy topic "homelab-gatus" via the INTERNAL ntfy service
+# — the external MetalLB VIP is not reliably reachable pod->VIP from inside the
+# cluster. Token injected as ${NTFY_TOKEN} from the SOPS gatus-alerting secret.
+alerting:
+  ntfy:
+    url: "http://ntfy.ntfy.svc.cluster.local"
+    topic: "homelab-gatus"
+    token: "${NTFY_TOKEN}"
+    priority: 3
+    default-alert:
+      failure-threshold: 3
+      success-threshold: 2
+      send-on-resolved: true
+
+# In-cluster services are checked via their internal ClusterIP DNS, not the
+# public *.ronaldlokers.nl URLs: from inside the cluster the MetalLB VIP
+# (10.0.40.100) refuses pod->VIP connections. Internal checks confirm the app
+# is up; the external TLS/ingress path is covered by cert-manager + the external
+# lokilabs check. No TLS on internal hops, so cert-expiry conditions are dropped.
+endpoints:
+  - name: linkding
+    group: homelab
+    url: "http://linkding.linkding.svc.cluster.local:9090/health"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+    alerts:
+      - type: ntfy
+  - name: immich
+    group: homelab
+    url: "http://immich-server.immich.svc.cluster.local:2283/api/server/ping"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+    alerts:
+      - type: ntfy
+  - name: mealie
+    group: homelab
+    url: "http://mealie.mealie.svc.cluster.local:9000/api/app/about"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+    alerts:
+      - type: ntfy
+  - name: ntfy
+    group: homelab
+    url: "http://ntfy.ntfy.svc.cluster.local/v1/health"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+    alerts:
+      - type: ntfy
+  - name: lokilabs-healthz
+    group: external
+    url: "https://lokilabs.nl/api/healthz"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+    alerts:
+      - type: ntfy
+  - name: proxmox
+    group: infrastructure
+    # Checked at the backend host directly — the ingress VIP isn't reachable from
+    # inside the cluster. Proxmox serves a self-signed cert, so skip TLS verify.
+    url: "https://10.0.40.20:8006"
+    interval: 60s
+    client:
+      insecure: true
+    conditions:
+      - "[STATUS] == 200"
+    alerts:
+      - type: ntfy

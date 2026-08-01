@@ -4,7 +4,7 @@ This guide walks through setting up both the staging and production Kubernetes c
 
 ## Staging Cluster (k3d)
 
-The staging cluster runs in k3d on an Ubuntu Server VM in Proxmox on the MS-01 mini PC.
+The staging cluster runs in k3d on an Ubuntu Server VM in Proxmox on `hightower` (Intel NUC7i3DNHE).
 
 ### Prerequisites
 
@@ -17,13 +17,13 @@ The staging cluster runs in k3d on an Ubuntu Server VM in Proxmox on the MS-01 m
 ```bash
 k3d cluster create staging \
   --servers 1 \
-  --agents 3 \
+  --agents 1 \
   --k3s-arg "--tls-san=10.0.40.52@server:0" \
   --port "80:80@loadbalancer" \
   --port "443:443@loadbalancer"
 ```
 
-This creates a 4-node cluster (1 server + 3 agents) with:
+This creates a 2-node cluster (1 server + 1 agent) with:
 - TLS certificate valid for the VM's IP address (10.0.40.52)
 - HTTP and HTTPS ports exposed for ingress
 
@@ -43,7 +43,11 @@ kubectl config rename-context k3d-staging staging
 kubectl --context=staging get nodes
 ```
 
-You should see 4 nodes in Ready state.
+You should see 2 nodes in Ready state.
+
+> Staging ran 1 server + 3 agents until 2026-07-27, when it was rebuilt on a
+> less powerful Proxmox host. Older war stories in `docs/war-stories/` reference
+> the four-node layout and are accurate for their date.
 
 ## Production Cluster (K3s HA)
 

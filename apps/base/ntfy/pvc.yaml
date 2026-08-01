@@ -4,8 +4,12 @@ metadata:
   name: ntfy-cache
   namespace: ntfy
 spec:
+  # Stated explicitly: production annotates both local-path and longhorn as
+  # default StorageClasses, so an omitted class is a coin flip between
+  # node-local and replicated storage.
+  storageClassName: longhorn
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi
+      storage: 5Gi

@@ -6,9 +6,30 @@ resources:
 - ingress.yaml
 - ntfy-secret.yaml
 
+# Generating ntfy-config (rather than patching the base ConfigMap) appends a
+# content hash to its name and rewrites the Deployment's volume reference, so a
+# config change rolls the pod. Patching the ConfigMap in place did not: ntfy
+# reads server.yml only at startup, so edits applied cleanly and then sat unused
+# until something else happened to restart the pod.
+configMapGenerator:
+- name: ntfy-config
+  files:
+  - server.yml
+
 images:
 - name: binwiederhier/ntfy
-  newTag: v2.25
+  newTag: v2.26
 patches:
-- path: configmap-patch.yaml
 - path: deployment-patch.yaml
+# Opt in to Reloader: roll this workload when a mounted ConfigMap or Secret
+# changes. Without it a SOPS secret rotation applies cleanly and the pod keeps
+# serving the old value, because env/envFrom are injected only at pod creation.
+- target:
+    kind: Deployment
+  patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: placeholder
+      annotations:
+        reloader.stakater.com/auto: "true"

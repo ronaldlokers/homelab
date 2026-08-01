@@ -140,7 +140,7 @@ Two shared labels on each app's `Namespace` (set in `apps/base/<app>/namespace.y
 **Traffic allowed** (each app's `allow-internet-egress` rule lives in its own `apps/base/<app>/network-policies.yaml`; pgadmin has none since it needs no internet access):
 - All application pods → Internet (0.0.0.0/0) on ports 80, 443
 - **Excludes** private networks: 172.16.0.0/12, 192.168.0.0/16 (10.0.0.0/8 varies per namespace)
-- **Homepage** → Internet including 10.0.0.0/8 on ports 80, 443, 8006 (for Proxmox at 10.0.1.10)
+- **Homepage** → Internet including 10.0.0.0/8 on ports 80, 443, 8006 (for Proxmox at 10.0.40.20)
 - Database namespace → Internet on port 443 (Backblaze B2 backups; stays in `infrastructure/configs/base/network-policies/allow-egress-internet.yaml`)
 - Monitoring namespace → Internet on ports 80, 443 (webhooks, external queries; same base file)
 
@@ -179,7 +179,7 @@ Two shared labels on each app's `Namespace` (set in `apps/base/<app>/namespace.y
 
 **Security note**: Homepage has broader access than typical apps because it's a monitoring dashboard that needs to query many services.
 
-**Special case - Proxmox**: Homepage's Proxmox widget connects via the `allow-internet-egress` policy (port 8006 to 10.0.1.10), not through namespace selectors, because Proxmox is an external service outside the cluster.
+**Special case - Proxmox**: Homepage's Proxmox widget connects via the `allow-internet-egress` policy (port 8006 to 10.0.40.20), not through namespace selectors, because Proxmox is an external service outside the cluster.
 
 ### 8. Allow Database to Kubernetes API (`allow-database-to-k8s-api.yaml`)
 

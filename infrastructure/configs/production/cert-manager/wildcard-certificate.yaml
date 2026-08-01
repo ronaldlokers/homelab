@@ -10,3 +10,8 @@ spec:
     kind: ClusterIssuer
   dnsNames:
     - "*.ronaldlokers.nl"
+    # Second wildcard for internal-only hosts (e.g. immich.private.ronaldlokers.nl).
+    # Names under *.private.ronaldlokers.nl resolve to the VIP (private DNS
+    # wildcard) and are never exposed publicly. Sharing one cert means Traefik's
+    # default TLSStore serves valid TLS for these hosts with no per-namespace work.
+    - "*.private.ronaldlokers.nl"

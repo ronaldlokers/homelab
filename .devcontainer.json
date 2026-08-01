@@ -4,6 +4,9 @@
     "ghcr.io/devcontainers-extra/features/neovim-homebrew:1": {}
   },
   "onCreateCommand": "sudo chsh -s /usr/bin/zsh $USER",
+  "mounts": [
+    "source=${localEnv:HOME}/.kube,target=/home/vscode/.kube,type=bind,consistency=cached"
+  ],
   "settings": {
     "terminal.integrated.defaultProfile.linux": "zsh",
     "terminal.integrated.profiles.linux": {

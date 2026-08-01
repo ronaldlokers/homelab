@@ -18,7 +18,19 @@ patches:
     target:
       kind: PersistentVolumeClaim
       name: pgadmin4
+  # Opt in to Reloader: roll this workload when a mounted ConfigMap or Secret
+  # changes. Without it a SOPS secret rotation applies cleanly and the pod keeps
+  # serving the old value, because env/envFrom are injected only at pod creation.
+  - target:
+      kind: Deployment
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: placeholder
+        annotations:
+          reloader.stakater.com/auto: "true"
 
 images:
   - name: dpage/pgadmin4
-    newTag: "9.16"
+    newTag: "9.17"

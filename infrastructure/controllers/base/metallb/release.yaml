@@ -8,7 +8,7 @@ spec:
   chart:
     spec:
       chart: metallb
-      version: "0.14.9"
+      version: "0.16.1"
       sourceRef:
         kind: HelmRepository
         name: metallb
@@ -18,3 +18,38 @@ spec:
     crds: Create
   upgrade:
     crds: CreateReplace
+  values:
+    # This cluster advertises purely over L2 (see
+    # infrastructure/configs/production/metallb/l2advertisement.yaml); there are
+    # no BGP peers. 0.16 flipped the chart default to the frr-k8s backend, which
+    # would schedule a bundled subchart DaemonSet plus controller on all three
+    # CM5 nodes to serve BGP that is never configured. Both backends stay off so
+    # the speaker runs native, as it did on 0.14.
+    frrk8s:
+      enabled: false
+    speaker:
+      frr:
+        enabled: false
+
+    prometheus:
+      # 0.16 dropped kube-rbac-proxy for native TLS: "The old HTTP endpoints are
+      # no longer available, they are now HTTPS served by self-signed
+      # certificates." The hand-written PodMonitors this replaces scraped plain
+      # HTTP and would have gone silently stale — a PodMonitor has nowhere to put
+      # the tlsConfig this needs, which is why the chart's own ServiceMonitor is
+      # used instead of a local copy. Letting the chart own them also means the
+      # next upgrade cannot break them behind our back.
+      serviceMonitor:
+        enabled: true
+        speaker:
+          tlsConfig:
+            insecureSkipVerify: true
+        controller:
+          tlsConfig:
+            insecureSkipVerify: true
+      # Required by the chart whenever rbacPrometheus is on and a monitor is
+      # enabled: it scopes the Role/RoleBinding it creates in metallb-system to
+      # the Prometheus identity allowed to scrape.
+      rbacPrometheus: true
+      serviceAccount: kube-prometheus-stack-prometheus
+      namespace: monitoring
