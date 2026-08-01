@@ -9,21 +9,52 @@ loki.write "default" {
   }
 }
 
-// local.file_match discovers files on the local filesystem using glob patterns and the doublestar library. It returns an array of file paths.
-local.file_match "node_logs" {
-  path_targets = [{
-      // Monitor syslog to scrape node-logs
-      __path__  = "/var/log/syslog",
-      job       = "node/syslog",
-      node_name = sys.env("HOSTNAME"),
-      cluster   = "production",
-  }]
+// loki.relabel promotes journal metadata to real Loki labels. Journal fields
+// arrive as __journal_* and are dropped unless explicitly mapped here.
+loki.relabel "journal" {
+  // Rules are consumed by loki.source.journal below via relabel_rules, so this
+  // component forwards nothing itself.
+  forward_to = []
+
+  // "unit" is what makes per-service querying possible, e.g. {unit="k3s.service"}.
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+
+  rule {
+    source_labels = ["__journal__hostname"]
+    target_label  = "node_name"
+  }
+
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label  = "level"
+  }
 }
 
-// loki.source.file reads log entries from files and forwards them to other loki.* components.
-// You can specify multiple loki.source.file components by giving them different labels.
-loki.source.file "node_logs" {
-  targets    = local.file_match.node_logs.targets
+// loki.source.journal reads the systemd journal directly.
+//
+// This replaces a loki.source.file tailing /var/log/syslog, which silently
+// collected nothing: Debian Trixie ships journald only, rsyslog is not
+// installed, and /var/log/syslog does not exist on these nodes. The target
+// never matched, so no node-level or systemd-unit log has ever reached Loki --
+// including everything k3s writes. Pod logs were unaffected; they arrive via
+// loki.source.kubernetes below, which uses the Kubernetes API rather than files.
+//
+// Requires the host /var/log mount (alloy.mounts.varlog) and /etc/machine-id,
+// both set in release.yaml. Alloy runs as root, so no added privileges are
+// needed to read /var/log/journal (root:systemd-journal).
+loki.source.journal "node_logs" {
+  path          = "/var/log/journal"
+  // Bounds backfill on restart: without this Alloy would re-read the entire
+  // retained journal and republish it to Loki as freshly-ingested lines.
+  max_age       = "12h"
+  relabel_rules = loki.relabel.journal.rules
+  labels        = {
+    job     = "node/journal",
+    cluster = "production",
+  }
   forward_to = [loki.write.default.receiver]
 }
 

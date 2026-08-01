@@ -9,23 +9,21 @@ loki.write "default" {
   }
 }
 
-// local.file_match discovers files on the local filesystem using glob patterns and the doublestar library. It returns an array of file paths.
-local.file_match "node_logs" {
-  path_targets = [{
-      // Monitor syslog to scrape node-logs
-      __path__  = "/var/log/syslog",
-      job       = "node/syslog",
-      node_name = sys.env("HOSTNAME"),
-      cluster   = "staging",
-  }]
-}
-
-// loki.source.file reads log entries from files and forwards them to other loki.* components.
-// You can specify multiple loki.source.file components by giving them different labels.
-loki.source.file "node_logs" {
-  targets    = local.file_match.node_logs.targets
-  forward_to = [loki.write.default.receiver]
-}
+// No node-level log collection in staging, deliberately.
+//
+// This previously held a loki.source.file tailing /var/log/syslog, copied from
+// the production config. It collected nothing: k3d "nodes" are containers, not
+// hosts. Verified on k3d-staging-agent-0 -- PID 1 is docker-init, there is no
+// journald binary, no /var/log/journal, and no /var/log/syslog.
+//
+// Production solves this with loki.source.journal (see the production
+// config.alloy), which is not portable here because there is no journal to
+// read. Anything k3s itself logs in staging goes to the k3d node container's
+// stdout, which lives outside the cluster and is reachable via `docker logs`
+// on the Proxmox VM rather than through Alloy.
+//
+// Pod logs are unaffected and continue below via loki.source.kubernetes, which
+// reads through the Kubernetes API rather than from files.
 
 // discovery.kubernetes allows you to find scrape targets from Kubernetes resources.
 // It watches cluster state and ensures targets are continually synced with what is currently running in your cluster.
