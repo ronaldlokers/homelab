@@ -67,6 +67,29 @@ spec:
         # trains people to ignore the channel.
         KubeJobFailed: true
 
+    alertmanager:
+      alertmanagerSpec:
+        # Without this, NOTHING outside the monitoring namespace is ever
+        # delivered. prometheus-operator scopes each AlertmanagerConfig CRD to
+        # its own namespace by default (OnNamespace), so the ntfy-config in
+        # monitoring/ was rendered with a `namespace="monitoring"` matcher.
+        # Alertmanager's top-level route falls through to receiver "null", so
+        # every alert that did not carry that label was silently discarded:
+        #
+        #   PostgreSQLWALArchivingFailing   namespace=database        -> dropped
+        #   PostgreSQLContinuousArchiving   namespace=database        -> dropped
+        #   KubeJobFailed                   namespace=renovate        -> dropped
+        #   TargetDown                      namespace=metallb-system  -> dropped
+        #
+        # That is why a genuine KubeJobFailed fired unread for 15 days and why
+        # seven PostgreSQL criticals went unnoticed — not alert fatigue, which
+        # is what the cleanup in #145 assumed. They never arrived.
+        #
+        # "None" drops the injected namespace matcher so the single ntfy route
+        # receives every alert, which is what a one-operator cluster wants.
+        alertmanagerConfigMatcherStrategy:
+          type: None
+
     prometheus:
       prometheusSpec:
         # Without storageSpec the TSDB lives on an emptyDir, so every pod
