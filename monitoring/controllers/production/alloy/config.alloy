@@ -122,9 +122,13 @@ loki.process "journal_metrics" {
       // would. There is no way to tell the two apart from a healthy cluster.
       //
       // This canary travels the identical code path and naming convention, so
-      // observing loki_process_custom_k3s_journal_lines_total confirms both. If
-      // it goes flat, EtcdApplyLatencyHigh is blind -- which alerts.yaml alerts
-      // on directly.
+      // observing loki_process_custom_k3s_journal_lines confirms both. If it
+      // goes flat, EtcdApplyLatencyHigh is blind -- which alerts.yaml alerts on
+      // directly.
+      //
+      // It earned its keep immediately: the exposed name has NO _total suffix,
+      // contradicting the Alloy docs, and the node label is node_name. Both
+      // rules were wrong on first write and would have stayed silently green.
       metric.counter {
         name              = "k3s_journal_lines"
         description       = "All k3s.service journal lines reaching the metrics pipeline; proves EtcdApplyLatencyHigh's path is live"
