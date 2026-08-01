@@ -6,9 +6,18 @@ resources:
 - ingress.yaml
 - ntfy-secret.yaml
 
+# Generating ntfy-config (rather than patching the base ConfigMap) appends a
+# content hash to its name and rewrites the Deployment's volume reference, so a
+# config change rolls the pod. Patching the ConfigMap in place did not: ntfy
+# reads server.yml only at startup, so edits applied cleanly and then sat unused
+# until something else happened to restart the pod.
+configMapGenerator:
+- name: ntfy-config
+  files:
+  - server.yml
+
 images:
 - name: binwiederhier/ntfy
   newTag: v2.25
 patches:
-- path: configmap-patch.yaml
 - path: deployment-patch.yaml
