@@ -18,7 +18,7 @@ configMapGenerator:
 
 images:
 - name: binwiederhier/ntfy
-  newTag: v2.25
+  newTag: v2.26
 patches:
 - path: deployment-patch.yaml
 # Opt in to Reloader: roll this workload when a mounted ConfigMap or Secret
