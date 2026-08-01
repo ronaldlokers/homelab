@@ -1,7 +1,7 @@
 # Migrate etcd from eMMC to NVMe
 
 **Status:** corrected 2026-08-01, not yet executed. Diagnosis + pre-flight 1/3/4 already done.
-**Access:** SSH as root on each node. `kubectl exec` does NOT work — Step 1 kills the kubelet it relies on.
+**Access:** `ssh ronald@<node>`, then `sudo` for every command below. `kubectl exec` does NOT work — Step 1 kills the kubelet it relies on.
 **Time:** ~30 min per node + 15 min monitoring. Three nodes.
 **Rule:** one node at a time. Two nodes down = quorum loss.
 
@@ -18,9 +18,9 @@ etcd data size: 424M. NVMe has one partition, mounted at `/mnt/longhorn`.
 ## Order — one node at a time, in this sequence
 
 ```bash
-ssh root@10.0.40.102     # kube-srv-2  — start here (follower, most free space)
-ssh root@10.0.40.103     # kube-srv-3  — second     (follower)
-ssh root@10.0.40.101     # kube-srv-1  — last       (etcd leader on 2026-08-01)
+ssh ronald@10.0.40.102     # kube-srv-2  — start here (follower, most free space)
+ssh ronald@10.0.40.103     # kube-srv-3  — second     (follower)
+ssh ronald@10.0.40.101     # kube-srv-1  — last       (etcd leader on 2026-08-01)
 ```
 
 Re-check the leader before the final node — it may have moved.
@@ -35,31 +35,31 @@ kubectl get --raw /healthz/etcd --context=production
 kubectl get nodes --context=production
 
 # 2. snapshots exist on target  -> expect ~5 files
-ssh root@<target-ip> ls /var/lib/rancher/k3s/server/db/snapshots/
+ssh ronald@<target-ip> sudo ls /var/lib/rancher/k3s/server/db/snapshots/
 
 # 3. longhorn reserved  -> expect 10737418240 on all nodes
 kubectl -n longhorn-system get nodes.longhorn.io --context=production \
   -o custom-columns='NODE:.metadata.name,RESERVED:.spec.disks.ssd-disk.storageReserved'
 
 # 4. confirm target is not the leader  -> expect 0
-ssh root@<target-ip> "curl -s http://127.0.0.1:2381/metrics | grep '^etcd_server_is_leader '"
+ssh ronald@<target-ip> "curl -s http://127.0.0.1:2381/metrics | grep '^etcd_server_is_leader '"
 
 # ...or check all three at once:
 for ip in 10.0.40.101 10.0.40.102 10.0.40.103; do
   echo -n "$ip leader="
-  ssh root@$ip "curl -s http://127.0.0.1:2381/metrics | grep '^etcd_server_is_leader ' | awk '{print \$2}'"
+  ssh ronald@$ip "curl -s http://127.0.0.1:2381/metrics | grep '^etcd_server_is_leader ' | awk '{print \$2}'"
 done
 ```
 
 ## Procedure — repeat per node
 
-All commands run on the node via `ssh root@<target-ip>` unless marked *(workstation)*.
-Substitute the IP from the Order block above.
+All commands run on the node after `ssh ronald@<target-ip>`, unless marked *(workstation)*.
+Substitute the IP from the Order block above. Everything touching k3s or `/var/lib/rancher` needs `sudo`.
 
 ### 1. Stop k3s
 
 ```bash
-systemctl stop k3s
+sudo systemctl stop k3s
 ```
 
 *(workstation)* `kubectl get nodes --context=production` → target `NotReady`, other two `Ready`.
@@ -67,9 +67,9 @@ systemctl stop k3s
 ### 2. Copy etcd to NVMe
 
 ```bash
-mkdir -p /mnt/longhorn/etcd
-rsync -a /var/lib/rancher/k3s/server/db/etcd/ /mnt/longhorn/etcd/
-du -sh /var/lib/rancher/k3s/server/db/etcd /mnt/longhorn/etcd
+sudo mkdir -p /mnt/longhorn/etcd
+sudo rsync -a /var/lib/rancher/k3s/server/db/etcd/ /mnt/longhorn/etcd/
+sudo du -sh /var/lib/rancher/k3s/server/db/etcd /mnt/longhorn/etcd
 ```
 
 → both sizes must match.
@@ -77,7 +77,7 @@ du -sh /var/lib/rancher/k3s/server/db/etcd /mnt/longhorn/etcd
 ### 3. Move original aside
 
 ```bash
-mv /var/lib/rancher/k3s/server/db/etcd /var/lib/rancher/k3s/server/db/etcd.bak-$(date +%Y%m%d)
+sudo mv /var/lib/rancher/k3s/server/db/etcd /var/lib/rancher/k3s/server/db/etcd.bak-$(date +%Y%m%d)
 ```
 
 Do not delete. This is the rollback.
@@ -85,10 +85,11 @@ Do not delete. This is the rollback.
 ### 4. Bind-mount
 
 ```bash
-mkdir -p /var/lib/rancher/k3s/server/db/etcd
-mount --bind /mnt/longhorn/etcd /var/lib/rancher/k3s/server/db/etcd
-echo "/mnt/longhorn/etcd /var/lib/rancher/k3s/server/db/etcd none bind 0 0" >> /etc/fstab
-findmnt /var/lib/rancher/k3s/server/db/etcd
+sudo mkdir -p /var/lib/rancher/k3s/server/db/etcd
+sudo mount --bind /mnt/longhorn/etcd /var/lib/rancher/k3s/server/db/etcd
+# note: `sudo echo ... >> file` does NOT work — the redirect runs as your user
+echo "/mnt/longhorn/etcd /var/lib/rancher/k3s/server/db/etcd none bind 0 0" | sudo tee -a /etc/fstab
+sudo findmnt /var/lib/rancher/k3s/server/db/etcd
 ```
 
 → SOURCE must be `/dev/nvme0n1p1`.
@@ -97,7 +98,7 @@ findmnt /var/lib/rancher/k3s/server/db/etcd
 ### 5. Start k3s
 
 ```bash
-systemctl start k3s
+sudo systemctl start k3s
 ```
 
 *(workstation)*, after 30-60s:
@@ -113,8 +114,8 @@ kubectl get --raw /healthz/etcd --context=production    # ok
 
 ```bash
 # on node
-journalctl -u k3s --since '15 min ago' --no-pager | grep -c "apply request took too long"
-findmnt /var/lib/rancher/k3s/server/db/etcd
+sudo journalctl -u k3s --since '15 min ago' --no-pager | grep -c "apply request took too long"
+sudo findmnt /var/lib/rancher/k3s/server/db/etcd
 ```
 ```bash
 # workstation
@@ -132,12 +133,12 @@ Only then start the next node.
 ## Rollback
 
 ```bash
-systemctl stop k3s
-umount /var/lib/rancher/k3s/server/db/etcd
-rmdir /var/lib/rancher/k3s/server/db/etcd
-mv /var/lib/rancher/k3s/server/db/etcd.bak-<date> /var/lib/rancher/k3s/server/db/etcd
-sed -i '\|/mnt/longhorn/etcd|d' /etc/fstab
-systemctl start k3s
+sudo systemctl stop k3s
+sudo umount /var/lib/rancher/k3s/server/db/etcd
+sudo rmdir /var/lib/rancher/k3s/server/db/etcd
+sudo mv /var/lib/rancher/k3s/server/db/etcd.bak-<date> /var/lib/rancher/k3s/server/db/etcd
+sudo sed -i '\|/mnt/longhorn/etcd|d' /etc/fstab
+sudo systemctl start k3s
 ```
 
 Node must return `Ready` on eMMC data before anything else. Do not retry until the failure is understood.
@@ -146,11 +147,11 @@ If the node will not return at all: restore from the pre-flight snapshot (k3s cl
 ## After all three nodes
 
 - [ ] 3x `Ready`, `/healthz/etcd` = ok
-- [ ] `findmnt` = `/dev/nvme0n1p1` on all three
+- [ ] `sudo findmnt` = `/dev/nvme0n1p1` on all three
 - [ ] warning count near zero on all three
 - [ ] 19 volumes healthy
 - [ ] reboot one node → bind mount re-establishes from fstab
-- [ ] after one stable week: `rm -rf /var/lib/rancher/k3s/server/db/etcd.bak-*`
+- [ ] after one stable week: `sudo rm -rf /var/lib/rancher/k3s/server/db/etcd.bak-*`
 - [ ] update this file's status header; update `docs/architecture.md` storage section
 
 ## Notes
