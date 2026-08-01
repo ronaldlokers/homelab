@@ -114,6 +114,11 @@ A **runbook** is an action-oriented guide for handling specific incidents. Unlik
   - **Severity**: High
   - **Time to Fix**: 15-30 minutes
 
+- [**Migrate etcd Data Directory from SD/eMMC to NVMe**](etcd-migrate-to-nvme.md) *(proposed, not yet executed)*
+  - **Symptoms**: etcd key reads taking multiple seconds instead of ~100ms; NetworkPolicy/controller changes taking minutes to days to propagate
+  - **Severity**: Medium
+  - **Time to Fix**: ~15-30 minutes per node × 3 nodes, plus stability monitoring between each
+
 ## Runbook Structure
 
 Each runbook follows this format:

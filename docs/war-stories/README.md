@@ -25,6 +25,7 @@ These stories document actual problems, debugging processes, and solutions. They
 - **[A HelmRelease Stuck "Failed" for Seven Months While Its Pods Ran Fine](flux-helmrelease-terminal-failure.md)** - Flux's terminal-error circuit breaker silently blocking all future reconciliation attempts
 - **[A PostgreSQL Replica That Wouldn't Come Back](postgres-replica-networkpolicy-dataplane-sync.md)** - Ruling out a wrong node-flakiness hypothesis with a controlled A/B test, then finding a stale NetworkPolicy dataplane sync as the real cause
 - **[The Photo Database That Had Backups — Except It Didn't](cnpg-invisible-backup-gap.md)** - Four months of zero recoverability behind green dashboards: WAL archiving without a base backup, an hourly "daily" cron, an exact-match PodMonitor, and alerts selecting a label that never existed
+- **[All Three Control-Plane Nodes Running etcd on SD Card Instead of NVMe](etcd-emmc-storage-latency.md)** - A NetworkPolicy fix that wouldn't converge led to 30x-over etcd read latency, explaining a 4-day-old propagation mystery
 
 ### Applications
 
