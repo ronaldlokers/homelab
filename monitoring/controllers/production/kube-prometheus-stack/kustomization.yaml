@@ -5,3 +5,4 @@ resources:
   - ../../base/kube-prometheus-stack/
   - release.yaml
   - alertmanager-config.yaml
+  - job-alerts.yaml

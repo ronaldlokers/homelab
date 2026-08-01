@@ -1,0 +1,48 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kube-job-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+    app.kubernetes.io/name: kube-prometheus-stack
+spec:
+  groups:
+    - name: kubernetes-apps-jobs
+      rules:
+        # Time-bounded replacement for the stock KubeJobFailed, which is
+        # disabled in release.yaml.
+        #
+        # The stock rule is `kube_job_failed > 0` with no age limit. Because
+        # CronJobs retain their most recent failed Job by design
+        # (failedJobsHistoryLimit defaults to 1), a single failure keeps this
+        # firing forever — the Job object stays until deleted by hand, so the
+        # alert reports "a job failed at some point" rather than "something is
+        # wrong now". Observed firing on a 15-day-old renovate failure and a
+        # 160-day-old longhorn backup failure, both long recovered.
+        #
+        # The `and on (namespace, job_name)` join restricts it to Jobs started
+        # in the last 24h. Both metrics come from kube-state-metrics for the
+        # same object, so the identifying labels line up; the join shape was
+        # verified against kube_job_complete, which returned 6 of 9 Jobs with
+        # the older 3 correctly excluded.
+        #
+        # A genuinely broken CronJob still fires: it produces a fresh failed
+        # Job on its next schedule, which is inside the window.
+        - alert: KubeJobFailed
+          annotations:
+            summary: "Job {{ $labels.namespace }}/{{ $labels.job_name }} failed"
+            description: >-
+              Job {{ $labels.namespace }}/{{ $labels.job_name }} failed to
+              complete and started within the last 24 hours. Check the Job's
+              pod logs. Note this deliberately ignores older failed Jobs left
+              behind by failedJobsHistoryLimit — if you are investigating a
+              historical failure, query kube_job_failed directly instead.
+            runbook_url: https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubejobfailed
+          expr: |
+            kube_job_failed{job="kube-state-metrics"} > 0
+            and on (namespace, job_name)
+            (kube_job_status_start_time > (time() - 86400))
+          for: 15m
+          labels:
+            severity: warning
