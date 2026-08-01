@@ -8,7 +8,7 @@ resources:
 
 images:
 - name: lscr.io/linuxserver/speedtest-tracker
-  newTag: 1.14.5
+  newTag: 1.14.6
 patches:
 - path: deployment-patch.yaml
 # Opt in to Reloader: roll this workload when a mounted ConfigMap or Secret
