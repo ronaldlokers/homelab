@@ -67,7 +67,51 @@ loki.source.journal "node_logs" {
     job     = "node/journal",
     cluster = "production",
   }
-  forward_to = [loki.write.default.receiver]
+  // Fans out: log delivery to Loki, and a metrics-only branch below.
+  forward_to = [loki.write.default.receiver, loki.process.journal_metrics.receiver]
+}
+
+// loki.process turns specific journal lines into Prometheus counters, so they
+// can be alerted on through the existing PrometheusRule -> Alertmanager -> ntfy
+// path. Loki's ruler is not configured (no rulerConfig, no alertmanager_url),
+// and metric-based alerting is cheaper to evaluate than repeated LogQL queries.
+//
+// This is a DEAD END on purpose: forward_to is empty and loki.source.journal
+// forwards to loki.write.default in parallel, not through here. Log delivery
+// therefore cannot be affected by anything in this block. The alternative --
+// chaining journal -> process -> write -- would put every node log line behind
+// a stage.match whose treatment of NON-matching entries is unspecified in the
+// Alloy docs. Getting that wrong would silently drop every log that is not
+// k3s.service. Not worth the risk for a counter.
+loki.process "journal_metrics" {
+  forward_to = []
+
+  stage.match {
+    selector = "{unit=\"k3s.service\"}"
+
+    // Matches the warning etcd emits when an apply exceeds its 100ms
+    // expected-duration. This ran at 1,624-2,088/hr per node while etcd was on
+    // eMMC; it is 0 since the NVMe migration. See
+    // docs/runbooks/etcd-migrate-to-nvme.md.
+    stage.regex {
+      expression = "(?P<etcd_apply_slow>apply request took too long)"
+    }
+
+    stage.metrics {
+      metric.counter {
+        name        = "k3s_etcd_apply_slow"
+        description = "k3s etcd apply requests exceeding etcd's 100ms expected-duration, counted from journal warnings"
+        source      = "etcd_apply_slow"
+        action      = "inc"
+        // Default is 5m. Too short here: once etcd is healthy the counter goes
+        // idle, the series is dropped, and the next single occurrence appears
+        // as a brand-new series starting at zero -- which rate() cannot see as
+        // an increase. A long idle window keeps the series alive so a genuine
+        // regression actually registers.
+        max_idle_duration = "24h"
+      }
+    }
+  }
 }
 
 // discovery.kubernetes allows you to find scrape targets from Kubernetes resources.

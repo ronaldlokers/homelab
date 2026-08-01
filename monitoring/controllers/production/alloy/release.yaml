@@ -60,3 +60,10 @@ spec:
               type: File
     serviceAccount:
       create: true
+    # Alloy's own metrics were never scraped, so its health was invisible:
+    # loki_source_journal_target_lines_total sat at 0 through a merge and a
+    # verification pass without anything noticing. Prometheus here has empty
+    # serviceMonitorSelector/serviceMonitorNamespaceSelector, which match all,
+    # so enabling this is sufficient — no additionalLabels needed.
+    serviceMonitor:
+      enabled: true

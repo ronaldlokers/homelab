@@ -4,6 +4,7 @@ namespace: monitoring
 resources:
   - ../../base/alloy/
   - release.yaml
+  - alerts.yaml
 
 configMapGenerator:
   - name: alloy-config
