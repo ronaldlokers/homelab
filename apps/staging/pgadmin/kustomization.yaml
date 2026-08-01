@@ -33,4 +33,4 @@ patches:
 
 images:
   - name: dpage/pgadmin4
-    newTag: "9.16"
+    newTag: "9.17"
