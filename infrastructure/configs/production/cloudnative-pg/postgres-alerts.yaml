@@ -10,13 +10,26 @@ spec:
   groups:
     - name: postgres_archiving_alerts
       rules:
-        # Alert when WAL archiving fails
+        # Fires when the most recent archive attempt failed, i.e. archiving is
+        # broken *now*.
+        #
+        # This previously used `cnpg_pg_stat_archiver_failed_count > 0`. That is
+        # a cumulative counter since stats_reset, so a single transient failure
+        # latches the alert on forever. It did exactly that: immich-cluster-2
+        # recorded one failure, archiving recovered and kept succeeding, and the
+        # alert stayed critical indefinitely with `increase(...[1h])` at 0.
+        #
+        # Comparing the two timestamps asks the right question — is the newest
+        # failure more recent than the newest success? Note both metrics use -1
+        # as their "never happened" sentinel rather than 0, which this handles
+        # naturally: -1 never exceeds a real timestamp, and a cluster that has
+        # failed but never succeeded (positive > -1) correctly fires.
         - alert: PostgreSQLWALArchivingFailing
           annotations:
             summary: "PostgreSQL WAL archiving is failing on {{ $labels.pod }}"
-            description: "PostgreSQL cluster {{ $labels.cnpg_io_cluster }} has {{ $value }} failed WAL archive attempts. Check B2 connectivity to https://s3.eu-central-003.backblazeb2.com and verify credentials in b2-credentials secret."
+            description: "The most recent WAL archive attempt on {{ $labels.pod }} failed more recently than the last success, so archiving is currently broken and PITR coverage is stalling. Check B2 connectivity to https://s3.eu-central-003.backblazeb2.com and verify credentials in the b2-credentials secret."
           expr: |
-            cnpg_pg_stat_archiver_failed_count > 0
+            cnpg_pg_stat_archiver_last_failed_time > cnpg_pg_stat_archiver_last_archived_time
           for: 15m
           labels:
             severity: critical
@@ -36,20 +49,31 @@ spec:
             severity: warning
             component: database
 
-        # Alert on continuous archiving status
-        # (cnpg_io_cluster comes from podTargetLabels on the
-        # cloudnative-pg-clusters PodMonitor)
-        - alert: PostgreSQLContinuousArchivingFailed
+        # Replaces PostgreSQLContinuousArchivingFailed, which fired
+        # unconditionally and had nothing to do with archiving.
+        #
+        # Its expression was:
+        #   cnpg_collector_up{...} == 1 unless cnpg_collector_last_collection_error{...} == 0
+        #
+        # `unless` is a set operation requiring identical label sets on both
+        # sides. They do not match here, so nothing was ever excluded and all 6
+        # instances fired permanently — while last_collection_error was 0 on
+        # every one of them. Six standing criticals that could not respond to
+        # the cluster's actual state, alongside a description warning about WAL
+        # filling PVCs that no part of the expression measured.
+        #
+        # What it *should* have measured is kept below at warning severity,
+        # because a failing collector blinds the archiving alerts above rather
+        # than being an outage in itself.
+        - alert: CNPGMetricsCollectorFailing
           annotations:
-            summary: "PostgreSQL continuous archiving has failed on {{ $labels.cnpg_io_cluster }}"
-            description: "Continuous archiving status is not healthy for cluster {{ $labels.cnpg_io_cluster }}. WAL files may accumulate and fill PVCs. Check operator logs and B2 connectivity."
+            summary: "CloudNativePG metrics collector is erroring on {{ $labels.pod }}"
+            description: "The CNPG exporter on {{ $labels.pod }} is failing to collect. While this is firing the archiver metrics are stale, so PostgreSQLWALArchivingFailing and the backup-age alerts cannot be trusted for this instance. Check the instance's postgres container logs."
           expr: |
-            cnpg_collector_up{cnpg_io_cluster=~"postgres-cluster|immich-cluster"} == 1
-            unless
-            cnpg_collector_last_collection_error{cnpg_io_cluster=~"postgres-cluster|immich-cluster"} == 0
+            cnpg_collector_last_collection_error > 0
           for: 20m
           labels:
-            severity: critical
+            severity: warning
             component: database
 
     - name: postgres_backup_alerts
