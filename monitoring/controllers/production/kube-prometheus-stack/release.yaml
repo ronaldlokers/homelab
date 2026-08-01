@@ -53,6 +53,19 @@ spec:
         kubeControllerManager: false
         kubeSchedulerAlerting: false
         kubeProxy: false
+      disabled:
+        # Replaced by a time-bounded copy in job-alerts.yaml. The stock rule is
+        # kube_job_failed > 0 with no upper bound on age, and CronJobs keep
+        # their most recent failed Job by design (failedJobsHistoryLimit), so
+        # any single failure fires this alert permanently until someone deletes
+        # the Job object by hand.
+        #
+        # It was firing on a renovate Job that failed once 15 days ago and on a
+        # longhorn backup Job from 160 days ago. Both had long since recovered —
+        # renovate completed hourly throughout, and longhorn backups ran nightly.
+        # Two permanent alerts describing nothing, in a channel where that
+        # trains people to ignore the channel.
+        KubeJobFailed: true
 
     prometheus:
       prometheusSpec:
