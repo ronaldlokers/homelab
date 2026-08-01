@@ -59,15 +59,25 @@
   `X-Forwarded-For` from Traefik — without it every request appears to come from
   the ingress pod and all visitors share a single bucket
 
-**Gotcha — the production ConfigMap patch replaces `server.yml` wholesale**:
-`apps/production/ntfy/configmap-patch.yaml` is a strategic-merge patch on a
-ConfigMap. `data` is a `map[string]string`, so patching the `server.yml` key
-replaces the entire string — the YAML *inside* it is not deep-merged with
-`apps/base/ntfy/configmap.yaml`. Any setting production needs must be repeated
-in the patch. This previously caused `cache-file`, `cache-duration`,
-`behind-proxy` and `enable-web-app` to be silently dropped in production, which
-meant the message cache was in-memory only (messages lost on pod restart) and
-rate limiting keyed off the Traefik pod IP. Verify renders with:
+**Config is generated, not patched**:
+`apps/production/ntfy/kustomization.yaml` builds `ntfy-config` with a
+`configMapGenerator` from `apps/production/ntfy/server.yml`. Kustomize appends a
+content hash to the ConfigMap name and rewrites the Deployment's volume
+reference, so editing `server.yml` produces a new ConfigMap name, which changes
+the Deployment spec, which rolls the pod.
+
+This replaced an in-place ConfigMap patch that silently did not work. `data` is a
+`map[string]string`, so patching the `server.yml` key replaced the entire string
+rather than deep-merging the YAML inside it — `cache-file`, `cache-duration`,
+`behind-proxy` and `enable-web-app` from the base ConfigMap never reached
+production. Worse, because ntfy reads `server.yml` only at startup and nothing
+triggered a rollout, config changes applied cleanly and then sat unused until
+some unrelated event restarted the pod.
+
+There is no base ConfigMap any more — its content was always discarded by the
+overlay. Each overlay owns its own `server.yml`.
+
+Verify a render with:
 
 ```bash
 kustomize build apps/production/ntfy | yq 'select(.kind=="ConfigMap")'
