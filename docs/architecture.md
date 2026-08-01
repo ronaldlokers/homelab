@@ -96,7 +96,7 @@ Dependencies are enforced through Kustomization `dependsOn` fields, and every Ku
 
 - **Platform**: Sipeed NanoCluster with 3× Raspberry Pi CM5 modules
 - **Nodes**: 3× Raspberry Pi CM5 (16GB RAM each)
-- **Storage**: Each node has a dedicated 512GB NVMe SSD for Longhorn storage
+- **Storage**: Each node has a 512GB NVMe SSD (Longhorn replicas + the etcd data directory) plus onboard eMMC for the OS — see [Node Storage Layout](#node-storage-layout-production)
 - **Network**: Gigabit Ethernet
 
 **Node Configuration**:
@@ -154,6 +154,34 @@ Dependencies are enforced through Kustomization `dependsOn` fields, and every Ku
 - Replica anti-affinity: Disabled (allows replicas on same node if needed)
 - Auto-balance: least-effort (balances when convenient)
 - Data path: `/mnt/longhorn` on each node's NVMe SSD
+- Reserved per disk: 10Gi (`spec.disks.ssd-disk.storageReserved`)
+
+### Node Storage Layout (Production)
+
+Each CM5 node has two storage devices, and it matters which path lands on which:
+
+| Path | Device | Contents |
+|---|---|---|
+| `/` | `/dev/mmcblk0p2` (eMMC) | OS, k3s binaries, container images |
+| `/mnt/longhorn` | `/dev/nvme0n1p1` (512GB NVMe) | Longhorn `replicas/`, `longhorn-disk.cfg` |
+| `/mnt/longhorn/etcd` | `/dev/nvme0n1p1` (512GB NVMe) | etcd data directory |
+| `/var/lib/rancher/k3s/server/db/etcd` | bind mount → `/mnt/longhorn/etcd` | what k3s actually opens |
+
+**etcd deliberately does not live on eMMC.** k3s defaults its etcd data directory to `/var/lib/rancher/k3s/server/db/etcd` on the root filesystem, which on these nodes is eMMC. eMMC cannot sustain etcd's fsync pattern: measured apply latency was 1,200-2,300ms p50 with 18-27 second maxima, which surfaced as NetworkPolicy and controller changes taking minutes to days to propagate. Migrating to NVMe on 2026-08-01 eliminated it entirely — zero latency-threshold breaches at idle.
+
+The mechanism is a bind mount recorded in `/etc/fstab` on each node, so k3s needs no configuration change and the mount survives reboot:
+
+```
+/mnt/longhorn/etcd /var/lib/rancher/k3s/server/db/etcd none bind 0 0
+```
+
+Verify with `sudo findmnt /var/lib/rancher/k3s/server/db/etcd` — the source must be `/dev/nvme0n1p1`, not `/dev/mmcblk0p2`.
+
+Consequences to keep in mind when changing anything here:
+
+- **etcd shares the NVMe with Longhorn replica I/O.** Accepted trade-off — a contended NVMe still vastly outperforms uncontended eMMC. No contention has been observed in practice, but if etcd latency reappears the fix is a dedicated `nvme0n1p2` partition.
+- **A rebuilt or replaced node will come back with etcd on eMMC** unless the migration is redone. It is not captured in any declarative config — this is host state, not GitOps state. See [`docs/runbooks/etcd-migrate-to-nvme.md`](/docs/runbooks/etcd-migrate-to-nvme.md).
+- **Longhorn's 10Gi reservation is the only thing holding disk space back** on a filesystem etcd now also depends on.
 
 ## Networking
 
