@@ -50,7 +50,14 @@ spec:
                   storage: 10Gi
 
     grafana:
-      adminPassword: ronald
+      # Was a hardcoded `adminPassword` in cleartext here. Grafana proxies the
+      # Loki datasource — 30 days of every pod log, node journal line and
+      # Kubernetes event — so that one word was the only thing gating it.
+      # Rotated, because the old value is in git history.
+      admin:
+        existingSecret: grafana-admin
+        userKey: admin-user
+        passwordKey: admin-password
       grafana.ini:
         server:
           root_url: https://grafana.staging.ronaldlokers.nl
