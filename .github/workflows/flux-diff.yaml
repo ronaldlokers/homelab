@@ -207,8 +207,10 @@ jobs:
               clusters/*|infrastructure/*|apps/*|monitoring/*) ;;
               *) continue ;;
             esac
-            # deleted files cannot be inspected; treat them as ordinary changes
-            if [ ! -f "$f" ] || ! grep -q '^sops:' "$f" 2>/dev/null; then
+            # Deleted files cannot be inspected; treat them as ordinary changes.
+            # The helper parses the file rather than grepping it — see its
+            # docstring for the multi-document bypass that motivated it.
+            if [ ! -f "$f" ] || ! python3 .github/scripts/is-sops-secret.py "$f"; then
               only_secrets=false
               break
             fi
