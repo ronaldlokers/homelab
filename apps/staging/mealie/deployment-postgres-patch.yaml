@@ -7,6 +7,12 @@ spec:
     spec:
       containers:
         - name: mealie
+          # Staging runs on a 2-core node. Base requests 100m for production;
+          # observed staging usage is 5m. Memory requests are left alone —
+          # CPU is the constraint here, memory sits at ~49%.
+          resources:
+            requests:
+              cpu: 25m
           image: ghcr.io/mealie-recipes/mealie:v3.22.0
           env:
             - name: DB_ENGINE

@@ -89,6 +89,12 @@ spec:
     # Enable minio for storage
     minio:
       enabled: true
+      # Chart default requests 100m; observed usage is 5m serving a
+      # single-binary Loki holding two days of staging logs.
+      resources:
+        requests:
+          cpu: 25m
+          memory: 128Mi
 
     gateway:
       service:
