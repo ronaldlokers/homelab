@@ -40,7 +40,11 @@ spec:
                   name: ntfy-secret
                   key: auth-users
             - name: NTFY_AUTH_ACCESS
-              # One account per publisher, each write-only on exactly one topic.
+              # One account per publisher, each write-only on only the topics
+              # it actually sends to. homeassistant covers both `homeassistant`
+              # and `deurbel`: the doorbell notification is sent by Home
+              # Assistant, so a separate `deurbel` account would be a second
+              # credential to keep in sync for the same publisher.
               #
               # These were `*:<topic>:write-only` — `*` is anonymous, so anyone
               # on the internet could publish to all five. That let a stranger
@@ -51,5 +55,5 @@ spec:
               # the alerts stop arriving with no error anywhere — ntfy just 403s
               # the publish. flux-staging stays separate from flux so a wedged
               # staging cluster cannot bury a production alarm.
-              value: "alertmanager:alerts:write-only,fluxprod:flux:write-only,fluxstaging:flux-staging:write-only,homeassistant:homeassistant:write-only,deurbel:deurbel:write-only"
+              value: "alertmanager:alerts:write-only,fluxprod:flux:write-only,fluxstaging:flux-staging:write-only,homeassistant:homeassistant:write-only,homeassistant:deurbel:write-only"
 
