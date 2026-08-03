@@ -46,8 +46,7 @@ spec:
                     identifier: main
                     port: 2283
           tls:
-            - secretName: wildcard-ronaldlokers-nl-tls
-              hosts:
+            - hosts:
                 - immich.ronaldlokers.nl
                 - immich.private.ronaldlokers.nl
     machine-learning:

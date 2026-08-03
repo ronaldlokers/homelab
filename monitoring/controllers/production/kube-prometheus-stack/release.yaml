@@ -138,8 +138,7 @@ spec:
         hosts:
           - prometheus.ronaldlokers.nl
         tls:
-          - secretName: wildcard-ronaldlokers-nl-tls
-            hosts:
+          - hosts:
               - prometheus.ronaldlokers.nl
     grafana:
       adminPassword: ronald
@@ -154,8 +153,7 @@ spec:
         hosts:
           - grafana.ronaldlokers.nl
         tls:
-          - secretName: wildcard-ronaldlokers-nl-tls
-            hosts:
+          - hosts:
               - grafana.ronaldlokers.nl
       # Dashboard providers for automatic dashboard provisioning
       dashboardProviders:

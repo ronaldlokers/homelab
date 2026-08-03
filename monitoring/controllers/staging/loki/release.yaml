@@ -66,10 +66,22 @@ spec:
 
     # The chunks cache defaults to ~9.6Gi memory request, larger than the
     # whole staging node; shrink both caches to fit.
+    #
+    # allocatedCPU was missed the first time and defaults to 500m *each*, so the
+    # two memcached pods reserved 1000m — a quarter of the cluster's entire
+    # schedulable CPU across both nodes — while measuring 2m and 3m of actual
+    # use. Memory was similarly over-reserved: 614Mi and 307Mi of requests
+    # against 38Mi and 22Mi in use.
+    #
+    # Sized from observed usage with generous headroom. These are caches for a
+    # single-binary Loki holding a couple of days of staging logs; if a query
+    # ever needs more, it gets a cache miss, not an outage.
     chunksCache:
-      allocatedMemory: 512
+      allocatedMemory: 128
+      allocatedCPU: 50m
     resultsCache:
-      allocatedMemory: 256
+      allocatedMemory: 64
+      allocatedCPU: 50m
 
     # The canary writes synthetic log lines continuously and reads them back to
     # measure the pipeline. That is two more pods plus a constant write/read
