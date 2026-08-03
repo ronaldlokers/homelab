@@ -8,7 +8,7 @@ patches:
       - op: replace
         path: /spec/chart/spec/version
         # renovate: datasource=helm depName=cert-manager registryUrl=https://charts.jetstack.io
-        value: "v1.19.6"
+        value: "v1.20.3"
     target:
       kind: HelmRelease
       name: cert-manager
