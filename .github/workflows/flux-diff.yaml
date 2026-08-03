@@ -155,6 +155,10 @@ jobs:
       contents: read
       pull-requests: read
     steps:
+      # Needed to tell a SOPS-encrypted Secret apart from any other manifest.
+      - name: Checkout
+        uses: actions/checkout@v7
+
       - name: Download verdicts
         uses: actions/download-artifact@v8
         with:
@@ -185,6 +189,34 @@ jobs:
 
           if [ "$flux_touched" = false ]; then
             echo "No Flux-managed files changed — a rendered diff is not expected."
+            exit 0
+          fi
+
+          # flate omits Secret contents from its render, deliberately: the output
+          # is posted as a PR comment. So a change that only rewrites an
+          # encrypted value produces byte-identical output and would trip this
+          # gate every time — which is what happened on #221, a genuine token
+          # rotation that reached the cluster correctly.
+          #
+          # If every Flux-managed file this PR touches is a SOPS-encrypted
+          # Secret, there is nothing a rendered diff could ever show, so the gate
+          # does not apply.
+          only_secrets=true
+          while IFS= read -r f; do
+            case "$f" in
+              clusters/*|infrastructure/*|apps/*|monitoring/*) ;;
+              *) continue ;;
+            esac
+            # deleted files cannot be inspected; treat them as ordinary changes
+            if [ ! -f "$f" ] || ! grep -q '^sops:' "$f" 2>/dev/null; then
+              only_secrets=false
+              break
+            fi
+          done < <(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')
+
+          if [ "$only_secrets" = true ]; then
+            echo "Only SOPS-encrypted Secrets changed — flate redacts Secret"
+            echo "contents, so no rendered diff is possible. Gate does not apply."
             exit 0
           fi
 
