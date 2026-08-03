@@ -13,10 +13,15 @@ spec:
           main:
             image:
               tag: v2.3.1
+            # Measured: 3m CPU, 414Mi memory at rest. 4Gi was a 10x
+            # over-reservation; 50m CPU made hpa.yaml's 50% target scale out at 25m,
+            # which nominal load crosses. At 200m the threshold is 100m. No limits,
+            # so a lower memory request cannot cause an OOM — it only changes
+            # scheduling and eviction ranking.
             resources:
               requests:
-                cpu: 50m
-                memory: 4Gi
+                cpu: 200m
+                memory: 1Gi
     server:
       ingress:
         main:
@@ -54,7 +59,10 @@ spec:
         cache:
           storageClass: longhorn
           accessMode: ReadWriteMany
+      # Measured: 3m CPU, 238Mi memory at rest. Kept at 2Gi rather than 1Gi
+      # because model loading spikes well above idle; there are no limits, so
+      # this is a scheduling floor, not a cap.
       resources:
         requests:
-          cpu: 50m
-          memory: 4Gi
+          cpu: 200m
+          memory: 2Gi
