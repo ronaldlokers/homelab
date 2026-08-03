@@ -119,3 +119,119 @@ jobs:
         with:
           message-id: flux-diff-${{ matrix.cluster }}
           message-path: comment.md
+
+      # The gate job below needs the verdict from *both* matrix legs, and matrix
+      # jobs cannot aggregate `outputs` (every leg writes the same key, last
+      # writer wins). So each leg publishes its verdict as an artifact instead.
+      - name: Publish change verdict
+        env:
+          CLUSTER: ${{ matrix.cluster }}
+          CHANGED: ${{ steps.diff.outputs.changed }}
+        run: |
+          mkdir -p verdict
+          {
+            echo "changed=$CHANGED"
+            echo "base_render_failed=$([ -f base-render-failed ] && echo true || echo false)"
+          } > "verdict/$CLUSTER.txt"
+
+      - name: Upload change verdict
+        uses: actions/upload-artifact@v7
+        with:
+          name: flux-diff-verdict-${{ matrix.cluster }}
+          path: verdict/
+          retention-days: 1
+
+  # A PR that edits Flux-managed files but renders no change on either cluster
+  # is almost always a silent no-op: a patch whose target selector matches
+  # nothing, a value nested under the wrong key, a field the chart ignores. Four
+  # such bugs were written and caught by hand in a single session on 2026-08-01
+  # (see #173). The rendered diff already made them visible — this converts
+  # "someone remembered to read the comment" into a gate.
+  require-rendered-diff:
+    name: Require a rendered diff
+    needs: flux-diff
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Download verdicts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: flux-diff-verdict-*
+          merge-multiple: true
+          path: verdicts
+
+      - name: Require a rendered diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Untrusted PR metadata is read through the API into shell variables
+          # rather than interpolated into this script, so a crafted branch or
+          # title cannot inject commands.
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Only these trees are rendered by Flux. A PR confined to CI, docs,
+          # scripts or skills has no reason to produce a diff, so it is not
+          # gated — that is the common case for repo-maintenance PRs.
+          flux_touched=false
+          while IFS= read -r f; do
+            case "$f" in
+              clusters/*|infrastructure/*|apps/*|monitoring/*) flux_touched=true; break ;;
+            esac
+          done < <(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')
+
+          if [ "$flux_touched" = false ]; then
+            echo "No Flux-managed files changed — a rendered diff is not expected."
+            exit 0
+          fi
+
+          # Deliberate no-ops are legitimate: reformatting, comment-only edits
+          # (kustomize strips comments), or a refactor that is provably inert.
+          # They need the `no-op` label, which makes the claim explicit and
+          # reviewable instead of silent.
+          if gh api "repos/$REPO/pulls/$PR" --jq '.labels[].name' | grep -qxF 'no-op'; then
+            echo "Labelled 'no-op' — rendering no change is declared intentional."
+            exit 0
+          fi
+
+          changed=false
+          base_failed=false
+          for v in verdicts/*.txt; do
+            [ -e "$v" ] || continue
+            if grep -qx 'changed=true' "$v"; then changed=true; fi
+            if grep -qx 'base_render_failed=true' "$v"; then base_failed=true; fi
+          done
+
+          # A partial base render makes "no diff" meaningless — it may only look
+          # empty because the base output is truncated. Warn, do not gate.
+          if [ "$base_failed" = true ]; then
+            echo "::warning::Base branch rendered only partially; the diff is unreliable, so this gate is not enforced."
+            exit 0
+          fi
+
+          if [ "$changed" = true ]; then
+            echo "Rendered diff present — the change reaches at least one cluster."
+            exit 0
+          fi
+
+          echo "::error::This PR changes Flux-managed files but renders no change on staging or production."
+          cat <<'MSG'
+
+          Every manifest still renders exactly as it does on the base branch, so
+          nothing this PR does would reach either cluster. That usually means:
+
+            - a kustomize patch whose `target` matches no resource
+            - a Helm value nested under the wrong key, or one the chart ignores
+            - a file added but never listed in a kustomization's `resources`
+            - an overlay edited that no Kustomization actually builds
+
+          Check the "Flux diff" comments on this PR: both say "No rendered
+          changes."
+
+          If the no-op is intentional (comment-only edits, reformatting), add the
+          `no-op` label to record that and this check will pass.
+          MSG
+          exit 1
