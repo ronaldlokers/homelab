@@ -30,7 +30,20 @@ spec:
       cron.database_name: 'postgres'
     # Allow password-less connections from within cluster
     pg_hba:
-      - host all app all trust
+      # Was `host all app all trust`: any pod that could reach port 5432
+      # authenticated as `app` against every database in the cluster, with no
+      # credential. NetworkPolicy was the only boundary, and it is
+      # namespace-granular rather than database-granular (#166).
+      #
+      # Every consumer was given this role's password first, while trust was
+      # still in effect and therefore ignoring it, so this line is the only
+      # thing that changes behaviour.
+      - host all app all scram-sha-256
+      # Deliberately left as trust. The streaming_replica role has NO PASSWORD
+      # SET (verified in pg_authid), so requiring scram here would break
+      # replication immediately. CNPG authenticates replicas with client
+      # certificates over TLS, which makes this line redundant rather than
+      # load-bearing, but removing it needs its own verified change.
       - host all streaming_replica all trust
       - host all postgres all md5
 
