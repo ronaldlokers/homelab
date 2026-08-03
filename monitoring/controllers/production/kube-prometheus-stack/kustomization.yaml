@@ -4,5 +4,6 @@ namespace: monitoring
 resources:
   - ../../base/kube-prometheus-stack/
   - release.yaml
+  - grafana-admin-secret.yaml
   - alertmanager-config.yaml
   - job-alerts.yaml
