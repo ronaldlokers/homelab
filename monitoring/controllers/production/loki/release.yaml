@@ -59,6 +59,27 @@ spec:
           s3ForcePathStyle: true
           insecure: true
 
+    # Chart defaults reserve 9830Mi and 1229Mi for the two memcached caches —
+    # together 11Gi, about 23% of this 48Gi cluster, for log caching. That
+    # single chunks-cache pod accounted for 60% of kube-srv-1's memory requests
+    # and left it at 86% allocated while the other two nodes sat near 39%,
+    # which blocks scheduling anything substantial there.
+    #
+    # Measured: chunks-cache uses 6673Mi (memcached fills whatever it is given,
+    # so this is real, not waste), results-cache uses 30Mi against 1229Mi
+    # reserved. CPU is 6m and 3m against 500m each.
+    #
+    # chunks-cache is halved rather than slashed: still 4Gi of chunk cache for a
+    # 30-day store, trading some query-time cache hits for schedulable headroom.
+    # results-cache is sized to what it actually uses. A cache miss costs a read
+    # from MinIO, not an outage.
+    chunksCache:
+      allocatedMemory: 4096
+      allocatedCPU: 100m
+    resultsCache:
+      allocatedMemory: 256
+      allocatedCPU: 100m
+
     deploymentMode: SimpleScalable
 
     backend:
