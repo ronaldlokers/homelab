@@ -13,6 +13,56 @@ loki.write "default" {
     url = "http://loki-gateway.monitoring.svc.cluster.local:80/loki/api/v1/push"
   }
 }
+// Redacts credentials before anything is written to Loki.
+//
+// Nightscout authenticates with a `token=` / `secret=` query parameter, so its
+// own logs, Traefik access logs and Kubernetes events all carry working
+// credentials in the URL. Loki retains 30 days of that, searchable by anyone
+// who reaches Grafana.
+//
+// This is a single chokepoint that EVERY source routes through, rather than a
+// stage on one pipeline: pod logs and cluster events each reached loki.write
+// independently, so scrubbing only `pod_logs` (as originally proposed) would
+// have left cluster events untouched. Adding a source later means pointing it
+// at this component instead of loki.write.default. Kept byte-identical to the
+// production config so the two cannot drift apart.
+//
+// Unlike stage.match, stage.replace has no effect on entries that do not match —
+// non-matching lines pass through byte-identical — so putting this in the
+// delivery path cannot drop logs. (That risk is why the journal metrics branch
+// below is kept as a separate dead end.)
+//
+// stage.replace substitutes only the CAPTURE GROUP, not the whole match, so the
+// surrounding context survives: `?token=abc123` becomes `?token=REDACTED`, which
+// keeps the line useful for debugging while the credential is gone. Every
+// pattern therefore captures the value alone and leaves the key name uncaptured.
+loki.process "scrub" {
+  forward_to = [loki.write.default.receiver]
+
+  // Auth headers. The scheme is matched but deliberately not captured, so
+  // `Authorization: Bearer <jwt>` redacts to `Authorization: Bearer REDACTED`
+  // and still shows which scheme was used.
+  stage.replace {
+    expression = "(?i)\\b(?:api[-_]secret|x[-_]api[-_]key|authorization)\\s*:\\s*(?:bearer\\s+|basic\\s+)?([^\\s,;\"]+)"
+    replace    = "REDACTED"
+  }
+
+  // Bare `Bearer <token>` outside a recognised header. The {8,} bound stops it
+  // matching ordinary prose such as "Bearer token was rejected".
+  stage.replace {
+    expression = "(?i)\\b(?:bearer|basic)\\s+([A-Za-z0-9._~+/=-]{8,})"
+    replace    = "REDACTED"
+  }
+
+  // Credentials as query parameters or logfmt fields — the Nightscout case.
+  // This also redacts the VALUE of any `secret=` field, which in a Kubernetes
+  // event may be a Secret's name rather than its contents. Losing a resource
+  // name from a log line is a deliberate trade against leaking a live token.
+  stage.replace {
+    expression = "(?i)\\b(?:token|secret|api[-_]?key|apikey|access[-_]?token|password|passwd|pwd)=([^&\\s\"]+)"
+    replace    = "REDACTED"
+  }
+}
 
 // No node-level log collection in staging, deliberately.
 //
@@ -119,7 +169,7 @@ loki.process "pod_logs" {
       }
   }
 
-  forward_to = [loki.write.default.receiver]
+  forward_to = [loki.process.scrub.receiver]
 }
 
 // loki.source.kubernetes_events tails events from the Kubernetes API and converts them
@@ -135,7 +185,7 @@ loki.source.kubernetes_events "cluster_events" {
 // loki.process receives log entries from other loki components, applies one or more processing stages,
 // and forwards the results to the list of receivers in the component's arguments.
 loki.process "cluster_events" {
-  forward_to = [loki.write.default.receiver]
+  forward_to = [loki.process.scrub.receiver]
 
   stage.static_labels {
     values = {
