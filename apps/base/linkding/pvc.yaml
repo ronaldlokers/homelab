@@ -1,0 +1,34 @@
+# /etc/linkding/data survived only as long as the pod did.
+#
+# Bookmarks live in Postgres, so linkding came back looking perfectly healthy
+# after every restart while this directory started empty. What it holds:
+#
+#   secretkey.txt   Django's SECRET_KEY. Regenerated when missing, which
+#                   invalidates every signed session cookie — so every user was
+#                   silently logged out on each restart. This is the part that
+#                   was already costing something.
+#   tasks.sqlite3   the background task queue (favicon and preview fetches).
+#                   Anything queued at restart was dropped.
+#   assets/         HTML snapshots of bookmarked pages. Empty today because
+#   previews/       LD_ENABLE_SNAPSHOTS is unset, so archiving is off. Turning it
+#   favicons/       on without this PVC would lose every archive on restart.
+#
+# storageClassName is deliberately omitted here and set per overlay: production
+# annotates BOTH local-path and longhorn as default, so an unqualified claim
+# binds non-deterministically. Same reasoning as commafeed.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: linkding-data
+  labels:
+    recurring-job.longhorn.io/backup-daily: enabled
+    recurring-job.longhorn.io/snapshot-daily: enabled
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # Currently 48K in use with archiving off. 1Gi matches commafeed and
+      # leaves room if snapshots are enabled later; Longhorn volumes can be
+      # expanded in place if that is not enough.
+      storage: 1Gi

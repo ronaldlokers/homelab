@@ -19,3 +19,12 @@ patches:
       name: placeholder
       annotations:
         reloader.stakater.com/auto: "true"
+# The base PVC omits storageClassName, which would fall to the cluster
+# default. Production annotates two StorageClasses as default, so state it.
+- patch: |
+    - op: add
+      path: /spec/storageClassName
+      value: longhorn
+  target:
+    kind: PersistentVolumeClaim
+    name: linkding-data

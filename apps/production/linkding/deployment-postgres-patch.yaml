@@ -21,9 +21,3 @@ spec:
               value: "app"
             - name: LD_DB_PASSWORD
               value: ""
-          volumeMounts:
-            - name: linkding-data
-              mountPath: "/etc/linkding/data"
-      volumes:
-        - name: linkding-data
-          emptyDir: {}
