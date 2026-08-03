@@ -56,12 +56,24 @@ spec:
           # `/` returns a 302 to the login page, which httpGet treats as
           # success (2xx and 3xx both pass). There is no dedicated health
           # endpoint in this image.
+          # First boot applies 240+ Django migrations and then runs
+          # collectstatic, and nginx does not accept connections until both
+          # finish. Measured on staging: well over 5 minutes on ARM64.
+          #
+          # 60 x 5s was not enough. The probe killed the container mid-migration
+          # and the restart began the whole sequence again from scratch, so it
+          # never converged — 2 restarts and climbing, with the logs looping
+          # back to "Running django-vite in production mode" each time.
+          #
+          # 10 minutes covers the observed cold start with room to spare. This
+          # only delays detection of a genuinely dead container at startup;
+          # livenessProbe still catches one that dies later.
           startupProbe:
             httpGet:
               path: /
               port: http
             periodSeconds: 5
-            failureThreshold: 60
+            failureThreshold: 120
           livenessProbe:
             httpGet:
               path: /
@@ -84,7 +96,11 @@ spec:
               memory: 256Mi
             limits:
               cpu: 1000m
-              memory: 1Gi
+              # Measured 731Mi during collectstatic on first boot, against a
+              # 1Gi limit — close enough that a slightly larger asset build
+              # would have been OOM-killed and looked like the same restart
+              # loop for a different reason.
+              memory: 2Gi
           volumeMounts:
             - name: media
               mountPath: /opt/recipes/mediafiles
