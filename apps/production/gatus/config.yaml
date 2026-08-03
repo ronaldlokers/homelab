@@ -24,42 +24,149 @@ alerting:
       success-threshold: 2
       send-on-resolved: true
 
-# In-cluster services are checked via their internal ClusterIP DNS, not the
-# public *.ronaldlokers.nl URLs: from inside the cluster the MetalLB VIP
-# (10.0.40.100) refuses pod->VIP connections. Internal checks confirm the app
-# is up; the external TLS/ingress path is covered by cert-manager + the external
-# lokilabs check. No TLS on internal hops, so cert-expiry conditions are dropped.
+# Every homelab service is checked at its real public URL, through Traefik and
+# real TLS — the same path an external client takes. Each entry asserts both
+# reachability and certificate validity, so one check covers the app being up
+# AND the certificate being current.
+#
+# This replaces internal ClusterIP checks over plain HTTP. Those confirmed the
+# app was running but never traversed TLS or the ingress, which is why
+# commafeed and speedtest served certificates that had expired four months
+# earlier while every check stayed green (2026-08-03).
+#
+# The previous comment here claimed "the MetalLB VIP refuses pod->VIP
+# connections". That was wrong. Gatus could not reach Traefik because the
+# NetworkPolicy allowed egress on ports 80/443 while Traefik's Service targets
+# 8000/8443, and egress is evaluated post-DNAT. Fixed in the egress policy;
+# pod -> VIP verified working.
+#
+# [STATUS] < 400 rather than == 200: several apps legitimately redirect to a
+# login page (grafana, linkding, speedtest all return 302). Asserting < 400
+# means "reached the app and it answered", which is the useful signal.
+#
+# 336h = 14 days. cert-manager renews at 30 days remaining, so crossing this
+# means renewal has been failing for a fortnight.
 endpoints:
-  - name: linkding
+  - name: commafeed
     group: homelab
-    url: "http://linkding.linkding.svc.cluster.local:9090/health"
+    url: "https://commafeed.ronaldlokers.nl"
     interval: 60s
     conditions:
-      - "[STATUS] == 200"
+      - "[STATUS] < 400"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+    alerts:
+      - type: ntfy
+  - name: homepage
+    group: homelab
+    url: "https://homepage.ronaldlokers.nl"
+    interval: 60s
+    conditions:
+      - "[STATUS] < 400"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
       - type: ntfy
   - name: immich
     group: homelab
-    url: "http://immich-server.immich.svc.cluster.local:2283/api/server/ping"
+    url: "https://immich.ronaldlokers.nl/api/server/ping"
     interval: 60s
     conditions:
-      - "[STATUS] == 200"
+      - "[STATUS] < 400"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+    alerts:
+      - type: ntfy
+  - name: linkding
+    group: homelab
+    url: "https://linkding.ronaldlokers.nl"
+    interval: 60s
+    conditions:
+      - "[STATUS] < 400"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
       - type: ntfy
   - name: mealie
     group: homelab
-    url: "http://mealie.mealie.svc.cluster.local:9000/api/app/about"
+    url: "https://mealie.ronaldlokers.nl"
     interval: 60s
     conditions:
-      - "[STATUS] == 200"
+      - "[STATUS] < 400"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+    alerts:
+      - type: ntfy
+  - name: nightscout
+    group: homelab
+    url: "https://nightscout.ronaldlokers.nl"
+    interval: 60s
+    conditions:
+      - "[STATUS] < 400"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
       - type: ntfy
   - name: ntfy
     group: homelab
-    url: "http://ntfy.ntfy.svc.cluster.local/v1/health"
+    url: "https://ntfy.ronaldlokers.nl"
     interval: 60s
     conditions:
-      - "[STATUS] == 200"
+      - "[STATUS] < 400"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+    alerts:
+      - type: ntfy
+  - name: speedtest
+    group: homelab
+    url: "https://speedtest.ronaldlokers.nl"
+    interval: 60s
+    conditions:
+      - "[STATUS] < 400"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+    alerts:
+      - type: ntfy
+  - name: grafana
+    group: homelab
+    url: "https://grafana.ronaldlokers.nl"
+    interval: 60s
+    conditions:
+      - "[STATUS] < 400"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+    alerts:
+      - type: ntfy
+  - name: gatus
+    group: homelab
+    url: "https://gatus.ronaldlokers.nl"
+    interval: 60s
+    conditions:
+      - "[STATUS] < 400"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+    alerts:
+      - type: ntfy
+  # These carry the local-network-only middleware, so a request from a pod is
+  # correctly refused with 403 — pod IPs are not inside the 10.0.0.0/16
+  # allowlist. Asserting 403 still exercises DNS, TCP, TLS and Traefik routing,
+  # so an expired or wrong certificate fails the check; it additionally proves
+  # the LAN restriction is still in force.
+  - name: longhorn
+    group: homelab-lan-only
+    url: "https://longhorn.ronaldlokers.nl"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 403"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+    alerts:
+      - type: ntfy
+  - name: pgadmin
+    group: homelab-lan-only
+    url: "https://pgadmin.ronaldlokers.nl"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 403"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+    alerts:
+      - type: ntfy
+  - name: prometheus
+    group: homelab-lan-only
+    url: "https://prometheus.ronaldlokers.nl"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 403"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
       - type: ntfy
   - name: lokilabs-healthz
@@ -81,129 +188,5 @@ endpoints:
       insecure: true
     conditions:
       - "[STATUS] == 200"
-    alerts:
-      - type: ntfy
-
-# ---------------------------------------------------------------------------
-# Certificate checks.
-#
-# These assert ONLY certificate expiry, deliberately. The endpoints above
-# already cover availability over plain HTTP against ClusterIP; these cover the
-# TLS path those checks cannot see, because they never traverse Traefik.
-#
-# Added after commafeed and speedtest were found serving certificates that had
-# expired four months earlier, while every cert-manager Certificate reported
-# Ready. Configuration was green; what was served was not. A check that reads
-# the served certificate is the only thing that distinguishes the two.
-#
-# Public hostnames resolve to Traefik's ClusterIP via hostAliases on the pod
-# (see deployment-patch.yaml) — SNI still selects the certificate, so this
-# tests exactly what an external client would receive.
-#
-# 336h = 14 days. cert-manager renews at 30 days remaining, so crossing this
-# threshold means renewal has been failing for a fortnight.
-# ---------------------------------------------------------------------------
-  - name: commafeed-certificate
-    group: certificates
-    url: "https://commafeed.ronaldlokers.nl"
-    interval: 10m
-    conditions:
-      - "[CERTIFICATE_EXPIRATION] > 336h"
-    alerts:
-      - type: ntfy
-  - name: gatus-certificate
-    group: certificates
-    url: "https://gatus.ronaldlokers.nl"
-    interval: 10m
-    conditions:
-      - "[CERTIFICATE_EXPIRATION] > 336h"
-    alerts:
-      - type: ntfy
-  - name: grafana-certificate
-    group: certificates
-    url: "https://grafana.ronaldlokers.nl"
-    interval: 10m
-    conditions:
-      - "[CERTIFICATE_EXPIRATION] > 336h"
-    alerts:
-      - type: ntfy
-  - name: homepage-certificate
-    group: certificates
-    url: "https://homepage.ronaldlokers.nl"
-    interval: 10m
-    conditions:
-      - "[CERTIFICATE_EXPIRATION] > 336h"
-    alerts:
-      - type: ntfy
-  - name: immich-certificate
-    group: certificates
-    url: "https://immich.ronaldlokers.nl"
-    interval: 10m
-    conditions:
-      - "[CERTIFICATE_EXPIRATION] > 336h"
-    alerts:
-      - type: ntfy
-  - name: linkding-certificate
-    group: certificates
-    url: "https://linkding.ronaldlokers.nl"
-    interval: 10m
-    conditions:
-      - "[CERTIFICATE_EXPIRATION] > 336h"
-    alerts:
-      - type: ntfy
-  - name: longhorn-certificate
-    group: certificates
-    url: "https://longhorn.ronaldlokers.nl"
-    interval: 10m
-    conditions:
-      - "[CERTIFICATE_EXPIRATION] > 336h"
-    alerts:
-      - type: ntfy
-  - name: mealie-certificate
-    group: certificates
-    url: "https://mealie.ronaldlokers.nl"
-    interval: 10m
-    conditions:
-      - "[CERTIFICATE_EXPIRATION] > 336h"
-    alerts:
-      - type: ntfy
-  - name: nightscout-certificate
-    group: certificates
-    url: "https://nightscout.ronaldlokers.nl"
-    interval: 10m
-    conditions:
-      - "[CERTIFICATE_EXPIRATION] > 336h"
-    alerts:
-      - type: ntfy
-  - name: ntfy-certificate
-    group: certificates
-    url: "https://ntfy.ronaldlokers.nl"
-    interval: 10m
-    conditions:
-      - "[CERTIFICATE_EXPIRATION] > 336h"
-    alerts:
-      - type: ntfy
-  - name: pgadmin-certificate
-    group: certificates
-    url: "https://pgadmin.ronaldlokers.nl"
-    interval: 10m
-    conditions:
-      - "[CERTIFICATE_EXPIRATION] > 336h"
-    alerts:
-      - type: ntfy
-  - name: prometheus-certificate
-    group: certificates
-    url: "https://prometheus.ronaldlokers.nl"
-    interval: 10m
-    conditions:
-      - "[CERTIFICATE_EXPIRATION] > 336h"
-    alerts:
-      - type: ntfy
-  - name: speedtest-certificate
-    group: certificates
-    url: "https://speedtest.ronaldlokers.nl"
-    interval: 10m
-    conditions:
-      - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
       - type: ntfy
