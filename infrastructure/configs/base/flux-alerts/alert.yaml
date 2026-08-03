@@ -29,3 +29,8 @@ spec:
     - kind: HelmRelease
       name: "*"
       namespace: immich
+    # Deployed in both environments; was absent here, so a failed reloader
+    # release notified nobody.
+    - kind: HelmRelease
+      name: "*"
+      namespace: reloader
