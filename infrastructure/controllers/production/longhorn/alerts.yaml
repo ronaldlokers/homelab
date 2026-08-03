@@ -1,0 +1,135 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: longhorn-alerts
+  namespace: longhorn-system
+  labels:
+    release: kube-prometheus-stack
+    app.kubernetes.io/name: longhorn
+spec:
+  groups:
+    - name: longhorn_volume_health
+      rules:
+        # longhorn_volume_robustness is one-hot: every volume emits four series,
+        # one per `state` label, and the current state carries value 1. So the
+        # condition is {state="faulted"} == 1 — NOT robustness == 3. A rule
+        # comparing the value against a state ordinal never fires, which is the
+        # failure mode this repo keeps producing.
+        - alert: LonghornVolumeFaulted
+          annotations:
+            summary: "Longhorn volume {{ $labels.volume }} is faulted"
+            description: >-
+              Volume {{ $labels.volume }} (PVC {{ $labels.pvc_namespace }}/{{ $labels.pvc }})
+              has no usable replica. Data is unavailable to the workload now.
+              Check the Longhorn UI for replica state and whether the owning node
+              is healthy.
+          expr: |
+            longhorn_volume_robustness{state="faulted"} == 1
+          for: 5m
+          labels:
+            severity: critical
+            component: storage
+
+        - alert: LonghornVolumeDegraded
+          annotations:
+            summary: "Longhorn volume {{ $labels.volume }} is degraded"
+            description: >-
+              Volume {{ $labels.volume }} (PVC {{ $labels.pvc_namespace }}/{{ $labels.pvc }})
+              is running on fewer than its configured 3 replicas. It still serves
+              I/O, but another node failure could lose it. Longhorn usually
+              rebuilds automatically — 15m without recovering means it cannot.
+          expr: |
+            longhorn_volume_robustness{state="degraded"} == 1
+          for: 15m
+          labels:
+            severity: warning
+            component: storage
+
+    - name: longhorn_node_health
+      rules:
+        # Scoped to condition="ready" deliberately. In the steady state
+        # kernelmodulesloaded and requiredpackages both report 0 on all three
+        # nodes, so an unscoped `longhorn_node_status == 0` fires permanently
+        # and immediately.
+        - alert: LonghornNodeNotReady
+          annotations:
+            summary: "Longhorn node {{ $labels.node }} is not ready"
+            description: >-
+              Longhorn reports {{ $labels.node }} not ready. With 3-replica
+              volumes across 3 nodes, one node down means every volume is
+              degraded and a second failure loses data.
+          expr: |
+            longhorn_node_status{condition="ready"} == 0
+          for: 10m
+          labels:
+            severity: critical
+            component: storage
+
+    - name: longhorn_backup_health
+      rules:
+        # The NAS at 10.0.40.10 holds Longhorn backups AND all Loki chunks, and
+        # nothing alerted on it. Backups can stop entirely without any signal —
+        # the same shape as the CNPG invisible-backup gap
+        # (docs/war-stories/cnpg-invisible-backup-gap.md), on the newer and
+        # less-proven backup path.
+        - alert: LonghornBackupStale
+          annotations:
+            summary: "Longhorn volume {{ $labels.volume }} has no recent backup"
+            description: >-
+              No completed backup for {{ $labels.volume }} (PVC
+              {{ $labels.pvc_namespace }}/{{ $labels.pvc }}) in over 48 hours,
+              against a daily recurring job. Check the NAS at 10.0.40.10:9000 is
+              reachable and the backup-daily RecurringJob is running.
+          expr: |
+            (time() - longhorn_volume_last_backup_at) > 172800
+            and longhorn_volume_last_backup_at > 0
+          for: 1h
+          labels:
+            severity: warning
+            component: storage
+
+        # longhorn_backup_state: 3 = Completed, 4 = Error.
+        - alert: LonghornBackupFailed
+          annotations:
+            summary: "Longhorn backup failed for volume {{ $labels.volume }}"
+            description: >-
+              Backup {{ $labels.backup }} for volume {{ $labels.volume }}
+              (recurring job {{ $labels.recurring_job }}) is in the Error state.
+              Check backup-target connectivity to the NAS.
+          expr: |
+            longhorn_backup_state == 4
+          for: 15m
+          labels:
+            severity: warning
+            component: storage
+
+    - name: longhorn_disk_capacity
+      rules:
+        # etcd shares this filesystem. Since 2026-08-01 the etcd data directory
+        # is bind-mounted from /mnt/longhorn/etcd — the same NVMe partition
+        # Longhorn fills. storageReserved (10Gi) constrains Longhorn scheduling,
+        # not replica growth or snapshot data, so nothing prevents the disk
+        # filling underneath etcd.
+        #
+        # Because all three control-plane nodes are configured identically and
+        # replicas land on all three, a fill event is correlated: etcd loses
+        # quorum on every node at once, not one.
+        #
+        # 30Gi is 3x the reserve, chosen to leave room to act rather than to
+        # catch the last moment. Current free space is 175-288Gi per node.
+        - alert: LonghornDiskSpaceLow
+          annotations:
+            summary: "Longhorn disk on {{ $labels.node }} is running low — etcd shares this filesystem"
+            description: >-
+              Less than 30Gi free on {{ $labels.node }}'s Longhorn disk. etcd's
+              data directory lives on this same filesystem, and Longhorn's 10Gi
+              storageReserved does not protect it from replica or snapshot
+              growth. If this reaches zero, etcd cannot fsync and loses quorum —
+              on all three nodes simultaneously, since they fill together.
+              See docs/runbooks/etcd-migrate-to-nvme.md.
+          expr: |
+            (longhorn_disk_capacity_bytes - longhorn_disk_usage_bytes) < 32212254720
+          for: 15m
+          labels:
+            severity: critical
+            component: storage
