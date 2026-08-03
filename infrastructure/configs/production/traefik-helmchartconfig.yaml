@@ -28,17 +28,27 @@
 # Local keeps the packet on the node that received it, so the source address is
 # preserved and the allowlist compares against the actual caller.
 #
-# ## Why three replicas
+# ## Why a DaemonSet
 #
 # Under Local, only nodes with a ready Traefik endpoint attract traffic — MetalLB
 # will not announce the VIP from a node that has none. With the single replica
 # this cluster ran, the VIP would pin to that one node and a node failure would
 # take all ingress down until the pod rescheduled and the announcement moved.
 #
-# One replica per node means every node can serve, every request is node-local,
-# and losing a node costs nothing. The anti-affinity is required rather than
-# preferred so two replicas never share a node and leave a third node unable to
-# announce; with three nodes and three replicas that is exactly one each.
+# A DaemonSet is the primitive that actually means "one per node", so every node
+# can serve and every request is node-local.
+#
+# The first attempt used replicas: 3 with required podAntiAffinity, which
+# deadlocked: the chart's Deployment rolls with maxSurge 1 / maxUnavailable 0, so
+# it must place a fourth pod before retiring any of the three — and required
+# anti-affinity leaves nowhere to put it.
+#
+#   FailedScheduling: 0/3 nodes are available: 3 node(s) didn't match pod
+#   anti-affinity rules
+#
+# Traffic kept flowing on the old pods, but the rollout could never complete and
+# no future Traefik upgrade would either. A DaemonSet has no surge to schedule
+# and needs no anti-affinity, and it keeps holding if a node is ever added.
 apiVersion: helm.cattle.io/v1
 kind: HelmChartConfig
 metadata:
@@ -50,11 +60,4 @@ spec:
       spec:
         externalTrafficPolicy: Local
     deployment:
-      replicas: 3
-    affinity:
-      podAntiAffinity:
-        requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchLabels:
-                app.kubernetes.io/name: traefik
-            topologyKey: kubernetes.io/hostname
+      kind: DaemonSet
