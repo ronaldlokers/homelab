@@ -7,40 +7,6 @@ metadata:
 spec:
   template:
     spec:
-      # Map every public hostname to Traefik's ClusterIP so Gatus can check the
-      # certificate Traefik actually SERVES, not the one cert-manager believes
-      # it issued. Pod -> MetalLB VIP is refused from inside the cluster (see
-      # the note in config.yaml), so the public URLs are unreachable directly;
-      # resolving them to Traefik's Service IP keeps SNI correct, which is what
-      # selects the certificate.
-      #
-      # This exists because on 2026-08-03 commafeed and speedtest were found
-      # serving certificates that expired on 2026-03-21 — four months — while
-      # every cert-manager Certificate reported Ready and renewals succeeded on
-      # schedule. The break lived between cert-manager and Traefik, so nothing
-      # that inspects Certificate resources could see it. Only the served cert
-      # can.
-      #
-      # The IP is Traefik's ClusterIP, which is stable for the life of the
-      # Service. If the Service is ever recreated this goes stale and every
-      # certificate check fails — loudly, via ntfy, which is the correct
-      # failure direction for a monitoring check.
-      hostAliases:
-        - ip: "10.43.253.156"
-          hostnames:
-            - commafeed.ronaldlokers.nl
-            - gatus.ronaldlokers.nl
-            - grafana.ronaldlokers.nl
-            - homepage.ronaldlokers.nl
-            - immich.ronaldlokers.nl
-            - linkding.ronaldlokers.nl
-            - longhorn.ronaldlokers.nl
-            - mealie.ronaldlokers.nl
-            - nightscout.ronaldlokers.nl
-            - ntfy.ronaldlokers.nl
-            - pgadmin.ronaldlokers.nl
-            - prometheus.ronaldlokers.nl
-            - speedtest.ronaldlokers.nl
       containers:
         - name: gatus
           envFrom:
