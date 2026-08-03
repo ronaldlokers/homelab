@@ -6,16 +6,25 @@ metadata:
     name: renovate-container-env
 sops:
     age:
-        - recipient: age1hh6cdyljk2ks5mkmxqx6g65c7a8rgndy5p2s2d7w2gvqx4h53ggqtwr7rh
-          enc: |
+        - enc: |
             -----BEGIN AGE ENCRYPTED FILE-----
-            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByRVlra28vdVY2KzZXdytu
-            RHBqdGlZUGNhZUIzYmd0KzFpUmF3Yy8xdmo0CkhCcmVnRkpGdi9QbzgxTEorOFhz
-            Y2R3cGFhTmNabUw5VHA1bVh2V3ZZLzQKLS0tIFZuVElQSUVWancyZjlidU91Qzd6
-            d1QxZWwxZmUwTFk2cEQ3SDJ2RWZJZXMKTCtT2eV1fZjfZvTJyhwLvfHSX/i9a2BS
-            cFb3Q/cSw4rwkQg80mRjJzeYQpMRTGenB/yCMyL62ORsMUqFwqgY+g==
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA0U213YktCZy8vTlVPdVJZ
+            bTEybjRhaWYrYWhMa1FZSS9KQUZrdmlGK1ZZClZnOUY3UGxIbFJvUXgxTFRKQUN1
+            ektZYlJwbDNzelVpSjNjVUZQREFmUDAKLS0tIENMdHhpbnV5cHlSVFI2ZWl1eUN3
+            NjZNRS80bGRkMGd4bjQ3cnkxMGcvSUkKIvhTiSHZsRC5EYpyVzrarfDfth5fymTP
+            NRVweD8HWNqQZ0NjAaoh7F5oZXkGHmx3JJImBci91ogrAnR7U6w7fg==
             -----END AGE ENCRYPTED FILE-----
+          recipient: age1hh6cdyljk2ks5mkmxqx6g65c7a8rgndy5p2s2d7w2gvqx4h53ggqtwr7rh
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBtT2lEbWhYUE9rbEhsWWxW
+            YjZXajEyUEdZTGx0RXFVVjJvRUZuNElXcHlBCnVFdzJmZHBVR0ZmVTN5dFVUb1BR
+            ZnVDYXdTdkcxaCszZWVvaEp6RUZxODgKLS0tIHU0MnJWVDYxK2NxemYrY1FJZjd0
+            a0FmM0lkcjhjYnNSTWNlNnpKdW41M1kK4FoMDzhVyppXmWl4lKic7R1LZqwFCrdL
+            qfIGEcw08E6UBj292/9KNpRy1MuDWacKDPnxnwzpNwZikJc0LWt3Qw==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age14jzgqqg2c008ty2leafhduq77p7lyh9aw46wasygf9jmly3wse0sx7sf4u
+    encrypted_regex: ^(data|stringData)$
     lastmodified: "2025-12-02T17:27:39Z"
     mac: ENC[AES256_GCM,data:aoWZki7JAR3rTpOiBq0fc8ndmCb74l6gc4mXij/LGosmsA6TBK7OSBSw39we3LXyD5o0Zsycle1ekgp1hkXSie3wRUFQT/AOCbXVtpZrepeV3wekve8nAiEqXEkRJ73bPDWia88a64u/1SXOqYFVq6LF5tu9EpALsWHUCYHyBk8=,iv:uzxZmXY6sMq+PoQKDRMMnRVeZ4FTC9JnA1WyPFtPrrQ=,tag:T64WXSmh5VVQt1cdVVl68Q==,type:str]
-    encrypted_regex: ^(data|stringData)$
     version: 3.11.0

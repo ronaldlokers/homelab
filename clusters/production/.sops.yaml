@@ -1,4 +1,21 @@
+# Two recipients, deliberately, and this is the first half of a key rotation.
+#
+# age1hh6cd… is the original production key. Its private half was inside the
+# `sops age keys` blob that sat in the public dotfiles repo (and is still in
+# that repo's history), wrapped only by the passphrase on key.txt.age — so it
+# must be treated as compromised, and every file here as readable by anyone
+# who cracks that one passphrase.
+#
+# age14jzgq… replaces it. Both are listed while the cluster's flux-system
+# sops-age secret still holds only the old key: every file below decrypts with
+# either, so this half can be merged without the cluster losing the ability to
+# decrypt anything. The old key comes out in a second change, after the cluster
+# secret has been replaced.
+#
+# See docs/security.md, "Rotating an age key".
 creation_rules:
   - path_regex: .*.yaml
     encrypted_regex: ^(data|stringData)$
-    age: age1hh6cdyljk2ks5mkmxqx6g65c7a8rgndy5p2s2d7w2gvqx4h53ggqtwr7rh
+    age: >-
+      age1hh6cdyljk2ks5mkmxqx6g65c7a8rgndy5p2s2d7w2gvqx4h53ggqtwr7rh,
+      age14jzgqqg2c008ty2leafhduq77p7lyh9aw46wasygf9jmly3wse0sx7sf4u

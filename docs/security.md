@@ -12,10 +12,27 @@ Flux automatically decrypts secrets during deployment using the cluster's age ke
 
 Each environment has its own SOPS configuration and age encryption key for security isolation:
 
-| Environment | Public Key | Backup |
-|------------|------------|---------|
-| Staging | `age1uq9nturwsx36q045qtrm85lkg8qmzpgk9srduqesxs2ahjurw53sp9rhm6` | Proton Pass |
-| Production | `age1hh6cdyljk2ks5mkmxqx6g65c7a8rgndy5p2s2d7w2gvqx4h53ggqtwr7rh` | Proton Pass |
+| Environment | Public Key | Status | Backup |
+|------------|------------|--------|---------|
+| Staging | `age146l4mqkpljck0n9gfncn2te3yqu0s25xyn3438j2pfmg0u4zju2s6fyvrv` | current | Proton Pass |
+| Production | `age14jzgqqg2c008ty2leafhduq77p7lyh9aw46wasygf9jmly3wse0sx7sf4u` | current | Proton Pass |
+| Staging | `age1uq9nturwsx36q045qtrm85lkg8qmzpgk9srduqesxs2ahjurw53sp9rhm6` | **compromised, being retired** | Proton Pass |
+| Production | `age1hh6cdyljk2ks5mkmxqx6g65c7a8rgndy5p2s2d7w2gvqx4h53ggqtwr7rh` | **compromised, being retired** | Proton Pass |
+
+> [!WARNING]
+> The two retiring keys must be treated as public. Their private halves were
+> inside the `sops age keys` blob that lived in the **public**
+> `ronaldlokers/dotfiles` repository from 2026-07-07 to 2026-07-30, and remain
+> in that repository's history. That blob was age-encrypted, but only to an
+> identity whose own private half — `key.txt.age` — sat at the root of the same
+> public repository, wrapped by a single passphrase. One passphrase, offline,
+> unlimited attempts, permanent target. Everything in this repository encrypted
+> to those two keys should be assumed readable by anyone who has cloned it.
+>
+> Re-keying the files, which is what the rest of this section is about, protects
+> them **from here on**. It does not un-expose anything already extracted. The
+> credentials *inside* the encrypted files are a separate rotation and a
+> separate decision.
 
 Both private keys live in SOPS's default key file `~/.config/sops/age/keys.txt`
 (one key per line, preceded by a `# staging` / `# production` comment) — **never
@@ -47,7 +64,9 @@ Each cluster has its own `.sops.yaml` configuration file:
 creation_rules:
   - path_regex: .*.yaml
     encrypted_regex: ^(data|stringData)$
-    age: age1uq9nturwsx36q045qtrm85lkg8qmzpgk9srduqesxs2ahjurw53sp9rhm6
+    age: >-
+      age1uq9nturwsx36q045qtrm85lkg8qmzpgk9srduqesxs2ahjurw53sp9rhm6,
+      age146l4mqkpljck0n9gfncn2te3yqu0s25xyn3438j2pfmg0u4zju2s6fyvrv
 ```
 
 ### Production: `clusters/production/.sops.yaml`
@@ -56,7 +75,9 @@ creation_rules:
 creation_rules:
   - path_regex: .*.yaml
     encrypted_regex: ^(data|stringData)$
-    age: age1hh6cdyljk2ks5mkmxqx6g65c7a8rgndy5p2s2d7w2gvqx4h53ggqtwr7rh
+    age: >-
+      age1hh6cdyljk2ks5mkmxqx6g65c7a8rgndy5p2s2d7w2gvqx4h53ggqtwr7rh,
+      age14jzgqqg2c008ty2leafhduq77p7lyh9aw46wasygf9jmly3wse0sx7sf4u
 ```
 
 These configurations:
@@ -64,6 +85,63 @@ These configurations:
 - Only encrypt the `data` and `stringData` fields (Secret content)
 - Leave metadata unencrypted for readability
 - Use environment-specific age public keys
+
+## Rotating an age key
+
+Two changes, in this order, and the order is the whole point: a cluster whose
+`sops-age` secret no longer matches any recipient on a file cannot decrypt it,
+and Flux will keep reconciling and keep failing.
+
+**Phase 1 — add the new key (this can merge on its own).**
+
+```bash
+age-keygen -o new-<env>.key            # note the public half it prints
+```
+
+Add it to `clusters/<env>/.sops.yaml` *alongside* the existing recipient, then
+re-key every encrypted file for that environment. The encrypted files live
+outside `clusters/`, so SOPS will not find the config by walking upward — point
+it there explicitly, and note that `--config` is a global flag and must come
+before the subcommand:
+
+```bash
+for f in $(grep -rl 'ENC\[AES256_GCM' --include='*.yaml' apps infrastructure monitoring | grep /<env>/); do
+  sops --config clusters/<env>/.sops.yaml updatekeys -y "$f"
+done
+```
+
+Every file now decrypts with either key, so the cluster carries on with the old
+one and nothing breaks when this merges.
+
+Verify before opening the PR — separately for each key, because "it still
+decrypts" proves nothing if your key file holds both:
+
+```bash
+SOPS_AGE_KEY_FILE=new-<env>.key sops --decrypt <some-file> >/dev/null   # new key works
+SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt sops --decrypt <some-file> >/dev/null   # old still works
+```
+
+**Phase 2 — swap the cluster over, then drop the old key.**
+
+Put the new private key in Proton Pass (`sops age keys`, one key per line with
+its `# staging` / `# production` comment), `chezmoi apply` so
+`~/.config/sops/age/keys.txt` picks it up, then replace the cluster secret:
+
+```bash
+grep -A1 "^# <env>" ~/.config/sops/age/keys.txt | grep AGE-SECRET-KEY | \
+  kubectl --context=<env> create secret generic sops-age \
+  --namespace=flux-system --from-file=age.agekey=/dev/stdin \
+  --dry-run=client -o yaml | kubectl --context=<env> apply -f -
+```
+
+Watch a reconcile succeed (`flux reconcile kustomization apps --context=<env>`)
+*before* going further. Only then remove the old recipient from
+`clusters/<env>/.sops.yaml`, re-run the `updatekeys` loop, and merge that as a
+second change.
+
+**If the old key was compromised rather than merely old**, re-keying is half the
+job. The ciphertext an attacker already holds does not become unreadable — the
+credentials inside it have to be re-issued at their source.
 
 ## Required Secrets
 

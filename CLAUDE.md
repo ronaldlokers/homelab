@@ -125,13 +125,19 @@ sops --decrypt path/to/secret.yaml
 ```bash
 # Create secret YAML with stringData field
 # Then encrypt:
-export AGE_PUBLIC=age1hh6cdyljk2ks5mkmxqx6g65c7a8rgndy5p2s2d7w2gvqx4h53ggqtwr7rh  # production
+export AGE_PUBLIC=age14jzgqqg2c008ty2leafhduq77p7lyh9aw46wasygf9jmly3wse0sx7sf4u  # production
 sops --age=$AGE_PUBLIC --encrypt --encrypted-regex '^(data|stringData)$' --in-place secret.yaml
 ```
 
 **Age public keys**:
-- Staging: `age1uq9nturwsx36q045qtrm85lkg8qmzpgk9srduqesxs2ahjurw53sp9rhm6`
-- Production: `age1hh6cdyljk2ks5mkmxqx6g65c7a8rgndy5p2s2d7w2gvqx4h53ggqtwr7rh`
+- Staging: `age146l4mqkpljck0n9gfncn2te3yqu0s25xyn3438j2pfmg0u4zju2s6fyvrv`
+- Production: `age14jzgqqg2c008ty2leafhduq77p7lyh9aw46wasygf9jmly3wse0sx7sf4u`
+
+Two older keys — staging `age1uq9nt…` and production `age1hh6cd…` — are still
+listed as recipients on every encrypted file while the clusters' `sops-age`
+secrets are swapped over, and are **compromised**: their private halves are in
+the public dotfiles repository's history. Do not encrypt anything new to them,
+and see `docs/security.md`, "Rotating an age key", for the phase-2 removal.
 
 ### Bootstrap Commands
 
