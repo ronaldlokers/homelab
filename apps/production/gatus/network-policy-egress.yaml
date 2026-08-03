@@ -31,3 +31,29 @@ spec:
       ports:
         - protocol: TCP
           port: 8006 # proxmox backend
+    # Reach Traefik so checks can go through the real ingress path — the same
+    # TLS termination and routing an external client hits — rather than
+    # bypassing it via ClusterIP over plain HTTP.
+    #
+    # The ports are 8000/8443, NOT 80/443. NetworkPolicy egress is evaluated
+    # against the post-DNAT destination, and Traefik's Service maps 80->8000 and
+    # 443->8443, so a rule naming 80/443 never matches and every connection is
+    # refused. That is why the existing `allow-egress-monitoring` rule
+    # (0.0.0.0/0 on 80/443) does not cover it, and why reaching ntfy on 80 works
+    # — that Service targets port 80, so the port is unchanged by DNAT.
+    #
+    # This is why Gatus previously could not check the public URLs at all, which
+    # the config.yaml comment misattributed to the MetalLB VIP refusing pod
+    # connections. Retested 2026-08-03: pod -> VIP works fine.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 8000 # traefik web entrypoint (Service port 80)
+        - protocol: TCP
+          port: 8443 # traefik websecure entrypoint (Service port 443)
