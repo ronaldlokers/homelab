@@ -1,0 +1,16 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cloudflared
+  namespace: cloudflared
+spec:
+  # cloudflared is the only path for the two services published to the
+  # internet (ntfy and immich). Both replicas being evicted together — by a
+  # node drain, an upgrade, or the scheduler rebalancing — takes those offline
+  # with no warning, because nothing else can serve them.
+  #
+  # minAvailable: 1 makes a drain evict them one at a time instead.
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: cloudflared
