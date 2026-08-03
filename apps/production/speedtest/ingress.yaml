@@ -20,4 +20,3 @@ spec:
   tls:
     - hosts:
         - speedtest.ronaldlokers.nl
-      secretName: wildcard-ronaldlokers-nl-tls

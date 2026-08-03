@@ -19,6 +19,5 @@ spec:
                 port:
                   name: http
   tls:
-    - secretName: wildcard-ronaldlokers-nl-tls
-      hosts:
+    - hosts:
         - ntfy.ronaldlokers.nl
