@@ -177,7 +177,17 @@ spec:
         enabled: true
         ingressClassName: traefik
         annotations:
-          traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
+          # Grafana was the only admin surface without the LAN gate that
+          # Prometheus, Longhorn and pgAdmin all carry — and it proxies the Loki
+          # datasource, so it exposed 30 days of every pod log, node journal line
+          # and Kubernetes event to the internet behind one password.
+          #
+          # This gate is only meaningful because Traefik now runs
+          # externalTrafficPolicy: Local (#163). Before that the ipAllowList saw
+          # a masqueraded flannel address instead of the caller and returned 403
+          # to everyone, so adding it here would have locked Grafana out entirely
+          # rather than restricting it.
+          traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd,kube-system-local-network-only@kubernetescrd
         hosts:
           - grafana.ronaldlokers.nl
         tls:
