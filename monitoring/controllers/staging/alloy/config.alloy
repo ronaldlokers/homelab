@@ -5,7 +5,12 @@ logging {
 
 loki.write "default" {
   endpoint {
-    url = "http://loki-write.monitoring.svc.cluster.local:3100/loki/api/v1/push"
+    // Staging Loki runs deploymentMode: SingleBinary with write.replicas: 0, so
+    // the chart never renders a loki-write Service. This pointed at loki-write
+    // (copied from production, which runs SimpleScalable), so every push failed
+    // and staging Loki has never received a log line. loki-gateway is the same
+    // endpoint the staging Grafana datasource already reads from.
+    url = "http://loki-gateway.monitoring.svc.cluster.local:80/loki/api/v1/push"
   }
 }
 
