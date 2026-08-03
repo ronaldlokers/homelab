@@ -19,13 +19,13 @@ spec:
         app: tandoor
     spec:
       securityContext:
-        # The image runs as uid/gid 65534 and writes to both mounted paths.
         fsGroup: 65534
       containers:
+        # The application. It serves no TCP port: its entrypoint ends with
+        # `gunicorn --bind unix:/tmp/tandoor.sock`, hardcoded, with no
+        # environment variable to move it. Upstream's compose pairs it with a
+        # separate nginx container, which is the sidecar below.
         - name: tandoor
-          ports:
-            - name: http
-              containerPort: 80
           securityContext:
             allowPrivilegeEscalation: false
           env:
@@ -45,29 +45,50 @@ spec:
                 secretKeyRef:
                   name: tandoor-secret
                   key: SECRET_KEY
-            # Django refuses to serve a Host header that is not listed. The
-            # per-environment hostname is patched in by each overlay.
+            # Django refuses to serve a Host header that is not listed, so a
+            # wrong value here is a hard 400 rather than a warning. Patched per
+            # environment.
             - name: ALLOWED_HOSTS
               value: "localhost"
-            # Behind Traefik, which terminates TLS. Without this Django builds
-            # http:// absolute URLs and the login POST fails CSRF origin checks.
+            # Traefik terminates TLS. Without this Django builds http:// absolute
+            # URLs and the login POST fails its CSRF origin check — the app comes
+            # up fine and then nobody can log in.
             - name: SECURE_PROXY_SSL_HEADER
               value: "True"
-          # `/` returns a 302 to the login page, which httpGet treats as
-          # success (2xx and 3xx both pass). There is no dedicated health
-          # endpoint in this image.
-          # First boot applies 240+ Django migrations and then runs
-          # collectstatic, and nginx does not accept connections until both
-          # finish. Measured on staging: well over 5 minutes on ARM64.
+          # No HTTP probe: there is no port to probe. Pod readiness is decided
+          # by the nginx container, which cannot serve anything until this one
+          # has created the socket.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              # Measured 731Mi during collectstatic on first boot; a 1Gi limit
+              # left too little headroom.
+              memory: 2Gi
+          volumeMounts:
+            - name: media
+              mountPath: /opt/recipes/mediafiles
+            - name: static
+              mountPath: /opt/recipes/staticfiles
+            - name: socket
+              mountPath: /tmp
+
+        - name: nginx
+          image: nginx:1.29-alpine
+          ports:
+            - name: http
+              containerPort: 80
+          securityContext:
+            allowPrivilegeEscalation: false
+          # First boot applies 240+ Django migrations and then runs collectstatic
+          # before the socket appears, which takes well over five minutes on
+          # ARM64. Until then nginx answers 502, so this budget has to cover the
+          # app's cold start, not nginx's.
           #
-          # 60 x 5s was not enough. The probe killed the container mid-migration
-          # and the restart began the whole sequence again from scratch, so it
-          # never converged — 2 restarts and climbing, with the logs looping
-          # back to "Running django-vite in production mode" each time.
-          #
-          # 10 minutes covers the observed cold start with room to spare. This
-          # only delays detection of a genuinely dead container at startup;
-          # livenessProbe still catches one that dies later.
+          # A shorter budget killed the pod mid-migration and each restart began
+          # the whole sequence again, so it never converged.
           startupProbe:
             httpGet:
               path: /
@@ -92,24 +113,34 @@ spec:
             failureThreshold: 3
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: 10m
+              memory: 32Mi
             limits:
-              cpu: 1000m
-              # Measured 731Mi during collectstatic on first boot, against a
-              # 1Gi limit — close enough that a slightly larger asset build
-              # would have been OOM-killed and looked like the same restart
-              # loop for a different reason.
-              memory: 2Gi
+              cpu: 200m
+              memory: 128Mi
           volumeMounts:
-            - name: media
-              mountPath: /opt/recipes/mediafiles
+            - name: socket
+              mountPath: /tmp
             - name: static
-              mountPath: /opt/recipes/staticfiles
+              mountPath: /static
+              readOnly: true
+            - name: media
+              mountPath: /media
+              readOnly: true
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
       volumes:
         - name: media
           persistentVolumeClaim:
             claimName: tandoor-media
-        # Regenerated by collectstatic on every start — see pvc.yaml.
+        # Regenerated by collectstatic on every start, so it needs no PVC —
+        # losing it costs startup time, not data. See pvc.yaml.
         - name: static
           emptyDir: {}
+        # Carries the gunicorn socket between the two containers.
+        - name: socket
+          emptyDir: {}
+        - name: nginx-config
+          configMap:
+            name: tandoor-nginx
