@@ -12,3 +12,10 @@ spec:
           envFrom:
             - secretRef:
                 name: gatus-alerting
+          env:
+            # Substituted into the storage DSN in config.yaml.
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-app-credentials
+                  key: password
