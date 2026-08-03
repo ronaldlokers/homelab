@@ -1,0 +1,60 @@
+# Makes Traefik see the real client address.
+#
+# k3s ships Traefik as a bundled HelmChart; a HelmChartConfig of the same name
+# in kube-system is merged into it, which is the supported way to override the
+# values without unmanaging the chart.
+#
+# ## Why
+#
+# The default externalTrafficPolicy is Cluster. MetalLB announces the VIP from
+# one node (kube-srv-1), Traefik runs on another (kube-srv-3), so every request
+# crosses nodes and kube-proxy masquerades it. Measured with traefik/whoami
+# behind the ingress:
+#
+#   X-Forwarded-For: 10.42.0.0
+#   X-Real-Ip:       10.42.0.0
+#
+# That is a flannel address, not the caller. So the local-network-only
+# middleware (ipAllowList, sourceRange 10.0.0.0/16) never saw a real client
+# address: it compared 10.42.0.0 against the LAN range, which does not match,
+# and returned 403 to everyone. Prometheus, Longhorn and pgAdmin were not
+# "protected" — they were unreachable, including from the LAN.
+#
+# Worse, it was not stable: had Traefik been scheduled onto the announcing node
+# there would have been no masquerade, the real address would have arrived, and
+# the same allowlist would suddenly have started admitting LAN clients. The
+# behaviour depended on pod placement.
+#
+# Local keeps the packet on the node that received it, so the source address is
+# preserved and the allowlist compares against the actual caller.
+#
+# ## Why three replicas
+#
+# Under Local, only nodes with a ready Traefik endpoint attract traffic — MetalLB
+# will not announce the VIP from a node that has none. With the single replica
+# this cluster ran, the VIP would pin to that one node and a node failure would
+# take all ingress down until the pod rescheduled and the announcement moved.
+#
+# One replica per node means every node can serve, every request is node-local,
+# and losing a node costs nothing. The anti-affinity is required rather than
+# preferred so two replicas never share a node and leave a third node unable to
+# announce; with three nodes and three replicas that is exactly one each.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    service:
+      spec:
+        externalTrafficPolicy: Local
+    deployment:
+      replicas: 3
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: traefik
+            topologyKey: kubernetes.io/hostname
