@@ -26,3 +26,11 @@ patches:
           kind: HelmRelease
           name: "*"
           namespace: metallb-system
+      # Production-only: the tailscale operator and its subnet router.
+      # Undocumented anywhere and absent from alerting until now.
+      - op: add
+        path: /spec/eventSources/-
+        value:
+          kind: HelmRelease
+          name: "*"
+          namespace: tailscale
