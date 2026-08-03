@@ -4,6 +4,18 @@
 # event body posted by notification-controller; '+' encodes spaces.
 # Base targets the public ntfy URL (used by staging, which has no in-cluster
 # ntfy); production patches this to the in-cluster service URL.
+#
+# Staging publishes to the flux-staging topic at default priority, production
+# to flux at high priority. They shared one topic until 2026-08-03, when a
+# CPU-saturated staging cluster produced a steady stream of dry-run timeout
+# alerts — the same channel a production alarm would arrive on. Separating them
+# means staging noise cannot bury production, and staging can be muted without
+# muting anything that matters.
+#
+# The flux-staging topic must be writable anonymously; that grant lives in
+# NTFY_AUTH_ACCESS in apps/production/ntfy/deployment-patch.yaml. Without it
+# ntfy 403s the publish and staging alerts disappear with no error surfaced
+# anywhere. Tightening the anonymous-write ACL generally is tracked in #165.
 apiVersion: notification.toolkit.fluxcd.io/v1beta3
 kind: Provider
 metadata:
@@ -11,4 +23,4 @@ metadata:
   namespace: flux-system
 spec:
   type: generic
-  address: "https://ntfy.ronaldlokers.nl/flux?tpl=yes&t=Flux+staging+{{.severity}}:+{{.involvedObject.kind}}/{{.involvedObject.name}}&m={{.message}}&priority=high&tags=warning"
+  address: "https://ntfy.ronaldlokers.nl/flux-staging?tpl=yes&t=Flux+staging+{{.severity}}:+{{.involvedObject.kind}}/{{.involvedObject.name}}&m={{.message}}&priority=default&tags=warning"
