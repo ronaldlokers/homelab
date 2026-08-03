@@ -40,4 +40,8 @@ spec:
                   name: ntfy-secret
                   key: auth-users
             - name: NTFY_AUTH_ACCESS
-              value: "*:alerts:write-only,*:deurbel:write-only,*:homeassistant:write-only,*:flux:write-only"
+              # flux-staging is separate from flux so a wedged staging cluster
+              # cannot bury a production alarm. Must be granted here BEFORE the
+              # staging Provider starts posting to it, or staging alerts stop
+              # arriving with no error anywhere — ntfy just 403s the publish.
+              value: "*:alerts:write-only,*:deurbel:write-only,*:homeassistant:write-only,*:flux:write-only,*:flux-staging:write-only"
