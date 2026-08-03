@@ -6,7 +6,7 @@ metadata:
 spec:
   dependsOn:
     - name: infrastructure-configs
-  interval: 1m0s
+  interval: 10m0s
   retryInterval: 1m
   # wait: true makes a failing app rollout mark this Kustomization not-Ready,
   # which feeds the Flux -> ntfy error alerts. Immich's multi-component

@@ -2,3 +2,34 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../../base/kyverno
+
+patches:
+  # Scale the non-admission controllers to zero on staging.
+  #
+  # Kyverno is deployed here but has zero ClusterPolicies — verified repo-wide
+  # and in-cluster. The background, cleanup and reports controllers exist to act
+  # on policies: generate/mutate resources, expire TTL'd objects, and produce
+  # PolicyReports. With no policies they have nothing to act on, yet each holds
+  # informers on the resources it would watch, and the reports controller writes
+  # PolicyReport objects — API-server work on a node whose control plane already
+  # has zero idle CPU.
+  #
+  # The admission controller stays at 1 replica so Kyverno remains installed and
+  # its webhooks keep working. Adding a policy later needs no change here beyond
+  # scaling these back up.
+  #
+  # replicas: 0 rather than dropping the components, so the Deployments stay
+  # visible and this is reversible with a one-line edit.
+  - patch: |
+      - op: replace
+        path: /spec/values/backgroundController/replicas
+        value: 0
+      - op: replace
+        path: /spec/values/cleanupController/replicas
+        value: 0
+      - op: replace
+        path: /spec/values/reportsController/replicas
+        value: 0
+    target:
+      kind: HelmRelease
+      name: kyverno

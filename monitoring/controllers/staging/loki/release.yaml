@@ -71,6 +71,14 @@ spec:
     resultsCache:
       allocatedMemory: 256
 
+    # The canary writes synthetic log lines continuously and reads them back to
+    # measure the pipeline. That is two more pods plus a constant write/read
+    # loop on a node with no CPU headroom, measuring a pipeline staging does not
+    # depend on. Disabled rather than removed — flip back if staging ever needs
+    # to prove log latency.
+    lokiCanary:
+      enabled: false
+
     # Enable minio for storage
     minio:
       enabled: true

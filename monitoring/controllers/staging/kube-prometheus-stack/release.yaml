@@ -28,6 +28,14 @@ spec:
   values:
     prometheus:
       prometheusSpec:
+        # Staging runs on a 2-vCPU VM whose entire host CPU is an i3-7100U.
+        # Prometheus was the single largest pod consumer at ~139m, essentially
+        # all of it scrape work, and the API server had zero idle. Halving the
+        # scrape rate and cutting retention to 2d costs nothing that staging is
+        # actually used for — it is a soak environment, not a history store.
+        scrapeInterval: 60s
+        evaluationInterval: 60s
+        retention: 2d
         # Without storageSpec the TSDB lives on an emptyDir, so every pod
         # restart discards it and the configured 10d retention never actually
         # holds. Staging carries ~122k active series; 10Gi covers 10d with
