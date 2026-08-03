@@ -232,4 +232,74 @@ if leaked:
     sys.exit(1)
 PY
 
+# ---------------------------------------------------------------------------
+# Every SOPS-encrypted file must be covered by a Flux Kustomization that has
+# decryption enabled.
+#
+# When it is not, Flux applies the file verbatim and the literal
+# ENC[AES256_GCM,...] string is stored as the value. Flux reports Ready, the
+# workload starts, and its password is simply the ciphertext — no error is
+# raised anywhere. This happened on staging: clusters/staging/monitoring.yaml
+# had its decryption block commented out, which stayed invisible until the
+# first encrypted Secret landed under monitoring/controllers/staging.
+# ---------------------------------------------------------------------------
+
+echo "INFO - Checking SOPS files are covered by a decrypting Kustomization"
+python3 - <<'PY'
+import pathlib, re, sys, yaml
+
+# Map each Flux Kustomization's path -> whether it decrypts.
+kustomizations = []
+for path in pathlib.Path("clusters").rglob("*.yaml"):
+    if path.name == ".sops.yaml":
+        continue
+    try:
+        docs = list(yaml.safe_load_all(path.read_text()))
+    except Exception:
+        continue
+    for doc in docs:
+        if not isinstance(doc, dict) or doc.get("kind") != "Kustomization":
+            continue
+        if "kustomize.toolkit.fluxcd.io" not in str(doc.get("apiVersion", "")):
+            continue
+        spec = doc.get("spec", {}) or {}
+        target = (spec.get("path") or "").lstrip("./").rstrip("/")
+        if target:
+            kustomizations.append((
+                target,
+                (spec.get("decryption") or {}).get("provider") == "sops",
+                f"{path}:{doc.get('metadata',{}).get('name')}",
+            ))
+
+uncovered = []
+for path in sorted(pathlib.Path(".").rglob("*.yaml")):
+    if ".git" in path.parts or path.parts[0] == "clusters":
+        continue
+    try:
+        text = path.read_text()
+    except (UnicodeDecodeError, OSError):
+        continue
+    if not re.search(r"^sops:", text, re.M):
+        continue
+    rel = str(path)
+    # longest matching path wins, mirroring how the trees nest
+    matches = sorted(
+        [k for k in kustomizations if rel.startswith(k[0] + "/")],
+        key=lambda k: len(k[0]), reverse=True,
+    )
+    if not matches:
+        uncovered.append((rel, "no Kustomization covers this path"))
+    elif not matches[0][1]:
+        uncovered.append((rel, f"{matches[0][2]} has no decryption.provider: sops"))
+
+if uncovered:
+    print(f"\nERROR - {len(uncovered)} SOPS file(s) would be applied without decryption:")
+    for rel, why in uncovered:
+        print(f"  {rel}")
+        print(f"    {why}")
+    print("\n  Flux would store the literal ENC[...] ciphertext as the value and")
+    print("  still report Ready. Add a decryption block to that Kustomization.")
+    sys.exit(1)
+PY
+
 echo "INFO - Validation passed"
