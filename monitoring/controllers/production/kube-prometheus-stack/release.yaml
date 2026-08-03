@@ -69,6 +69,12 @@ spec:
 
     alertmanager:
       alertmanagerSpec:
+        # Small and steady; requests keep it off the BestEffort eviction list.
+        resources:
+          requests:
+            cpu: 25m
+            memory: 128Mi
+
         # Without this, NOTHING outside the monitoring namespace is ever
         # delivered. prometheus-operator scopes each AlertmanagerConfig CRD to
         # its own namespace by default (OnNamespace), so the ntfy-config in
@@ -92,6 +98,16 @@ spec:
 
     prometheus:
       prometheusSpec:
+        # Measured 183m CPU / 1730Mi memory. Without requests Prometheus runs
+        # BestEffort and is evicted first under node pressure — losing
+        # observability exactly when something is going wrong. Requests only,
+        # no limits: a memory cap on Prometheus turns a heavy query into an OOM
+        # restart, which discards the WAL and is worse than the query being slow.
+        resources:
+          requests:
+            cpu: 200m
+            memory: 2Gi
+
         # Without storageSpec the TSDB lives on an emptyDir, so every pod
         # restart discards it and the configured 10d retention never actually
         # holds. Production carries ~353k active series at ~11.8k samples/sec,
@@ -141,6 +157,11 @@ spec:
           - hosts:
               - prometheus.ronaldlokers.nl
     grafana:
+      # Measured 13m CPU / 467Mi memory.
+      resources:
+        requests:
+          cpu: 50m
+          memory: 512Mi
       adminPassword: ronald
       grafana.ini:
         server:
