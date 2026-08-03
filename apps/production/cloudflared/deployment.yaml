@@ -15,6 +15,21 @@ spec:
       labels:
         app: cloudflared
     spec:
+      # Two replicas are only redundancy if they are on different nodes.
+      # Nothing enforced that: they currently sit on kube-srv-2 and
+      # kube-srv-3 by scheduler luck, and both could equally land together,
+      # at which point one node failure takes the internet path down
+      # entirely despite replicas: 2.
+      #
+      # maxSkew 1 over 3 nodes with 2 replicas is always satisfiable, and
+      # remains so with one node cordoned.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: cloudflared
       containers:
         - name: cloudflared
           image: cloudflare/cloudflared:2026.7.3
