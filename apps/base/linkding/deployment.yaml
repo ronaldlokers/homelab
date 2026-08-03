@@ -4,6 +4,13 @@ metadata:
   name: linkding
 spec:
   replicas: 1
+  # Required by the ReadWriteOnce linkding-data volume. A RollingUpdate starts
+  # the replacement pod before the old one releases the claim, so if the two land
+  # on different nodes the new pod blocks on a multi-attach error and the rollout
+  # stalls. Every other PVC-backed workload here (commafeed, mealie, ntfy,
+  # pgadmin, speedtest) uses Recreate for the same reason.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: linkding
@@ -49,3 +56,14 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+          # Defined here rather than in each overlay patch: both environments
+          # mounted this path identically, and keeping the mount next to the
+          # claim means a new overlay cannot forget it and silently fall back to
+          # ephemeral storage.
+          volumeMounts:
+            - name: linkding-data
+              mountPath: /etc/linkding/data
+      volumes:
+        - name: linkding-data
+          persistentVolumeClaim:
+            claimName: linkding-data
