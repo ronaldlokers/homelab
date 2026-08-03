@@ -49,6 +49,22 @@ spec:
               cpu: 500m
               memory: 512Mi
           env:
+            # Without this Nightscout defaults to AUTH_DEFAULT_ROLES=readable,
+            # which serves the full CGM history — glucose values, treatments,
+            # device status — to anyone who knows the hostname, no token needed.
+            # Verified against production: GET /api/v1/entries.json returned 200
+            # unauthenticated.
+            #
+            # NOT "denied", which is the obvious choice and breaks the pod. All
+            # three probes below target /api/v1/status, and under "denied" that
+            # endpoint answers 401, so the startup probe never passes and the
+            # container restarts forever. Confirmed on staging:
+            #   Startup probe failed: HTTP probe failed with statuscode: 401
+            #
+            # "status-only" grants exactly api:status:read — enough for the
+            # probes, nothing else. Reading data now requires a token.
+            - name: AUTH_DEFAULT_ROLES
+              value: "status-only"
             - name: DISPLAY_UNITS
               value: "mmol/L"
             - name: MONGODB_URI
