@@ -22,7 +22,10 @@ spec:
             - name: POSTGRES_USER
               value: "app"
             - name: POSTGRES_PASSWORD
-              value: ""
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-app-credentials
+                  key: password
             - name: BASE_URL
               value: "https://mealie.ronaldlokers.nl"
             - name: TZ

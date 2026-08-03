@@ -1,10 +1,11 @@
 metrics: true
 
 # Persist check history across restarts (production). Connects as the shared
-# `app` role via trust auth (empty password), same as every other app.
+# `app` role. ${POSTGRES_PASSWORD} is substituted by Gatus from the
+# environment, the same mechanism ${NTFY_TOKEN} already uses below.
 storage:
   type: postgres
-  path: "postgres://app@postgres-cluster-rw.database.svc.cluster.local:5432/gatus?sslmode=disable"
+  path: "postgres://app:${POSTGRES_PASSWORD}@postgres-cluster-rw.database.svc.cluster.local:5432/gatus?sslmode=disable"
 
 ui:
   title: "Homelab Status"

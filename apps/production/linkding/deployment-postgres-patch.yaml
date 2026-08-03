@@ -20,4 +20,7 @@ spec:
             - name: LD_DB_USER
               value: "app"
             - name: LD_DB_PASSWORD
-              value: ""
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-app-credentials
+                  key: password

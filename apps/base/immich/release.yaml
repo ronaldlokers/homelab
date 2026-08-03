@@ -33,8 +33,13 @@ spec:
                 value: immich
               DB_USERNAME:
                 value: "app"
+              # Was `value: ""`: pg_hba said `host all app all trust`, so
+              # Immich connected with no credential at all (#166).
               DB_PASSWORD:
-                value: ""
+                valueFrom:
+                  secretKeyRef:
+                    name: postgres-app-credentials
+                    key: password
 
     # Server component
     server:

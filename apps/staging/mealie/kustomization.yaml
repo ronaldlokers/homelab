@@ -2,6 +2,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: mealie
 resources:
+- postgres-credentials-secret.yaml
 - ../../base/mealie/
 - ingress.yaml
 patches:
