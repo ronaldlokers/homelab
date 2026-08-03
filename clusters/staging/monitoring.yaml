@@ -4,7 +4,7 @@ metadata:
   name: monitoring-controllers
   namespace: flux-system
 spec:
-  interval: 1m0s
+  interval: 10m0s
   retryInterval: 1m
   # kube-prometheus-stack is a large release; allow it time to become
   # healthy before dependents reconcile.

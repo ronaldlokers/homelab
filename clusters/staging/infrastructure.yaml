@@ -4,7 +4,7 @@ metadata:
   name: infrastructure-controllers
   namespace: flux-system
 spec:
-  interval: 1m0s
+  interval: 10m0s
   retryInterval: 1m
   # wait: true gates readiness on all HelmReleases being installed and
   # healthy; controller installs can take a while on a fresh cluster,
@@ -29,7 +29,7 @@ metadata:
 spec:
   dependsOn:
     - name: infrastructure-controllers
-  interval: 1m0s
+  interval: 10m0s
   retryInterval: 1m
   # PostgreSQL cluster bootstrap must complete before this Kustomization
   # reports Ready.
