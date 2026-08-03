@@ -79,6 +79,13 @@ spec:
     lokiCanary:
       enabled: false
 
+    # The chart's helm-test template hard-requires the canary ("Helm test
+    # requires the Loki Canary to be enabled"), so the two have to move
+    # together. Caught by flux-diff, which expands charts; validate.sh cannot
+    # see this because kustomize build does not render HelmReleases.
+    test:
+      enabled: false
+
     # Enable minio for storage
     minio:
       enabled: true

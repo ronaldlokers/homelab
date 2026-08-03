@@ -18,18 +18,20 @@ patches:
   # its webhooks keep working. Adding a policy later needs no change here beyond
   # scaling these back up.
   #
-  # replicas: 0 rather than dropping the components, so the Deployments stay
-  # visible and this is reversible with a one-line edit.
+  # `enabled: false` rather than `replicas: 0` — the chart rejects zero outright
+  # ("Kyverno does not support running with 0 replicas"), caught by flux-diff.
+  # Each block keeps its replicas/resources values so re-enabling is a one-word
+  # change back to true.
   - patch: |
-      - op: replace
-        path: /spec/values/backgroundController/replicas
-        value: 0
-      - op: replace
-        path: /spec/values/cleanupController/replicas
-        value: 0
-      - op: replace
-        path: /spec/values/reportsController/replicas
-        value: 0
+      - op: add
+        path: /spec/values/backgroundController/enabled
+        value: false
+      - op: add
+        path: /spec/values/cleanupController/enabled
+        value: false
+      - op: add
+        path: /spec/values/reportsController/enabled
+        value: false
     target:
       kind: HelmRelease
       name: kyverno
