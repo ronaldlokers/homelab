@@ -32,6 +32,14 @@ patches:
       - op: add
         path: /spec/values/reportsController/enabled
         value: false
+      # The base requests 100m for production; the staging admission controller
+      # measures 6m with no policies to evaluate. Memory left at the base value.
+      - op: replace
+        path: /spec/values/admissionController/resources/requests/cpu
+        value: 25m
+      - op: replace
+        path: /spec/values/admissionController/container/resources/requests/cpu
+        value: 25m
     target:
       kind: HelmRelease
       name: kyverno

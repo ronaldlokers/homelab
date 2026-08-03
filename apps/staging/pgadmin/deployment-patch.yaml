@@ -7,6 +7,12 @@ spec:
     spec:
       containers:
         - name: pgadmin4
+          # Staging runs on a 2-core node. Base requests 100m for production;
+          # observed staging usage is 2m. Memory requests are left alone —
+          # CPU is the constraint here, memory sits at ~49%.
+          resources:
+            requests:
+              cpu: 25m
           env:
             - name: PGADMIN_DEFAULT_EMAIL
               valueFrom:
