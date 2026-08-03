@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tandoor
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - secretName: wildcard-staging-ronaldlokers-nl-tls
+      hosts:
+        - tandoor.staging.ronaldlokers.nl
+  rules:
+    - host: tandoor.staging.ronaldlokers.nl
+      http:
+        paths:
+          - backend:
+              service:
+                name: tandoor
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix

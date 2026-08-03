@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tandoor
+spec:
+  template:
+    spec:
+      containers:
+        - name: tandoor
+          image: ghcr.io/tandoorrecipes/recipes:2.6.13
+          env:
+            - name: POSTGRES_HOST
+              value: "postgres-cluster-rw.database.svc.cluster.local"
+            - name: POSTGRES_DB
+              value: "tandoor"
+            - name: ALLOWED_HOSTS
+              value: "tandoor.staging.ronaldlokers.nl"
+          # Staging runs on a 2-core node; the base requests are sized for
+          # production. Memory is left alone — Django plus gunicorn needs it.
+          resources:
+            requests:
+              cpu: 25m

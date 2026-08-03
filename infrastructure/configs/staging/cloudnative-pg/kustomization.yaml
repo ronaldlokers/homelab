@@ -11,3 +11,4 @@ resources:
   - linkding-database.yaml
   - mealie-database.yaml
   - nightscout-database.yaml
+  - tandoor-database.yaml
