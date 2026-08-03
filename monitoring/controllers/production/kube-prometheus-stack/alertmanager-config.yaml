@@ -15,3 +15,14 @@ spec:
       webhookConfigs:
         - url: 'http://ntfy.ntfy.svc.cluster.local/alerts?template=alertmanager'
           sendResolved: true
+          # The alerts topic no longer accepts anonymous publishes (#165), so
+          # Alertmanager authenticates as its own account, which holds
+          # write-only on this one topic.
+          httpConfig:
+            basicAuth:
+              username:
+                name: ntfy-publisher
+                key: username
+              password:
+                name: ntfy-publisher
+                key: password
