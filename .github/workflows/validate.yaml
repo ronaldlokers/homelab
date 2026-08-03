@@ -21,13 +21,18 @@ jobs:
         with:
           install_args: kustomize kubeconform
 
+      # /tmp/crds-catalog is a sparse checkout of the datreeio CRD catalog,
+      # holding only the API groups this repo uses — 9MB against 222MB for the
+      # full catalog. Caching it keeps validation offline and deterministic:
+      # the previous per-resource fetch from raw.githubusercontent.com was
+      # rate-limited on shared CI egress IPs, which silently dropped coverage.
       - name: Cache kubeconform schemas
         uses: actions/cache@v6
         with:
           path: |
-            /tmp/kubeconform-schema-cache
             /tmp/flux-crd-schemas
             /tmp/k8s-json-schemas
+            /tmp/crds-catalog
           key: kubeconform-schemas-${{ github.run_id }}
           restore-keys: |
             kubeconform-schemas-
