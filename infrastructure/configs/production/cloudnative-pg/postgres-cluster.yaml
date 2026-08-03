@@ -6,6 +6,19 @@ metadata:
 spec:
   instances: 3
 
+  # Requests only, deliberately no limits. Without these the instances run
+  # BestEffort and are the FIRST thing the kubelet evicts under node memory
+  # pressure — ahead of every application, all of which do set requests. A
+  # database holding the only copy of live data should not be the first
+  # casualty of an unrelated memory spike.
+  #
+  # Sized from measured usage (peak 507Mi across instances) with headroom. No limits: a hard memory
+  # cap on PostgreSQL turns a slow query into an OOM kill and a failover.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 768Mi
+
   # Use DocumentDB-enabled PostgreSQL image for FerretDB v2.x (ARM64-compatible)
   imageName: "ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0"
 
