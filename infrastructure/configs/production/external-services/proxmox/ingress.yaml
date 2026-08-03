@@ -19,6 +19,5 @@ spec:
                 port:
                   name: https
   tls:
-    - secretName: wildcard-ronaldlokers-nl-tls
-      hosts:
+    - hosts:
         - proxmox.ronaldlokers.nl
