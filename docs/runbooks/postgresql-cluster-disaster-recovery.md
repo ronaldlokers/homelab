@@ -3,10 +3,82 @@
 ## Quick Reference
 
 - **Severity**: Critical (potential data loss)
-- **Estimated Time to Resolve**: 15-30 minutes
+- **Time to Resolve**: 18 minutes, measured — see "Verified restore" below
 - **Scenario**: PostgreSQL cluster accidentally deleted or corrupted
 - **Outcome**: Cluster restored from Backblaze B2 backups with minimal data loss
 - **Prerequisites**: Backups configured and running, access to cluster manifests
+
+## Verified restore
+
+This procedure was untested until **2026-08-04**. It had been asserted in four
+documents and never once run, which is the failure mode
+[the Immich backup gap](../war-stories/cnpg-invisible-backup-gap.md) is about:
+backups that look healthy and have never been proven to restore.
+
+It has now been executed end to end against the real Backblaze B2 backups,
+restoring `postgres-cluster` into a throwaway namespace with no `backup:`
+section, so it could not archive WAL back into the production prefix.
+
+**Result: it works.** Data verified against a live baseline taken beforehand:
+
+| Check | Live | Restored |
+|---|---|---|
+| databases | 8 | 8 |
+| linkding tables / bookmarks | 21 / 44 | 21 / 44 |
+| mealie tables / recipes | 66 / 49 | 66 / 49 |
+| commafeed / gatus tables | 13 / 8 | 13 / 8 |
+| `documentdb_data.documents_102` (CGM) | 22,045 | 22,042 |
+
+Extensions returned intact (`documentdb 0.107-0`, `pg_cron`, `postgis`, `vector`,
+`rum`) and `pg_is_in_recovery()` returned false, confirming promotion.
+
+The 3-row gap on the CGM table is the correct result, not a discrepancy: readings
+kept arriving in production while the restore replayed to a fixed point. An exact
+match there would have meant the query was accidentally hitting the live cluster.
+
+**Timing.** 18 minutes from `Cluster` creation to primary `Ready`, for ~3GB
+logical / 12GB on disk, downloaded from B2 and WAL-replayed on ARM64. The
+15-30 minute estimate above was sound; it had simply never been checked.
+
+### Three things that cost time, and will again
+
+1. **`serverName` is mandatory and its absence is not obvious.** Backups live
+   under `<destinationPath>/<serverName>/`. Omit it and CloudNativePG defaults to
+   the *new* cluster's name, finds nothing, and fails with a flat
+   `no target backup found` — no hint that the path is the problem. The
+   `externalClusters` blocks in this runbook already set it; do not drop it when
+   adapting them.
+
+2. **A failed attempt poisons the next one.** Retrying over the same PVC fails
+   with `FATAL: lock file "postmaster.pid" already exists`, and each retry
+   restarts the whole download and replay from the beginning. Delete the cluster
+   **and its PVC** before retrying:
+
+   ```bash
+   kubectl delete cluster <name> -n <ns> --wait=true
+   kubectl delete pvc --all -n <ns> --wait=true
+   ```
+
+3. **There is no progress indicator.** `status.phase` sits on
+   `Setting up primary` for the entire restore. Real progress is only visible in
+   the recovery job's logs:
+
+   ```bash
+   kubectl logs -n <ns> job/<cluster>-1-full-recovery -f
+   # "Target backup found"
+   # "restored log file 0000000E000000D300000021 from archive"
+   # "redo in progress, elapsed time: 740.86 s, current LSN: D3/22BE4638"
+   ```
+
+   To estimate remaining work, compare that LSN against
+   `SELECT pg_current_wal_lsn()` on the source.
+
+### Not yet verified
+
+Only `postgres-cluster` has been restore-tested. `immich-cluster` backs up to a
+separate prefix (`production-2026-07-immich/`) and uses the same mechanism, so it
+is likely fine — but "likely fine" is precisely the claim this exercise existed
+to stop us making.
 
 ## When to Use This Runbook
 

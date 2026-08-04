@@ -26,6 +26,8 @@ These stories document actual problems, debugging processes, and solutions. They
 - **[A PostgreSQL Replica That Wouldn't Come Back](postgres-replica-networkpolicy-dataplane-sync.md)** - Ruling out a wrong node-flakiness hypothesis with a controlled A/B test, then finding a stale NetworkPolicy dataplane sync as the real cause
 - **[The Photo Database That Had Backups — Except It Didn't](cnpg-invisible-backup-gap.md)** - Four months of zero recoverability behind green dashboards: WAL archiving without a base backup, an hourly "daily" cron, an exact-match PodMonitor, and alerts selecting a label that never existed
 - **[All Three Control-Plane Nodes Running etcd on SD Card Instead of NVMe](etcd-emmc-storage-latency.md)** - A NetworkPolicy fix that wouldn't converge led to 30x-over etcd read latency, explaining a 4-day-old propagation mystery
+- **[The App That Started Perfectly and Served Nothing](tandoor-service-env-var-collision.md)** - Kubernetes injects an environment variable per Service, which silently overwrote the port nginx was told to listen on
+- **[47 Restarts in 19 Hours, Every One Exiting Zero](liveness-without-startup-probe.md)** - A livenessProbe with no startupProbe is a startup timeout, and a clean SIGTERM shutdown is indistinguishable from success in the exit code
 
 ### Applications
 
