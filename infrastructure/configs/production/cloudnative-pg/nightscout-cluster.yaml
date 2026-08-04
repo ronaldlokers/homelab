@@ -141,22 +141,52 @@ spec:
     pg_ident:
       - documentdb postgres app
 
-  # initdb, not recovery: this cluster is new and has no archive to recover
-  # from. bootstrap only takes effect when the Cluster object is CREATED, so
-  # switching this to `recovery` is a follow-up once the first backup lands —
-  # and it matters, because #238 found the shared cluster's recovery block had
-  # been silently pointing at a five-month-stale prefix.
+  # Recovery, not initdb. This block is inert day to day — bootstrap only takes
+  # effect when the Cluster object is CREATED — which is exactly why #238 exists:
+  # the shared cluster's recovery block pointed at a five-month-stale prefix for
+  # months, reported healthy, and would have restored February data.
+  #
+  # So this one is not written from the documentation, it is copied from a
+  # restore that was actually performed and verified on 2026-08-04:
+  #
+  #   restored into a scratch cluster from the prefix below
+  #   entries 22,306 / auth_subjects 3 / profile 1 / treatments 13
+  #   documentdb_api.create_collection + drop_collection both functional
+  #
+  # The cluster was created with `initdb` and this postInitSQL, which is what
+  # installed the extension in the first place:
+  #
+  #   CREATE EXTENSION IF NOT EXISTS documentdb CASCADE;
+  #   GRANT documentdb_admin_role TO app;
+  #
+  # A recovered cluster carries the extension in its restored `postgres`
+  # database, so that step does not need repeating.
+  #
+  # NOTE: recover-from and archive-to are the same prefix. immich-cluster keeps
+  # them separate so a recovered cluster starts a clean WAL timeline; doing that
+  # here means bumping the archive prefix and leaving the new one without a base
+  # backup until the next ScheduledBackup. Same deliberate deferral as
+  # postgres-cluster. Safe for a single recovery; the constraint bites when
+  # recovering repeatedly.
   bootstrap:
-    initdb:
-      database: app
-      owner: app
-      # A fresh initdb database has no extensions. FerretDB needs DocumentDB,
-      # which must live in the database pg_cron uses (see cron.database_name
-      # above). postInitSQL runs as superuser against the `postgres` database at
-      # bootstrap, which is exactly where it needs to go.
-      postInitSQL:
-        - CREATE EXTENSION IF NOT EXISTS documentdb CASCADE;
-        - GRANT documentdb_admin_role TO app;
+    recovery:
+      source: clusterBackup
+
+  externalClusters:
+    - name: clusterBackup
+      barmanObjectStore:
+        destinationPath: "s3://homelab-postgres-backups/production-2026-08-nightscout/"
+        serverName: nightscout-cluster
+        endpointURL: "https://s3.eu-central-003.backblazeb2.com"
+        s3Credentials:
+          accessKeyId:
+            name: b2-credentials
+            key: ACCESS_KEY_ID
+          secretAccessKey:
+            name: b2-credentials
+            key: ACCESS_SECRET_KEY
+        wal:
+          maxParallel: 8
 
   storage:
     size: 10Gi
