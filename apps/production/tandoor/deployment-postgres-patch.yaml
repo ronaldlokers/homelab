@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tandoor
+spec:
+  template:
+    spec:
+      containers:
+        - name: tandoor
+          image: ghcr.io/tandoorrecipes/recipes:2.6.13
+          env:
+            - name: POSTGRES_HOST
+              value: "postgres-cluster-rw.database.svc.cluster.local"
+            - name: POSTGRES_DB
+              value: "tandoor"
+            # localhost is required: the probes send Host: localhost, and Django
+            # rejects anything not listed here with 400 DisallowedHost.
+            - name: ALLOWED_HOSTS
+              value: "tandoor.ronaldlokers.nl,localhost"
