@@ -12,6 +12,10 @@ spec:
   imageName: 'ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0'
 
   # DocumentDB image uses UID/GID 999
+  # Applications are useless until this is serving, and an app whose database
+  # is down crash-loops and adds load while achieving nothing. Ranked above
+  # applications, below the operator that manages it.
+  priorityClassName: homelab-database
   postgresUID: 999
   postgresGID: 999
 

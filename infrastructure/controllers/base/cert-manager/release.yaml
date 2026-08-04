@@ -25,5 +25,8 @@ spec:
     crds:
       enabled: true
     global:
+      # Nothing that needs TLS can converge until cert-manager is up, so it
+      # outranks applications when capacity is contended after a reboot.
+      priorityClassName: homelab-infrastructure
       leaderElection:
         namespace: cert-manager

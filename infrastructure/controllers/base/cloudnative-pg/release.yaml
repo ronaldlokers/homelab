@@ -21,3 +21,8 @@ spec:
     crds: Create
   upgrade:
     crds: CreateReplace
+  values:
+    # No database reconciles until the operator is running, and every app that
+    # needs one crash-loops meanwhile. It outranks applications when capacity is
+    # contended after a reboot.
+    priorityClassName: homelab-infrastructure

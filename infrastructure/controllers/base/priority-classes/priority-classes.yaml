@@ -1,0 +1,42 @@
+# Boot-order priorities.
+#
+# Staging idles at 17% CPU, so it is not resource-starved in steady state. What
+# hurts is convergence: a host reboot restarts every pod at once, and peak
+# demand during that is many times steady state. Without priorities the
+# scheduler treats a photo-management server and the PostgreSQL cluster half the
+# cluster depends on as equally urgent.
+#
+# Be clear about what this does and does not buy. It orders SCHEDULING and
+# protects these pods from preemption and from eviction under node pressure. It
+# does NOT pace disk I/O, so it cannot on its own stop a convergence storm — it
+# just makes sure that when capacity frees up, the things everything else waits
+# on get it first.
+#
+# Values sit far below system-cluster-critical (2000000000) so k3s components
+# and Traefik still outrank everything here. Applications are deliberately left
+# at the default of 0.
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: homelab-infrastructure
+# Operators and controllers that must exist before anything else can converge:
+# cert-manager (no certificates without it), the CloudNativePG operator (no
+# databases), and anything else whose absence blocks a whole class of workload.
+value: 100000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Cluster infrastructure controllers — must start before workloads that depend on them"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: homelab-database
+# The PostgreSQL instances themselves. Ranked below the operators that manage
+# them but above every application, because an app whose database is not up
+# will crash-loop and add load while achieving nothing — which is exactly the
+# pattern that makes a slow boot worse than it needs to be.
+value: 50000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "PostgreSQL clusters — applications are useless until these are serving"
