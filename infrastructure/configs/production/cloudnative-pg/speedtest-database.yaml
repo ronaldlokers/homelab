@@ -7,4 +7,10 @@ spec:
   cluster:
     name: postgres-cluster
   name: speedtest
-  owner: app
+  # Was `app`, the role shared by every application. Ownership matters beyond
+  # tidiness: a database's owner holds CONNECT implicitly, so revoking PUBLIC's
+  # CONNECT achieves nothing while `app` still owns the database.
+  #
+  # CloudNativePG issues ALTER DATABASE ... OWNER TO for this field. Ownership of
+  # the objects INSIDE the database is separate and was transferred first (#246).
+  owner: speedtest

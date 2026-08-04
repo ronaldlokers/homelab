@@ -1,3 +1,14 @@
+# This database is EMPTY and nothing reads it — verified on both clusters, zero
+# tables. Nightscout reaches Postgres through FerretDB, whose connection string
+# points at the shared `postgres` database, because that is where the DocumentDB
+# extension lives (pg_cron pins cron.database_name there too). The glucose data
+# is in `documentdb_data` inside `postgres`, not here.
+#
+# So this is the one database #219 deliberately did not migrate: giving it a
+# per-app owner would isolate an empty database while the real data stays in a
+# database shared with the operator, pg_cron and the metrics exporter. Revoking
+# PUBLIC's CONNECT there is a different operation with a different blast radius
+# and needs its own design.
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
