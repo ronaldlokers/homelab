@@ -10,8 +10,13 @@ spec:
           env:
             - name: QUARKUS_DATASOURCE_JDBC_URL
               value: "jdbc:postgresql://postgres-cluster-rw.database.svc.cluster.local/commafeed"
+            # Was the shared `app` role. Taken from the Secret so the role name
+            # and its password can never drift apart (#219).
             - name: QUARKUS_DATASOURCE_USERNAME
-              value: "app"
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-app-credentials
+                  key: username
             - name: QUARKUS_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:

@@ -1,11 +1,16 @@
 metrics: true
 
-# Persist check history across restarts (production). Connects as the shared
-# `app` role. ${POSTGRES_PASSWORD} is substituted by Gatus from the
-# environment, the same mechanism ${NTFY_TOKEN} already uses below.
+# Persist check history across restarts (production). Connects as gatus' own
+# role, which owns the gatus database and nothing else — it was the shared `app`
+# role, which owns every database (#219).
+#
+# Both ${POSTGRES_USER} and ${POSTGRES_PASSWORD} are substituted by Gatus from
+# the environment, the same mechanism ${NTFY_TOKEN} already uses below. The role
+# name is injected rather than written literally here so it cannot drift from
+# the password it is paired with.
 storage:
   type: postgres
-  path: "postgres://app:${POSTGRES_PASSWORD}@postgres-cluster-rw.database.svc.cluster.local:5432/gatus?sslmode=disable"
+  path: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-cluster-rw.database.svc.cluster.local:5432/gatus?sslmode=disable"
 
 ui:
   title: "Homelab Status"
