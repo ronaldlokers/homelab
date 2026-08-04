@@ -109,6 +109,24 @@ spec:
       # this line redundant rather than load-bearing.
       - host all streaming_replica all trust
       - host all postgres all md5
+      # DocumentDB's internal connections go over the socket (see
+      # documentdb.localhost_connection_string above) but connect as the CALLING
+      # role, not as postgres — the connection string's user= is overridden. So
+      # plain peer auth rejects them:
+      #
+      #   FATAL:  Peer authentication failed for user "app"
+      #
+      # This maps the server's own OS user onto the app role for socket
+      # connections only, via the pg_ident map below. Narrower than a trust
+      # rule: it grants nothing to anything that is not already running as
+      # postgres inside this container.
+      - local all app peer map=documentdb
+
+    # Lets `local all app peer map=documentdb` above resolve: OS user postgres —
+    # which is what the server itself runs as — may connect as the app role over
+    # the Unix socket. Nothing else matches this map.
+    pg_ident:
+      - documentdb postgres app
 
   # initdb, not recovery: this cluster is new and has no archive to recover
   # from. bootstrap only takes effect when the Cluster object is CREATED, so
