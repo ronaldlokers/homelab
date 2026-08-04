@@ -116,7 +116,7 @@ spec:
   externalClusters:
     - name: clusterBackup
       barmanObjectStore:
-        destinationPath: "s3://homelab-postgres-backups/production-2026-07-immich/"
+        destinationPath: "s3://homelab-postgres-backups/production-2026-08-immich/"
         serverName: immich-cluster
         endpointURL: "https://s3.eu-central-003.backblazeb2.com"
         s3Credentials:
@@ -129,8 +129,21 @@ spec:
         wal:
           maxParallel: 8
 
+  # 20Gi, down from 50Gi. CloudNativePG refuses to shrink storage in place —
+  #
+  #   can't shrink existing storage from 50Gi to 20Gi
+  #
+  # so this only takes effect by deleting the cluster and letting it restore,
+  # which is why the recovery prefix above had to be correct first (#257: it was
+  # pointing at a six-week-stale archive).
+  #
+  # Sized against measured use, not guesswork. After #258 dropped wal_keep_size
+  # from 8GB to 512MB, an instance holds 739M: ~130MB of database (of which 95MB
+  # is the geodata_places reference table) and ~600M of WAL. 20Gi is verified
+  # rather than assumed — a scratch cluster was restored at exactly this size on
+  # 2026-08-04 and matched live: same database sizes, 219,618 geodata rows.
   storage:
-    size: 50Gi
+    size: 20Gi
     storageClass: longhorn
 
   backup:
@@ -139,7 +152,7 @@ spec:
       # Archive to a NEW timeline, distinct from the recovery source above, so
       # a recovered cluster starts a clean WAL history (avoids the
       # "Expected empty archive" collision). Bump this suffix on each DR.
-      destinationPath: "s3://homelab-postgres-backups/production-2026-08-immich/"
+      destinationPath: "s3://homelab-postgres-backups/production-2026-09-immich/"
       endpointURL: "https://s3.eu-central-003.backblazeb2.com"
       s3Credentials:
         accessKeyId:
