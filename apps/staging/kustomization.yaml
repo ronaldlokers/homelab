@@ -7,6 +7,15 @@ resources:
   - nightscout
   - pgadmin
   - commafeed
-  - immich
+  # Immich is deliberately not deployed to staging.
+  #
+  # It is the heaviest workload here — server, machine-learning and its own
+  # CloudNativePG instance, four pods plus three volumes — and the least likely
+  # thing to be exercised before a production change. Staging idles at 17% CPU,
+  # but a host reboot restarts every pod at once, and Immich contributes the
+  # largest share of that convergence storm on a single-VM k3d cluster.
+  #
+  # The overlay under apps/staging/immich/ is kept intact; re-enable by
+  # restoring this one line.
   - gatus
   - tandoor
