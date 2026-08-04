@@ -84,6 +84,33 @@ spec:
       # database in this cluster that can hold the DocumentDB extension. Left at
       # the default so the extension lands where postInitSQL creates it.
       cron.database_name: "postgres"
+      # Both of these make DocumentDB's and pg_cron's OWN connections back into
+      # this server go over the Unix socket instead of TCP.
+      #
+      # They default to `localhost`, which is a TCP connection, which lands on
+      # `host all postgres all md5` in pg_hba and needs a password nothing
+      # supplies. Every one of the four DocumentDB maintenance jobs then fails:
+      #
+      #   jobid | status | count
+      #       1 | failed |    67     delete_expired_rows (TTL)
+      #       2 | failed |  2033     build_index_concurrently(1)
+      #       3 | failed |  2033     build_index_concurrently(2)
+      #       4 | failed |    67     cursor_directory_cleanup
+      #
+      # Zero successes. The same default breaks cursor continuation
+      # (`find().batchSize(n)` past the first batch) and
+      # documentdb_api.drop_collection, both with
+      # "password authentication failed for user app".
+      #
+      # Over the socket, `local all all peer` matches: the server's OS user is
+      # postgres, so requesting DB user postgres authenticates with no password
+      # and no trust rule. unix_socket_directories is /controller/run here.
+      #
+      # The shared postgres-cluster avoids the pg_cron half by accident — its
+      # jobs were scheduled when cron.host was empty, so their stored nodename
+      # is empty and they already use the socket.
+      cron.host: "/controller/run"
+      documentdb.localhost_connection_string: "host=/controller/run user=postgres"
     pg_hba:
       # Passwords required, as on the shared cluster (#166). There is only one
       # consumer here, but a cluster that trusts unauthenticated connections is
