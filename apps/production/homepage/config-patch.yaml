@@ -30,6 +30,10 @@ data:
             icon: mealie.png
             href: https://mealie.ronaldlokers.nl
             description: Recipe manager
+        - Tandoor:
+            icon: tandoor-recipes.png
+            href: https://tandoor.ronaldlokers.nl
+            description: Recipe manager
 
     - Health:
         - Nightscout:

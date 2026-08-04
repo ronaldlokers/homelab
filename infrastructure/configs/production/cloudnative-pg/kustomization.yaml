@@ -14,3 +14,4 @@ resources:
   - mealie-database.yaml
   - nightscout-database.yaml
   - speedtest-database.yaml
+  - tandoor-database.yaml
