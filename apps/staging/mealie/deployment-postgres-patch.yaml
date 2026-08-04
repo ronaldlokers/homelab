@@ -23,8 +23,13 @@ spec:
               value: "5432"
             - name: POSTGRES_DB
               value: "mealie"
+            # Was the shared `app` role. Taken from the Secret so the role name
+            # and its password can never drift apart (#219).
             - name: POSTGRES_USER
-              value: "app"
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-app-credentials
+                  key: username
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
