@@ -1,0 +1,126 @@
+# A PostgreSQL cluster that exists solely for Nightscout.
+#
+# ## Why a whole cluster for one app
+#
+# #219 gave every application its own role owning its own database. Nightscout
+# was the one it could not fix, and the reason is a hard constraint rather than
+# an oversight.
+#
+# Nightscout talks MongoDB; FerretDB translates that onto PostgreSQL using the
+# DocumentDB extension. DocumentDB depends on pg_cron — it registers four
+# maintenance jobs (TTL expiry, two index builders, cursor cleanup) — and pg_cron
+# can only be installed in the single database named by `cron.database_name`,
+# which is a cluster-wide postmaster-context setting. Verified directly:
+#
+#   ERROR:  can only create extension in database postgres
+#   DETAIL: Jobs must be scheduled from the database configured in
+#           cron.database_name, since the pg_cron background worker reads job
+#           descriptions from this database.
+#
+# So DocumentDB can live in exactly ONE database per PostgreSQL cluster. In the
+# shared cluster that database is `postgres` — which every role could reach,
+# which is precisely the cross-database access #219 set out to remove. The
+# `nightscout` database in the shared cluster was always empty; nothing ever
+# read it.
+#
+# Giving Nightscout its own cluster is the only way to isolate it without
+# repointing `cron.database_name` on the cluster all seven other applications
+# depend on. immich-cluster already establishes the pattern here: a dedicated
+# CNPG cluster, its own image, its own backups.
+#
+# ## What isolation means here
+#
+# This cluster is single-tenant, so its `app` role is isolated by construction —
+# there is no second application whose credential it could reach. That is why
+# there are no per-app roles here, unlike postgres-cluster.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: nightscout-cluster
+  namespace: database
+spec:
+  # Staging runs on a single-host k3d box: 1 instance is enough (no real node
+  # HA to gain here). Production keeps 3 in its own overlay.
+  instances: 1
+
+  # Applications are useless until this is serving, and an app whose database
+  # is down crash-loops and adds load while achieving nothing. Ranked above
+  # applications, below the operator that manages it.
+  priorityClassName: homelab-database
+
+  # Same DocumentDB-enabled image the shared cluster runs, so the extension
+  # version matches and the data can be moved across with pg_dump.
+  imageName: "ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0"
+
+  # DocumentDB image uses UID/GID 999
+  postgresUID: 999
+  postgresGID: 999
+
+  # Enable superuser access for extension management
+  enableSuperuserAccess: true
+
+  postgresql:
+    shared_preload_libraries:
+      - pg_cron
+      - pg_documentdb_core
+      - pg_documentdb
+    parameters:
+      max_connections: "100"
+      shared_buffers: "256MB"
+      # The database pg_cron keeps its metadata in, and therefore the only
+      # database in this cluster that can hold the DocumentDB extension. Left at
+      # the default so the extension lands where postInitSQL creates it.
+      cron.database_name: "postgres"
+    pg_hba:
+      # Passwords required, as on the shared cluster (#166). There is only one
+      # consumer here, but a cluster that trusts unauthenticated connections is
+      # still one NetworkPolicy mistake away from being readable.
+      - host all app all scram-sha-256
+      # Deliberately left as trust. The streaming_replica role has NO PASSWORD
+      # SET, so requiring scram here would break replication immediately. CNPG
+      # authenticates replicas with client certificates over TLS, which makes
+      # this line redundant rather than load-bearing.
+      - host all streaming_replica all trust
+      - host all postgres all md5
+
+  # initdb, not recovery: this cluster is new and has no archive to recover
+  # from. bootstrap only takes effect when the Cluster object is CREATED, so
+  # switching this to `recovery` is a follow-up once the first backup lands —
+  # and it matters, because #238 found the shared cluster's recovery block had
+  # been silently pointing at a five-month-stale prefix.
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+      # A fresh initdb database has no extensions. FerretDB needs DocumentDB,
+      # which must live in the database pg_cron uses (see cron.database_name
+      # above). postInitSQL runs as superuser against the `postgres` database at
+      # bootstrap, which is exactly where it needs to go.
+      postInitSQL:
+        - CREATE EXTENSION IF NOT EXISTS documentdb CASCADE;
+        - GRANT documentdb_admin_role TO app;
+
+  storage:
+    size: 5Gi
+    storageClass: local-path
+
+  backup:
+    retentionPolicy: "14d"
+    barmanObjectStore:
+      # Own prefix. Sharing one with another cluster trips barman's "Expected
+      # empty archive" check, and makes a restore ambiguous about which cluster
+      # it is restoring.
+      destinationPath: "s3://homelab-postgres-backups/staging-2026-08-nightscout/"
+      endpointURL: "https://s3.eu-central-003.backblazeb2.com"
+      s3Credentials:
+        accessKeyId:
+          name: b2-credentials
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: b2-credentials
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+        jobs: 2

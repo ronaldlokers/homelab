@@ -6,6 +6,7 @@ resources:
   - namespace.yaml
   - b2-credentials-secret.yaml
   - postgres-cluster.yaml
+  - nightscout-cluster.yaml
   # Immich is not deployed to staging (see apps/staging/kustomization.yaml),
   # so its dedicated PostgreSQL cluster is not created either. The file is kept
   # for when it is re-enabled.

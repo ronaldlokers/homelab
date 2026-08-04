@@ -6,6 +6,7 @@ resources:
   - namespace.yaml
   - b2-credentials-secret.yaml
   - postgres-cluster.yaml
+  - nightscout-cluster.yaml
   - immich-cluster.yaml
   - postgres-alerts.yaml
   - scheduled-backup.yaml
