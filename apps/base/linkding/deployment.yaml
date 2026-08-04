@@ -33,6 +33,25 @@ spec:
                 name: linkding-container-env
           securityContext:
             allowPrivilegeEscalation: false
+          # Gates the liveness probe until the app has actually started.
+          #
+          # Without this, liveness begins after initialDelaySeconds and kills the
+          # container once failureThreshold is reached — 120s total here. That is
+          # ample on an idle cluster and not ample during convergence, when every
+          # pod restarts at once and startup work contends for one disk.
+          #
+          # Observed on staging: linkding accumulated 47 restarts in 19 hours,
+          # every one exiting "Completed" (exit 0) at almost exactly 120s — the
+          # signature of SIGTERM from a failed liveness probe, not a crash.
+          #
+          # 30 x 10s gives startup five minutes; liveness then takes over
+          # unchanged and still catches a process that dies later.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
           livenessProbe:
             httpGet:
               path: /health
