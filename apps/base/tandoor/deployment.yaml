@@ -68,8 +68,15 @@ spec:
               value: "django.db.backends.postgresql"
             - name: POSTGRES_PORT
               value: "5432"
+            # Read from the Secret rather than hardcoded, so each environment
+            # supplies its own role and the name cannot drift from the password
+            # (#219). Production's Secret still says `app`; staging's says
+            # `tandoor`.
             - name: POSTGRES_USER
-              value: "app"
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-app-credentials
+                  key: username
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
