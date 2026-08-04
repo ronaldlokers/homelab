@@ -36,7 +36,32 @@ spec:
     parameters:
       max_connections: "100"
       shared_buffers: "256MB"
-      wal_keep_size: "8GB"
+      # WAL retention. Was wal_keep_size: 8GB, which is the OLD mechanism: a fixed
+      # floor of WAL kept on disk so a lagging standby can catch up by streaming
+      # rather than fetching from the archive.
+      #
+      # CloudNativePG enables HA replication slots, which are the precise
+      # replacement — a slot retains exactly what its standby still needs. With
+      # both configured PostgreSQL keeps max(wal_keep_size, what the slots need),
+      # and the slots were holding 0 bytes with both replicas streaming at 0 lag.
+      # So the 8GB floor was protecting nothing and costing:
+      #
+      #   3 instances x 8.1G = 24.3G logical, x3 Longhorn replicas = 72.9G
+      #
+      # per cluster. Across immich-cluster and postgres-cluster that was 145.8G
+      # of physical disk, out of 256.8G in use across all of Longhorn.
+      #
+      # 512MB is CloudNativePG's own default, which nightscout-cluster has always
+      # run on without trouble.
+      wal_keep_size: "512MB"
+      # The other half, and the reason the 8GB floor felt necessary. Slots retain
+      # WAL for as long as their standby needs it, and with no bound a standby
+      # that stays down long enough will grow its slot until the volume fills.
+      # This caps that: past 4GB the slot is invalidated and CloudNativePG
+      # re-clones the replica from the archive instead. Slower than streaming,
+      # but bounded — the failure mode becomes a rebuild rather than a full disk
+      # on the primary.
+      max_slot_wal_keep_size: "4GB"
     # Allow password-less connections from within cluster
     pg_hba:
       # Was `host all app all trust`: any pod that could reach port 5432

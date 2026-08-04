@@ -80,6 +80,12 @@ spec:
     parameters:
       max_connections: "100"
       shared_buffers: "256MB"
+      # Bounds how much WAL a replication slot may retain for a standby that has
+      # fallen behind or gone away. Without a cap (-1, the default) a long-absent
+      # standby grows its slot until the volume fills. Past this, the slot is
+      # invalidated and CloudNativePG re-clones the replica from the archive:
+      # slower than streaming, but a bounded failure instead of a full disk.
+      max_slot_wal_keep_size: "4GB"
       # The database pg_cron keeps its metadata in, and therefore the only
       # database in this cluster that can hold the DocumentDB extension. Left at
       # the default so the extension lands where postInitSQL creates it.
