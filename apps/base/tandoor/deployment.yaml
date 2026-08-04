@@ -101,12 +101,26 @@ spec:
             httpGet:
               path: /
               port: http
+              # kubelet sends Host: <pod-IP> by default, which Django rejects with
+              # 400 DisallowedHost because it is not in ALLOWED_HOSTS. Every
+              # overlay includes `localhost` there, so probes use it and stay
+              # identical across environments.
+              httpHeaders:
+                - name: Host
+                  value: localhost
             periodSeconds: 5
             failureThreshold: 120
           livenessProbe:
             httpGet:
               path: /
               port: http
+              # kubelet sends Host: <pod-IP> by default, which Django rejects with
+              # 400 DisallowedHost because it is not in ALLOWED_HOSTS. Every
+              # overlay includes `localhost` there, so probes use it and stay
+              # identical across environments.
+              httpHeaders:
+                - name: Host
+                  value: localhost
             initialDelaySeconds: 30
             periodSeconds: 30
             timeoutSeconds: 5
@@ -115,6 +129,13 @@ spec:
             httpGet:
               path: /
               port: http
+              # kubelet sends Host: <pod-IP> by default, which Django rejects with
+              # 400 DisallowedHost because it is not in ALLOWED_HOSTS. Every
+              # overlay includes `localhost` there, so probes use it and stay
+              # identical across environments.
+              httpHeaders:
+                - name: Host
+                  value: localhost
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
