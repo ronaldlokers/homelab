@@ -59,10 +59,30 @@ spec:
       - host all postgres all md5
 
   # Restore from backup on (re)creation so an accidental delete/rebuild does
-  # not lose the Immich database. Recovery reads the CURRENT generation's
-  # archive; the live cluster archives to a NEW timeline (see backup below),
-  # so recover-from and archive-to never share a WAL path.
-  # On a real DR, re-point this source at the then-current archive prefix.
+  # not lose the Immich database.
+  #
+  # recover-from and archive-to are deliberately different prefixes, so a
+  # recovered cluster starts a clean WAL timeline instead of colliding with
+  # barman's "Expected empty archive" check. That part is sound. What was NOT
+  # sound is that the recover-from prefix went stale and nothing noticed:
+  #
+  #   bootstrap.recovery read : production-2026-03-immich/
+  #   every backup written to : production-2026-07-immich/
+  #
+  # This cluster was CREATED from the 2026-03 prefix 42 days ago and has
+  # archived to 2026-07 ever since, so nothing had written 2026-03 since June.
+  # A delete-and-recreate — the exact scenario this block exists for — would
+  # have restored a six-week-old photo library and reported Ready. Same failure
+  # #238 found on postgres-cluster, in the one place #238 did not change.
+  #
+  # So: recover from where the data actually is, and archive to a NEW
+  # generation. The ScheduledBackup carries immediate: true, so the new prefix
+  # gets a base backup as soon as the cluster comes up rather than waiting for
+  # 02:30.
+  #
+  # THE RULE THIS KEEPS BREAKING: after any recovery, the archive prefix must be
+  # bumped again and this source pointed at the prefix just recovered from.
+  # Rotating one without the other is what produced the stale pointer above.
   bootstrap:
     recovery:
       source: clusterBackup
@@ -71,7 +91,7 @@ spec:
   externalClusters:
     - name: clusterBackup
       barmanObjectStore:
-        destinationPath: "s3://homelab-postgres-backups/production-2026-03-immich/"
+        destinationPath: "s3://homelab-postgres-backups/production-2026-07-immich/"
         serverName: immich-cluster
         endpointURL: "https://s3.eu-central-003.backblazeb2.com"
         s3Credentials:
@@ -94,7 +114,7 @@ spec:
       # Archive to a NEW timeline, distinct from the recovery source above, so
       # a recovered cluster starts a clean WAL history (avoids the
       # "Expected empty archive" collision). Bump this suffix on each DR.
-      destinationPath: "s3://homelab-postgres-backups/production-2026-07-immich/"
+      destinationPath: "s3://homelab-postgres-backups/production-2026-08-immich/"
       endpointURL: "https://s3.eu-central-003.backblazeb2.com"
       s3Credentials:
         accessKeyId:
