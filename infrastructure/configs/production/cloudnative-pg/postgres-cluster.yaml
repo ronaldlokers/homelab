@@ -36,9 +36,15 @@ spec:
   # deliberately a separate step, so the roles can be created and verified
   # without any application noticing.
   #
-  # Ownership of existing objects is NOT handled here. Every table in each
-  # database is still owned by `app`, and transferring that needs
-  # `REASSIGN OWNED BY app TO <role>` run inside each database. See the runbook.
+  # Ownership of existing objects is NOT handled here, and neither is revoking
+  # PUBLIC's CONNECT — which is the mechanism that actually permits
+  # cross-database access. Both are per-database migrations rather than
+  # declarative config: docs/runbooks/postgres-per-app-role-migration.md.
+  #
+  # Do NOT reach for `REASSIGN OWNED BY app TO <role>` there. It also covers
+  # shared objects, and `app` owns every database in this cluster, so running it
+  # inside one database hands all of them to that role. The runbook uses scoped
+  # ALTER statements instead.
   managed:
     roles:
       - name: commafeed

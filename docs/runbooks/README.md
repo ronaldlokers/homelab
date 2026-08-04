@@ -66,6 +66,12 @@ A **runbook** is an action-oriented guide for handling specific incidents. Unlik
   - **Severity**: High
   - **Time to Fix**: 15-30 minutes
 
+- [**Migrate an App from the Shared PostgreSQL `app` Role**](postgres-per-app-role-migration.md) *(proven on staging 2026-08-04)*
+  - **Symptoms**: not an incident — a planned migration. Every app authenticates as one role that owns every database, so any app's Secret is a cluster-wide credential
+  - **Severity**: Medium (a standing privilege-escalation path, not an outage)
+  - **Time to Fix**: ~10 minutes per database, one app at a time
+  - **Warning**: `REASSIGN OWNED` is the obvious command and hands away every database. Order of steps is load-bearing
+
 - [**PostgreSQL Replica NetworkPolicy Dataplane Sync**](postgres-replica-networkpolicy-dataplane-sync.md)
   - **Symptoms**: Reprovisioned CNPG replica crash-loops with "connection refused" to the K8s API despite correct-looking NetworkPolicy config
   - **Severity**: High
