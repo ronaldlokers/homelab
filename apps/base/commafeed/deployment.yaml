@@ -16,6 +16,44 @@ spec:
     spec:
       securityContext:
         fsGroup: 65534 # Nobody user/group
+      # Commafeed exits rather than waiting when PostgreSQL is not reachable:
+      #
+      #   Caused by: org.postgresql.util.PSQLException: Connection to
+      #   postgres-cluster-rw.database.svc.cluster.local:5432 refused
+      #
+      # It exits 1, the Deployment restarts it, and it tries again. Observed on
+      # staging after a host reboot: seven restarts before the database was
+      # accepting connections, each one a full JVM plus Hibernate plus Liquibase
+      # startup — burning exactly the CPU and disk that are scarce during
+      # convergence, to achieve nothing.
+      #
+      # A startupProbe cannot help; the process is gone before any probe runs.
+      # PriorityClasses order scheduling but do not make an app wait for a
+      # dependency. This does.
+      #
+      # busybox nc rather than pg_isready: the failure mode is a refused TCP
+      # connection, and CNPG's -rw Service only has endpoints once an instance
+      # is primary — so TCP-open is a sufficient signal here and costs no extra
+      # image pull.
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.37
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z postgres-cluster-rw.database.svc.cluster.local 5432; do
+                echo "waiting for postgres..."
+                sleep 3
+              done
+              echo "postgres is accepting connections"
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
       containers:
         - name: commafeed
           image: athou/commafeed:7.2.0-postgresql
