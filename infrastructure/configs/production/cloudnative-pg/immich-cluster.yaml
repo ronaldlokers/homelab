@@ -5,6 +5,10 @@ metadata:
   namespace: database
 spec:
   instances: 3
+  # Applications are useless until this is serving, and an app whose database
+  # is down crash-loops and adds load while achieving nothing. Ranked above
+  # applications, below the operator that manages it.
+  priorityClassName: homelab-database
 
   # Requests only, deliberately no limits. Without these the instances run
   # BestEffort and are the FIRST thing the kubelet evicts under node memory
