@@ -13,8 +13,10 @@ spec:
               value: "postgres-cluster-rw.database.svc.cluster.local"
             - name: POSTGRES_DB
               value: "tandoor"
+            # localhost is required: the probes send Host: localhost, and Django
+            # rejects anything not listed here with 400 DisallowedHost.
             - name: ALLOWED_HOSTS
-              value: "tandoor.staging.ronaldlokers.nl"
+              value: "tandoor.staging.ronaldlokers.nl,localhost"
           # Staging runs on a 2-core node; the base requests are sized for
           # production. Memory is left alone — Django plus gunicorn needs it.
           resources:
