@@ -18,6 +18,24 @@ spec:
       labels:
         app: tandoor
     spec:
+      # Kubernetes injects an environment variable per Service in the namespace,
+      # named after it. The Service here is `tandoor`, so it sets
+      # TANDOOR_PORT=tcp://10.43.x.x:80 — and boot.sh substitutes $TANDOOR_PORT
+      # straight into nginx's listen directive:
+      #
+      #   nginx: [emerg] invalid host in "tcp://10.43.209.23:80" of the
+      #   "listen" directive in /etc/nginx/http.d/Recipes.conf:9
+      #
+      # nginx then never starts, gunicorn runs behind nothing, and port 80 stays
+      # closed — so the pod looks like a slow boot rather than a config error.
+      # boot.sh's `${TANDOOR_PORT:-80}` default cannot save it, because the
+      # variable is set, just to the wrong kind of value.
+      #
+      # Turning the injection off removes the collision at the source, and the
+      # explicit TANDOOR_PORT below keeps it correct even if this is ever
+      # re-enabled. Nothing here discovers other services by environment
+      # variable; everything uses DNS.
+      enableServiceLinks: false
       securityContext:
         fsGroup: 65534
       containers:
@@ -42,6 +60,10 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
           env:
+            # Explicit, so the nginx listen directive is right regardless of
+            # what Kubernetes would otherwise inject as TANDOOR_PORT.
+            - name: TANDOOR_PORT
+              value: "80"
             - name: DB_ENGINE
               value: "django.db.backends.postgresql"
             - name: POSTGRES_PORT
