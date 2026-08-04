@@ -1,6 +1,6 @@
 # Migrate an App from the Shared `app` Role to Its Own
 
-**Status:** proven on staging 2026-08-04 — mealie, commafeed, linkding, tandoor. Zero downtime, zero restarts.
+**Status:** executed on staging and production 2026-08-04 — ten databases. Staging was clean; production cost Tandoor 11 minutes of 500s because step 1 was missing `GRANT <role> TO app`. That statement is now in step 1 and is the single most important line here.
 **Access:** `kubectl exec -n database <primary> -c postgres -- psql` on the target cluster.
 **Time:** ~10 minutes per database, plus a Flux reconcile between steps.
 **Rule:** one application at a time, verified running before the next. Steps 1-5 are ordered, and the order is the whole point — see [Why the order matters](#why-the-order-matters).
@@ -23,14 +23,20 @@ Substitute `<db>` (database name), `<role>` (new role, same name by convention) 
 
 ### 1. Grant, then transfer ownership of the objects
 
-Both in one transaction, `GRANT` first. The app is still connected as `app` throughout.
+Both in one transaction, `GRANT` first. The app is still connected as `app` throughout — which is the whole reason for the first statement below.
+
+> **`GRANT <role> TO app` is not optional.** `app`'s access to these tables comes from *owning* them and nothing else — it holds no grants. The moment ownership moves, `app` loses every privilege it had, and the running pod starts returning `permission denied for table …` while still holding its old credentials. Making `app` a member of the new role carries its access across the gap. Measured on production 2026-08-04: skipping this took Tandoor down for **11 minutes**, and left five other apps equally broken but silent, because only Tandoor's health probe touched the database.
 
 ```sql
 \c <db>
 
 BEGIN;
 
--- Grants first: these keep the app working during the ownership change.
+-- Keeps the CURRENTLY CONNECTED role working after ownership moves. Dropped in
+-- step 6, once the app is verified on its new credentials.
+GRANT <role> TO app;
+
+-- Grants for the new role: these let it work before it owns anything.
 GRANT USAGE, CREATE ON SCHEMA public TO <role>;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO <role>;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO <role>;
@@ -61,10 +67,13 @@ ALTER SCHEMA public OWNER TO <role>;
 COMMIT;
 ```
 
-Verify nothing is still owned by `app`:
+Verify nothing is still owned by `app`, **and that `app` can still read** — the second check is the one that would have caught the production outage:
 
 ```sql
 SELECT tableowner, count(*) FROM pg_tables WHERE schemaname='public' GROUP BY 1;
+
+-- expect t. If this is f, the running pod is already broken.
+SELECT has_table_privilege('app', 'public.<any-table>', 'SELECT');
 ```
 
 > **Do NOT use `REASSIGN OWNED BY app TO <role>`.** It is the obvious command and it is wrong here. `REASSIGN OWNED` also covers **shared objects** — and `app` owns every database in the cluster, so running it inside one database hands *all* of them to that role. The loop above is scoped to objects in the current database on purpose.
@@ -114,13 +123,18 @@ kubectl get database <app> -n database --context=<env> \
 
 > If `applied=false` with `cluster resource has been deleted, skipping reconciliation`, the Database controller is stuck at a stale generation and is **not** applying anything. Editing `spec.owner` bumps the generation and normally unsticks it — but verify `applied=true` before believing the owner changed, because a silent no-op here makes step 4 look successful while achieving nothing.
 
-### 4. Revoke PUBLIC's CONNECT
+### 4. Revoke PUBLIC's CONNECT, and drop the bridge
 
 This is the step that actually creates the isolation. Everything before it was preparation.
 
 ```sql
 REVOKE CONNECT ON DATABASE <db> FROM PUBLIC;
 GRANT  CONNECT ON DATABASE <db> TO <role>;
+
+-- Undo the step-1 bridge. Leaving it in place means `app` still inherits
+-- everything <role> owns, which is most of what this migration set out to stop.
+\c <db>
+REVOKE <role> FROM app;
 ```
 
 ### 5. Verify both directions
@@ -177,14 +191,26 @@ Each step depends on the previous one having landed, and three of the four order
 
 | If you… | What happens |
 |---|---|
-| transfer ownership before granting | a window where the app can neither read via ownership (just lost) nor via grants (not yet given) |
-| revoke PUBLIC before switching credentials | the app is locked out of its own data immediately |
+| transfer ownership without `GRANT <role> TO app` | **the running app breaks immediately** — `app`'s access was ownership, and it just lost it |
+| transfer ownership before granting the new role | a window where the new role can read nothing |
+| revoke PUBLIC before switching credentials | the app is locked out of its own data |
 | revoke PUBLIC before transferring database ownership | **nothing happens, silently** — an owner holds `CONNECT` implicitly, so `app` still connects |
 | use `REASSIGN OWNED` | every database in the cluster changes owner, not just this one |
 
-The third is the one that cost real time. On mealie the revoke *appeared* to succeed — no error, `has_database_privilege('public', …)` returned `f` — and `app` could still connect, because `app` still owned the database. The negative test in step 5 is what caught it; `REVOKE` returning success is not evidence of anything.
+**The first one is the expensive one, and this runbook originally got it wrong.** The instinct is to protect the role being migrated *to*. The role at risk is the one being migrated *from*: `app` holds no grants anywhere, so ownership is its only access, and step 1 takes it away while step 2 has not yet shipped new credentials to the pod.
 
-The first is the one that got away with it. Mealie's ownership transfer happened without prior grants and nothing broke, because its connections were idle at that moment. That was luck. Every migration since grants first.
+Measured on production, 2026-08-04, migrating six databases at once:
+
+```
+14:15  ownership transferred away from app
+14:16  tandoor pod restarts, reconnects as app, ProgrammingError:
+       permission denied for table auth_user   (234 occurrences)
+14:26  new credentials roll out, pod recovers
+```
+
+Eleven minutes. The other five applications were in exactly the same state and looked fine — their health probes do not query the database, and no user happened to load a page. Tandoor was not the unlucky one; it was the only one instrumented well enough to notice.
+
+The fourth is the one that cost the most *time*, as opposed to uptime. On mealie the revoke *appeared* to succeed — no error, `has_database_privilege('public', …)` returned `f` — and `app` could still connect, because `app` still owned the database. The negative test in step 5 is what caught it; `REVOKE` returning success is not evidence of anything.
 
 ## Root cause of the original problem
 
