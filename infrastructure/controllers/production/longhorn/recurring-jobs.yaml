@@ -1,4 +1,26 @@
 ---
+# Retention is a disk-space decision as much as a recovery one: a Longhorn
+# backup job keeps `retain` LOCAL snapshots as well as remote backups, and old
+# snapshots pin blocks that the filesystem has long since freed.
+#
+# Measured 2026-08-04, across 120 snapshots holding 211.9Gi:
+#
+#   backup-monthly    18 snapshots   108.9Gi   <- largest consumer by far
+#   snapshot-daily    58 snapshots    95.8Gi
+#   backup-weekly     19 snapshots     2.7Gi
+#   backup-daily      20 snapshots     1.9Gi
+#
+# Most of that is stale WAL. Until today both database clusters ran
+# wal_keep_size: 8GB against replication slots that needed 0 bytes, so every
+# snapshot captured ~8GB of WAL per instance that no standby ever read. Keeping
+# twelve monthly copies of it pinned roughly a year of that on disk.
+#
+# The frequent jobs are cheap and stay as they are. The monthly one is the
+# expensive one and is cut to a quarter of restore points: the databases have
+# their own WAL-archived backups to B2 with PITR, so twelve months of
+# volume-level monthly copies is belt-and-braces on the data that is already
+# covered best.
+
 apiVersion: longhorn.io/v1beta2
 kind: RecurringJob
 metadata:
@@ -36,7 +58,11 @@ spec:
   name: backup-monthly
   task: backup
   cron: "0 4 1 * *"
-  retain: 12
+  # Was 12. Held 108.9Gi of local snapshots — more than every other job
+  # combined — to provide restore points that PostgreSQL's own B2 archive
+  # already covers with PITR. Three months is ample for the app volumes where
+  # this IS the only backup (mealie, tandoor, linkding, ntfy, pgadmin).
+  retain: 3
   concurrency: 1
   groups:
     - default
@@ -50,7 +76,10 @@ spec:
   name: snapshot-daily
   task: snapshot
   cron: "0 1 * * *"
-  retain: 3
+  # Was 3. These are local-only — no remote copy — so they buy fast rollback,
+  # not disaster recovery, and each retained generation costs ~32Gi across the
+  # cluster. Two still covers "yesterday was fine, today is not".
+  retain: 2
   concurrency: 2
   groups:
     - default
