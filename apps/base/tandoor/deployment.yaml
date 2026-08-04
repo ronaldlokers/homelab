@@ -70,8 +70,7 @@ spec:
               value: "5432"
             # Read from the Secret rather than hardcoded, so each environment
             # supplies its own role and the name cannot drift from the password
-            # (#219). Production's Secret still says `app`; staging's says
-            # `tandoor`.
+            # (#219). Both environments now say `tandoor`.
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:

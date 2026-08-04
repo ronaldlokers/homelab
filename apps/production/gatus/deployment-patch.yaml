@@ -13,7 +13,14 @@ spec:
             - secretRef:
                 name: gatus-alerting
           env:
-            # Substituted into the storage DSN in config.yaml.
+            # Both substituted into the storage DSN in config.yaml. The username
+            # comes from the Secret rather than being written into the DSN, so
+            # the role name and its password cannot drift apart (#219).
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-app-credentials
+                  key: username
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
