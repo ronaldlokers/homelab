@@ -15,15 +15,6 @@ data:
             icon: commafeed.png
             href: https://commafeed.staging.ronaldlokers.nl
             description: RSS feed reader
-        - Immich:
-            icon: immich.png
-            href: https://immich.staging.ronaldlokers.nl
-            description: Photo management
-            widget:
-              type: immich
-              url: https://immich.staging.ronaldlokers.nl
-              key: qvnCcXWT9a8SShkZCHvtgCl3SW9Ta6QLcuCBTqJD94
-              version: 2
 
     - Food:
         - Mealie:
