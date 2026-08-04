@@ -26,6 +26,32 @@ spec:
         target:
           kind: PrometheusRule
   values:
+    # Drop the highest-cardinality histogram buckets from the control-plane
+    # scrapes. Measured on staging: 67,377 active series, of which these nine
+    # metrics accounted for ~30,000 — 45% of everything Prometheus held.
+    #
+    #   7,030  apiserver_request_duration_seconds_bucket
+    #   6,560  apiserver_request_body_size_bytes_bucket
+    #   4,530  etcd_request_duration_seconds_bucket
+    #   4,272  apiserver_request_sli_duration_seconds_bucket
+    #   2,872  apiserver_response_sizes_bucket
+    #   1,568  apiserver_watch_cache_read_wait_seconds_bucket
+    #   1,287  apiserver_watch_events_sizes_bucket
+    #   1,045  workqueue_queue_duration_seconds_bucket
+    #   1,045  workqueue_work_duration_seconds_bucket
+    #
+    # Nothing here disables a scrape or a component. Only the per-bucket series
+    # are dropped; _count and _sum survive, so rates and averages still work —
+    # what is lost is the ability to compute latency percentiles for the API
+    # server, which no dashboard or alert in this repo does.
+    #
+    # Staging only. Production has the headroom and keeps full histograms.
+    kubeApiServer:
+      serviceMonitor:
+        metricRelabelings:
+          - sourceLabels: [__name__]
+            regex: "(apiserver_request_duration_seconds_bucket|apiserver_request_body_size_bytes_bucket|apiserver_request_sli_duration_seconds_bucket|apiserver_response_sizes_bucket|apiserver_watch_cache_read_wait_seconds_bucket|apiserver_watch_events_sizes_bucket|etcd_request_duration_seconds_bucket|workqueue_queue_duration_seconds_bucket|workqueue_work_duration_seconds_bucket)"
+            action: drop
     prometheus:
       prometheusSpec:
         # Staging runs on a 2-vCPU VM whose entire host CPU is an i3-7100U.

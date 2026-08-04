@@ -15,6 +15,11 @@ spec:
               value: "tandoor"
             # localhost is required: the probes send Host: localhost, and Django
             # rejects anything not listed here with 400 DisallowedHost.
+            # 740Mi measured with the default 3 workers, on a host with ~1.8Gi
+            # free. One worker is ample for a single-user staging instance and
+            # frees roughly 400Mi; production keeps the default.
+            - name: GUNICORN_WORKERS
+              value: "1"
             - name: ALLOWED_HOSTS
               value: "tandoor.staging.ronaldlokers.nl,localhost"
           # Staging runs on a 2-core node; the base requests are sized for
