@@ -21,11 +21,24 @@ spec:
       securityContext:
         fsGroup: 65534
       containers:
-        # The application. It serves no TCP port: its entrypoint ends with
-        # `gunicorn --bind unix:/tmp/tandoor.sock`, hardcoded, with no
-        # environment variable to move it. Upstream's compose pairs it with a
-        # separate nginx container, which is the sidecar below.
+        # One container. The image bundles nginx on port 80 in front of gunicorn,
+        # which binds a unix socket at /tmp/tandoor.sock. Verified in the pod:
+        #
+        #   tcp 0.0.0.0:80 LISTEN 11/nginx.pid
+        #   PID 11 nginx: master process
+        #   PID  7 gunicorn --bind unix:/tmp/tandoor.sock
+        #
+        # An nginx sidecar is NOT needed and actively breaks it — containers in
+        # a pod share a network namespace, so a second nginx fails with
+        # "bind() to 0.0.0.0:80 failed (98: Address in use)".
+        #
+        # The trap: nginx starts at the END of boot.sh, after migrations,
+        # collectstatic and gunicorn. Run netstat mid-boot and nothing is
+        # listening, which reads exactly like an image that serves no HTTP.
         - name: tandoor
+          ports:
+            - name: http
+              containerPort: 80
           securityContext:
             allowPrivilegeEscalation: false
           env:
@@ -45,50 +58,23 @@ spec:
                 secretKeyRef:
                   name: tandoor-secret
                   key: SECRET_KEY
-            # Django refuses to serve a Host header that is not listed, so a
-            # wrong value here is a hard 400 rather than a warning. Patched per
-            # environment.
+            # Django refuses any Host header not listed, so a wrong value is a
+            # hard 400 rather than a warning. Patched per environment.
             - name: ALLOWED_HOSTS
               value: "localhost"
             # Traefik terminates TLS. Without this Django builds http:// absolute
             # URLs and the login POST fails its CSRF origin check — the app comes
-            # up fine and then nobody can log in.
+            # up and then nobody can log in.
             - name: SECURE_PROXY_SSL_HEADER
               value: "True"
-          # No HTTP probe: there is no port to probe. Pod readiness is decided
-          # by the nginx container, which cannot serve anything until this one
-          # has created the socket.
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 1000m
-              # Measured 731Mi during collectstatic on first boot; a 1Gi limit
-              # left too little headroom.
-              memory: 2Gi
-          volumeMounts:
-            - name: media
-              mountPath: /opt/recipes/mediafiles
-            - name: static
-              mountPath: /opt/recipes/staticfiles
-            - name: socket
-              mountPath: /tmp
-
-        - name: nginx
-          image: nginx:1.29-alpine
-          ports:
-            - name: http
-              containerPort: 80
-          securityContext:
-            allowPrivilegeEscalation: false
-          # First boot applies 240+ Django migrations and then runs collectstatic
-          # before the socket appears, which takes well over five minutes on
-          # ARM64. Until then nginx answers 502, so this budget has to cover the
-          # app's cold start, not nginx's.
+          # First boot applies 240+ Django migrations, then collectstatic, and
+          # only then starts nginx — well over five minutes on ARM64.
           #
-          # A shorter budget killed the pod mid-migration and each restart began
-          # the whole sequence again, so it never converged.
+          # 60 x 5s was not enough: the probe killed the container mid-migration
+          # and each restart began the whole sequence again, so it never
+          # converged. 120 x 5s covers the measured cold start with room spare.
+          # This only delays detection of a container dead at startup;
+          # livenessProbe still catches one that dies later.
           startupProbe:
             httpGet:
               path: /
@@ -113,23 +99,18 @@ spec:
             failureThreshold: 3
           resources:
             requests:
-              cpu: 10m
-              memory: 32Mi
+              cpu: 100m
+              memory: 256Mi
             limits:
-              cpu: 200m
-              memory: 128Mi
+              cpu: 1000m
+              # Measured 731Mi during collectstatic on first boot; a 1Gi limit
+              # left too little headroom.
+              memory: 2Gi
           volumeMounts:
-            - name: socket
-              mountPath: /tmp
-            - name: static
-              mountPath: /static
-              readOnly: true
             - name: media
-              mountPath: /media
-              readOnly: true
-            - name: nginx-config
-              mountPath: /etc/nginx/conf.d
-              readOnly: true
+              mountPath: /opt/recipes/mediafiles
+            - name: static
+              mountPath: /opt/recipes/staticfiles
       volumes:
         - name: media
           persistentVolumeClaim:
@@ -138,9 +119,3 @@ spec:
         # losing it costs startup time, not data. See pvc.yaml.
         - name: static
           emptyDir: {}
-        # Carries the gunicorn socket between the two containers.
-        - name: socket
-          emptyDir: {}
-        - name: nginx-config
-          configMap:
-            name: tandoor-nginx
