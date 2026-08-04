@@ -71,6 +71,14 @@ spec:
         login: true
         passwordSecret:
           name: pg-role-nightscout
+      # Production only — speedtest-tracker does not run on staging, so this
+      # role has no staging counterpart. #239 declared six roles from the
+      # staging app list and missed it; production has seven consumers.
+      - name: speedtest
+        ensure: present
+        login: true
+        passwordSecret:
+          name: pg-role-speedtest
 
   priorityClassName: homelab-database
   postgresUID: 999
