@@ -26,6 +26,52 @@ spec:
   # Applications are useless until this is serving, and an app whose database
   # is down crash-loops and adds load while achieving nothing. Ranked above
   # applications, below the operator that manages it.
+  # Per-app roles. Until #219 every app authenticated as the shared `app` role,
+  # which owns every database — so any app that could read its own Secret held a
+  # credential valid against all of them. #166 stopped that being passwordless;
+  # it did not make it isolated.
+  #
+  # Declaring a role here is inert. It exists, it can log in, and nothing uses it
+  # until an application's connection string is switched over — which is
+  # deliberately a separate step, so the roles can be created and verified
+  # without any application noticing.
+  #
+  # Ownership of existing objects is NOT handled here. Every table in each
+  # database is still owned by `app`, and transferring that needs
+  # `REASSIGN OWNED BY app TO <role>` run inside each database. See the runbook.
+  managed:
+    roles:
+      - name: commafeed
+        ensure: present
+        login: true
+        passwordSecret:
+          name: pg-role-commafeed
+      - name: linkding
+        ensure: present
+        login: true
+        passwordSecret:
+          name: pg-role-linkding
+      - name: mealie
+        ensure: present
+        login: true
+        passwordSecret:
+          name: pg-role-mealie
+      - name: tandoor
+        ensure: present
+        login: true
+        passwordSecret:
+          name: pg-role-tandoor
+      - name: gatus
+        ensure: present
+        login: true
+        passwordSecret:
+          name: pg-role-gatus
+      - name: nightscout
+        ensure: present
+        login: true
+        passwordSecret:
+          name: pg-role-nightscout
+
   priorityClassName: homelab-database
   postgresUID: 999
   postgresGID: 999
