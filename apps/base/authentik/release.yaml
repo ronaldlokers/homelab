@@ -27,16 +27,26 @@ spec:
       enabled: false
 
     authentik:
-      postgresql:
-        host: postgres-cluster-rw.database.svc.cluster.local
-        port: 5432
-        name: authentik
-        user: authentik
-      # secret_key and the postgresql password come from a SOPS-encrypted
-      # Secret rather than these values, so neither is ever in plain text in
-      # git. Changing secret_key after first install invalidates every existing
-      # session and any encrypted field in the database — it is not rotatable
-      # in place.
+      # existingSecret does NOT merge with values under `authentik:`. Setting it
+      # makes the chart wire the container with a single `envFrom: secretRef`
+      # and emit no other environment at all, so anything configured here is
+      # silently ignored. Putting the database host in values and the password
+      # in the secret produced exactly that: authentik ignored the host and fell
+      # back to its built-in default.
+      #
+      #   PostgreSQL connection failed, retrying...
+      #   connection to server at "127.0.0.1", port 5432: Connection refused
+      #
+      # So the whole configuration lives in the Secret. For discoverability,
+      # since those values are encrypted and cannot be read from git:
+      #
+      #   AUTHENTIK_POSTGRESQL__HOST  postgres-cluster-rw.database.svc.cluster.local
+      #   AUTHENTIK_POSTGRESQL__PORT  5432
+      #   AUTHENTIK_POSTGRESQL__NAME  authentik
+      #   AUTHENTIK_POSTGRESQL__USER  authentik
+      #
+      # Anything added under `authentik:` here will do nothing while this is
+      # set. Add it to the Secret instead.
       existingSecret:
         secretName: authentik-secret
 

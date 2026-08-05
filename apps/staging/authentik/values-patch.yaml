@@ -4,13 +4,8 @@ metadata:
   name: authentik
 spec:
   values:
-    authentik:
-      # Staging is not reachable from the internet and holds no real identities,
-      # so error reporting stays off rather than shipping staging noise upstream.
-      error_reporting:
-        enabled: false
-      # Told explicitly, because authentik builds absolute URLs for OAuth
-      # redirects and e-mail links from this. Getting it wrong produces flows
-      # that redirect to the wrong host after a successful login.
-      web:
-        path: /
+    # Nothing under `authentik:` — existingSecret makes the chart ignore it (see
+    # the base release). Staging's error reporting is disabled via
+    # AUTHENTIK_ERROR_REPORTING__ENABLED in authentik-secret.yaml instead.
+    server:
+      replicas: 1
