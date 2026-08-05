@@ -69,12 +69,24 @@ spec:
     # so this is real, not waste), results-cache uses 30Mi against 1229Mi
     # reserved. CPU is 6m and 3m against 500m each.
     #
-    # chunks-cache is halved rather than slashed: still 4Gi of chunk cache for a
-    # 30-day store, trading some query-time cache hits for schedulable headroom.
-    # results-cache is sized to what it actually uses. A cache miss costs a read
-    # from MinIO, not an outage.
+    # chunks-cache was halved to 4096 on the reasoning that "memcached fills
+    # whatever it is given, so this is real, not waste". That was true of the
+    # 9830Mi default, where it measured 6673Mi. It is not true at 4096.
+    #
+    # Measured 2026-08-05 after 43h uptime, 0 restarts:
+    #
+    #   memcached_current_bytes  430Mi
+    #   memcached_limit_bytes   4096Mi        -> 10.5% filled
+    #
+    # It is not slowly filling, it is done: the working set is genuinely this
+    # small. 4096 reserved 4915Mi of requests — the single largest request in
+    # the cluster, ~4.4Gi of it unused, all of it on kube-srv-1.
+    #
+    # 1024 keeps 2.4x headroom over the measured working set. A cache miss costs
+    # a read from MinIO, not an outage, so the downside of being wrong here is
+    # latency rather than availability.
     chunksCache:
-      allocatedMemory: 4096
+      allocatedMemory: 1024
       allocatedCPU: 100m
     resultsCache:
       allocatedMemory: 256
@@ -84,6 +96,20 @@ spec:
 
     backend:
       replicas: 3
+      # 2Gi, down from the chart's 10Gi default. In SimpleScalable mode chunks
+      # are written through to MinIO and these volumes only ever hold the WAL,
+      # so they do not grow with retention. Measured across all six loki
+      # volumes: 30Mi total against 58Gi declared.
+      #
+      #   data-loki-write-0/1/2     0.01-0.02G of 9.7G
+      #   data-loki-backend-0/1/2   ~0.001G of 9.7G
+      #
+      # Longhorn keeps 3 replicas, so each gigabyte declared here is three on
+      # disk. Careful with Longhorn actualSize when checking this: it counts
+      # snapshots, and reported these volumes at ~10.2G — full — when the
+      # filesystem held 11Mi.
+      persistence:
+        size: 2Gi
       extraEnvFrom:
         - secretRef:
             name: loki-s3-secret
@@ -94,6 +120,20 @@ spec:
             name: loki-s3-secret
     write:
       replicas: 3
+      # 2Gi, down from the chart's 10Gi default. In SimpleScalable mode chunks
+      # are written through to MinIO and these volumes only ever hold the WAL,
+      # so they do not grow with retention. Measured across all six loki
+      # volumes: 30Mi total against 58Gi declared.
+      #
+      #   data-loki-write-0/1/2     0.01-0.02G of 9.7G
+      #   data-loki-backend-0/1/2   ~0.001G of 9.7G
+      #
+      # Longhorn keeps 3 replicas, so each gigabyte declared here is three on
+      # disk. Careful with Longhorn actualSize when checking this: it counts
+      # snapshots, and reported these volumes at ~10.2G — full — when the
+      # filesystem held 11Mi.
+      persistence:
+        size: 2Gi
       extraEnvFrom:
         - secretRef:
             name: loki-s3-secret
