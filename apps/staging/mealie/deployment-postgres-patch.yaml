@@ -48,6 +48,33 @@ spec:
             # trade worth making while this is the first client being proven.
             - name: OIDC_AUTO_REDIRECT
               value: "false"
+            # Mealie refuses a login whose ID token lacks email_verified:
+            #
+            #   [OIDC] email_verified claim is missing or false; refusing to
+            #          authenticate
+            #   [OIDC] Required claims not present in ID token or userinfo
+            #   401 Unauthorized
+            #
+            # authentik's built-in email scope mapping hardcodes
+            # `"email_verified": False`, which is accurate — this instance has
+            # no SMTP and no verification flow, so no address here has ever been
+            # proven. akadmin's came from AUTHENTIK_BOOTSTRAP_EMAIL.
+            #
+            # The alternative fix is editing that mapping to return True, and it
+            # is worse: the claim is asserted to EVERY client, so one relaxation
+            # would silently weaken every future integration. Scoping the
+            # relaxation to this one application keeps the lie out of the
+            # identity provider.
+            #
+            # REVISIT IF SELF-ENROLMENT IS EVER ENABLED. Today authentik has no
+            # enrolment flow, so addresses are only ever set by an administrator
+            # and cannot be claimed by their owner-to-be. If users can ever
+            # register themselves, an unverified address plus email-based
+            # account matching lets someone claim another person's Mealie
+            # account — at which point this must become real verification
+            # rather than a disabled check.
+            - name: OIDC_REQUIRES_EMAIL_VERIFICATION
+              value: "false"
             - name: DB_ENGINE
               value: "postgres"
             - name: POSTGRES_SERVER
