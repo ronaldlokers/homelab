@@ -169,3 +169,28 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+---
+# Allow authentik pods to talk to each other.
+#
+# Without this the namespace's default-deny-ingress blocks server<->worker
+# traffic, and it is not obvious that anything is wrong: both Deployments still
+# report 1/1 because kubelet's probes are not subject to NetworkPolicy. The
+# symptom is a pod inside the namespace being unable to reach
+# authentik-server at all, which is also what makes the API unusable from
+# anywhere except Traefik.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: authentik
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}
