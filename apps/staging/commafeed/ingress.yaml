@@ -3,7 +3,7 @@ kind: Ingress
 metadata:
   name: commafeed
   annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    cert-manager.io/cluster-issuer: "letsencrypt-production"
     traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
 spec:
   ingressClassName: "traefik"
