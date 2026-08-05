@@ -8,33 +8,50 @@ ui:
   header: "Homelab Status (staging)"
 
 endpoints:
-  # Staging apps use the Let's Encrypt *staging* issuer (untrusted CA), so
-  # skip TLS verification here. Cert-expiry checks are dropped for these —
-  # meaningless on throwaway staging certs. Kept on real external targets.
+  # Staging moved to the Let's Encrypt *production* issuer in #275, so these
+  # certificates are publicly trusted and verification is on. Expiry is
+  # checked here too now that the certificates are real ones worth watching —
+  # a renewal that silently stops working is otherwise invisible until the
+  # browser says so.
   - name: linkding
     group: homelab
     url: "https://linkding.staging.ronaldlokers.nl/health"
     interval: 60s
-    client:
-      insecure: true
     conditions:
       - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
   - name: immich
     group: homelab
     url: "https://immich.staging.ronaldlokers.nl/api/server/ping"
     interval: 60s
-    client:
-      insecure: true
     conditions:
       - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
   - name: mealie
     group: homelab
     url: "https://mealie.staging.ronaldlokers.nl/api/app/about"
     interval: 60s
-    client:
-      insecure: true
     conditions:
       - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+  # authentik is deliberately watched from Gatus rather than the other way
+  # round. Gatus itself stays outside SSO precisely so that this check is
+  # readable during an authentik outage — a status page that needs the thing
+  # it is reporting on tells you nothing at the only moment it matters.
+  - name: authentik
+    group: homelab
+    url: "https://authentik.staging.ronaldlokers.nl/-/health/live/"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
+  - name: tandoor
+    group: homelab
+    url: "https://tandoor.staging.ronaldlokers.nl/"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
   - name: lokilabs-healthz
     group: external
     url: "https://lokilabs.nl/api/healthz"
