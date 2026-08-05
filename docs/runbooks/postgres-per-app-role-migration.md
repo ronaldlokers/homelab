@@ -222,6 +222,46 @@ Authentication and authorization are separate problems, and fixing the first can
 
 New apps should never touch the `app` role. Create the database with `spec.owner: <role>` from the start and the whole procedure above collapses into declaring the role — there are no existing objects to transfer and PUBLIC's `CONNECT` can be revoked immediately.
 
+## Revoking on the `postgres` database breaks replication
+
+Everything above concerns per-app databases. The shared `postgres` database is a
+different animal, and revoking `PUBLIC`'s `CONNECT` there **breaks CloudNativePG
+replica rejoin** — silently, until the next time a replica restarts.
+
+```
+FATAL: permission denied for database "postgres"   user=streaming_replica
+```
+
+`streaming_replica` is **not** a superuser, so it does not bypass `CONNECT`, and
+CNPG uses `database=postgres` for the connection a replica makes when it rejoins.
+Nothing fails at the moment of the revoke: existing replicas hold open
+connections and keep streaming. The break only appears on a switchover, a node
+failure, or any pod restart — precisely when HA is supposed to save you.
+
+Measured on production 2026-08-05: a planned switchover left the demoted instance
+stuck `0/1 Running` for 13 minutes, retrying every 5 seconds, until:
+
+```sql
+GRANT CONNECT ON DATABASE postgres TO streaming_replica;
+```
+
+after which it rejoined immediately.
+
+**So if you revoke on `postgres`, grant `streaming_replica` back in the same
+transaction.** Checking live connections beforehand does not protect you —
+`streaming_replica` only connects when a replica rejoins, so it is absent from
+`pg_stat_activity` exactly when you are deciding whether the revoke is safe.
+
+```sql
+-- expect t on every cluster
+SELECT has_database_privilege('streaming_replica', 'postgres', 'CONNECT');
+```
+
+Worth knowing: none of this is declarative. The revokes and grants are hand-run
+SQL, so a cluster rebuilt from backup comes back with PostgreSQL's defaults —
+`PUBLIC` able to connect everywhere, and this problem gone along with the
+isolation it came from.
+
 ## Not covered by this runbook
 
 **Apps sharing the `postgres` database.** Nightscout reaches Postgres through FerretDB, which stores its data in the shared `postgres` database rather than a per-app one. Revoking `CONNECT` there would also hit the CloudNativePG operator and the monitoring exporter. That needs its own design, not this recipe.
