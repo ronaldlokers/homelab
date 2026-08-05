@@ -84,10 +84,16 @@ spec:
 
   postgresql:
     # Load DocumentDB extensions
+    # pg_documentdb_core and pg_documentdb are gone: the extension they back was
+    # dropped from this cluster once Nightscout moved to its own (#249).
+    #
+    # pg_cron stays. It was only ever here for DocumentDB's four maintenance
+    # jobs, all now unscheduled, so nothing uses it today — but removing it
+    # means a postmaster restart AND leaves cron.database_name pointing at an
+    # extension that no longer exists, and it costs nothing idle. Left for a
+    # change that is about pg_cron rather than a side effect of this one.
     shared_preload_libraries:
       - pg_cron
-      - pg_documentdb_core
-      - pg_documentdb
     parameters:
       max_connections: "100"
       shared_buffers: "256MB"
@@ -122,14 +128,20 @@ spec:
     initdb:
       database: app
       owner: app
-      # A fresh initdb DB has no extensions; on production these come from the
-      # restore. FerretDB (nightscout) needs the DocumentDB extension, which
-      # must live in the "postgres" DB (pg_cron is pinned there). postInitSQL
-      # runs as superuser against the postgres DB at bootstrap; grant the app
-      # user the documentdb role so FerretDB can use documentdb_api.
-      postInitSQL:
-        - CREATE EXTENSION IF NOT EXISTS documentdb CASCADE;
-        - GRANT documentdb_admin_role TO app;
+      # No postInitSQL. This used to create the DocumentDB extension here,
+      # because FerretDB stored Nightscout's data in this cluster's `postgres`
+      # database — the only database DocumentDB can live in, since it depends on
+      # pg_cron and pg_cron installs only into cron.database_name.
+      #
+      # That is exactly why Nightscout could not be isolated per-database and
+      # got its own cluster instead (#249). Since the cutover this cluster's
+      # copy has been dead weight, and it was expensive dead weight: DocumentDB
+      # schedules four pg_cron jobs, two of them every two seconds, and pg_cron
+      # logs every run with no retention. cron.job_run_details had reached
+      # 16,468,699 rows / 2,927 MB — the `postgres` database was 2969 MB, of
+      # which 23 MB was the actual glucose data and the rest was the log of
+      # maintenance jobs looking after it. After dropping the extension and
+      # truncating that table: 17 MB.
 
   storage:
     size: 10Gi
