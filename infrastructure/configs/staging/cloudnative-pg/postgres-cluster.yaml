@@ -74,6 +74,14 @@ spec:
   # Enable superuser access for extension management
   enableSuperuserAccess: true
 
+  # Exports the #219 isolation invariant so drift is detectable. See
+  # isolation-queries.yaml for why measuring it matters more than the
+  # config being declarative.
+  monitoring:
+    customQueriesConfigMap:
+      - name: cnpg-isolation-queries
+        key: isolation.yaml
+
   postgresql:
     # Load DocumentDB extensions
     shared_preload_libraries:

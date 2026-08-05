@@ -8,6 +8,51 @@ metadata:
     app.kubernetes.io/name: cloudnativepg
 spec:
   groups:
+    # #219 gave every application its own database and enforced it by revoking
+    # PUBLIC's CONNECT. That is hand-run SQL with nothing reproducing or
+    # checking it, and on 2026-08-05 it broke replication for four hours without
+    # a single signal turning red. These two alerts are the check that was
+    # missing.
+    - name: postgres_isolation_alerts
+      rules:
+        # The exact failure of 2026-08-05. REVOKE CONNECT ON DATABASE postgres
+        # FROM PUBLIC removed the only grant streaming_replica had —
+        # CloudNativePG's replication role is deliberately not a superuser, so
+        # unlike pg_cron it does not bypass CONNECT — and CNPG uses
+        # database=postgres for the connection a replica makes when it rejoins.
+        #
+        # Nothing surfaced it, because CONNECT is evaluated at connection time:
+        # replicas already streaming carried on, and the broken path only runs
+        # when one restarts. It took a planned switchover to expose it, thirteen
+        # minutes of a demoted instance retrying every five seconds.
+        #
+        # Critical rather than warning: the cluster is serving fine, but it can
+        # no longer rebuild a replica, so the next node failure is the one that
+        # finds out.
+        - alert: PostgreSQLReplicationRoleCannotConnect
+          annotations:
+            summary: "streaming_replica cannot connect to the postgres database on {{ $labels.pod }}"
+            description: "CloudNativePG uses database=postgres for replica rejoin, and streaming_replica is not a superuser so it does not bypass CONNECT. Replication looks healthy until a replica restarts, then it cannot rejoin. Fix with: GRANT CONNECT ON DATABASE postgres TO streaming_replica;"
+          expr: |
+            cnpg_pg_database_access_replica_connect{datname="postgres"} == 0
+          for: 5m
+          labels:
+            severity: critical
+        # The isolation itself. app and nightscout are deliberately excluded:
+        # `app` is CloudNativePG's own default database and `nightscout` is an
+        # empty leftover that nothing reads — FerretDB stores the glucose data
+        # in the shared postgres database, which is why #249 gave Nightscout its
+        # own cluster rather than its own database here.
+        - alert: PostgreSQLDatabaseNotIsolated
+          annotations:
+            summary: "PUBLIC can connect to database {{ $labels.datname }}"
+            description: "Database {{ $labels.datname }} has lost the REVOKE that isolates it, so any role in the cluster can connect to it. This is the state #219 removed. A cluster rebuilt with initdb rather than restored from backup comes back this way. Fix with: REVOKE CONNECT ON DATABASE {{ $labels.datname }} FROM PUBLIC;"
+          expr: |
+            cnpg_pg_database_access_public_connect{datname!~"app|nightscout|postgres"} == 1
+          for: 15m
+          labels:
+            severity: warning
+
     - name: postgres_archiving_alerts
       rules:
         # Fires when the most recent archive attempt failed, i.e. archiving is
