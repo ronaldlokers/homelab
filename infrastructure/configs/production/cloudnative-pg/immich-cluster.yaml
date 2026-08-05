@@ -108,6 +108,15 @@ spec:
   # THE RULE THIS KEEPS BREAKING: after any recovery, the archive prefix must be
   # bumped again and this source pointed at the prefix just recovered from.
   # Rotating one without the other is what produced the stale pointer above.
+  #
+  # AND THE RULE THAT PRODUCED #167: the prefix you rotate away from must be
+  # DELETED in the same change that retires it. Doing those as two steps left
+  # four dead prefixes holding 51.9 GB — 90% of the bucket — and, worse, four
+  # extra wrong answers to "which prefix do I restore from". Twice that question
+  # was answered wrongly (#238, #257).
+  #
+  # Rotated 2026-08-05: recovered from production-2026-08-immich/ during the
+  # #260 shrink, so that prefix is now the source and 2026-07 was deleted.
   bootstrap:
     recovery:
       source: clusterBackup

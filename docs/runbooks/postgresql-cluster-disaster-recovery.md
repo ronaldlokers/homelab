@@ -142,6 +142,30 @@ the **archive destination** on distinct paths. This repo does that with dated
    (bump the month/date). This becomes the recovered cluster's fresh timeline.
 3. After recovery, trigger a `Backup` so a base backup exists on the new prefix
    before relying on it for PITR.
+4. **Delete the prefix you rotated away from, in the same change.** This step is
+   new because skipping it is what produced #167: four dead prefixes holding
+   51.9 GB, 90% of the bucket. Cost was never the issue — at B2 pricing that is
+   about $0.31/month. The issue is that each dead prefix is another plausible
+   answer to "which one do I restore from", and that question has now been
+   answered wrongly twice (#238 on postgres-cluster, #257 on immich, six weeks
+   stale and would have reported Ready).
+
+   Note the bucket has **versioning enabled**, so `aws s3 rm --recursive` frees
+   nothing — it only writes delete markers. Deletion must enumerate and remove
+   object *versions*:
+
+   ```bash
+   aws --endpoint-url https://s3.eu-central-003.backblazeb2.com \
+     s3api list-object-versions --bucket homelab-postgres-backups --prefix "<retired>/" \
+     --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' > /tmp/v.json
+   aws --endpoint-url ... s3api delete-objects --bucket homelab-postgres-backups \
+     --delete file:///tmp/v.json
+   ```
+
+   Delete markers (`DeleteMarkers[]`) need the same treatment. The in-cluster
+   `b2-credentials` key can do this but **cannot** manage bucket lifecycle rules
+   — `AccessDenied: not entitled` — so an automated age-out rule has to be set
+   in the Backblaze console with a more privileged key.
 
 > The `serverName` under `externalClusters` identifies the source server inside
 > that prefix; keep it matching the cluster name of the generation you are
