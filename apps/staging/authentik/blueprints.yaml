@@ -1,0 +1,72 @@
+# authentik's OIDC clients, declared rather than clicked or curl'd.
+#
+# The main objection to authentik over Authelia was that its configuration lives
+# in its own database and so is not reproducible from this repo. Blueprints are
+# authentik's answer to that: YAML applied on startup, re-applied hourly, and
+# rolled back atomically if any entry fails.
+#
+# The chart mounts this ConfigMap at /blueprints/custom, which the container
+# watches, so a change here reaches authentik the same way every other change in
+# this repo reaches its cluster.
+#
+# grant_types is spelled out because omitting it is silent and fatal. Creating
+# this provider through the API without it produced an empty list, and authentik
+# then rejected every authorization request with the generic OAuth error
+# `invalid_request` / "The request is otherwise malformed" — while logging the
+# real reason, "Invalid grant_type for provider", only server-side. The web UI
+# defaults this field; the API does not.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authentik-blueprints
+  namespace: authentik
+data:
+  mealie.yaml: |
+    version: 1
+    metadata:
+      name: mealie-staging
+    entries:
+      - model: authentik_providers_oauth2.oauth2provider
+        id: mealie-provider
+        state: present
+        identifiers:
+          name: mealie-staging
+        attrs:
+          client_type: confidential
+          # authorization_code is what the browser flow needs; refresh_token
+          # lets Mealie keep a session without bouncing the user back to
+          # authentik on every expiry.
+          grant_types:
+            - authorization_code
+            - refresh_token
+          # Mealie matches accounts on the email claim, so the subject must be
+          # the email rather than authentik's opaque user UUID — otherwise every
+          # login looks like a different person.
+          sub_mode: user_email
+          authorization_flow:
+            !Find [authentik_flows.flow, [slug, default-provider-authorization-explicit-consent]]
+          invalidation_flow:
+            !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+          signing_key:
+            !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+          property_mappings:
+            - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+            - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+            - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+          redirect_uris:
+            # Mealie sends the browser to /login and completes the exchange at
+            # /api/auth/oauth/callback; both must be registered or authentik
+            # refuses the request.
+            - matching_mode: strict
+              url: https://mealie.staging.ronaldlokers.nl/login
+            - matching_mode: strict
+              url: https://mealie.staging.ronaldlokers.nl/api/auth/oauth/callback
+      - model: authentik_core.application
+        state: present
+        identifiers:
+          slug: mealie-staging
+        attrs:
+          name: Mealie (staging)
+          provider: !KeyOf mealie-provider
+          meta_launch_url: https://mealie.staging.ronaldlokers.nl
+          meta_description: Recipe manager

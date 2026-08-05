@@ -4,6 +4,7 @@ namespace: authentik
 resources:
   - ../../base/authentik
   - authentik-secret.yaml
+  - blueprints.yaml
   - ingress.yaml
 patches:
   - path: values-patch.yaml
