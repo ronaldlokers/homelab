@@ -1,0 +1,31 @@
+# Egress to authentik, for the half of OIDC that the browser never touches.
+#
+# The login redirect happens in the user's browser and needs nothing from this
+# policy. But the application itself fetches the discovery document and then
+# exchanges the authorization code for a token, server to server, and it does
+# so against authentik's public URL — which resolves to the cluster's own
+# ingress address:
+#
+#   authentik.staging.ronaldlokers.nl -> 10.0.40.52
+#
+# That address sits inside 10.0.0.0/8, which allow-internet-egress deliberately
+# excludes as an SSRF guard. So without this rule the login fails at the token
+# exchange with connection refused, after authentik has already said yes.
+#
+# Narrower than re-allowing the private range: one address, one port.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-oidc-egress
+  namespace: mealie
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.40.52/32
+      ports:
+        - protocol: TCP
+          port: 443
