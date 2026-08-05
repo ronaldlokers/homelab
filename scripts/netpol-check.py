@@ -34,7 +34,11 @@ import subprocess
 import sys
 import time
 
-PROBE_IMAGE = "alpine:3.20"
+# Ships python3, so the probe needs no network to start. An image that
+# installs its tools at runtime cannot probe an egress-denied pod: the
+# install is itself blocked, and the result reads as "no output" rather
+# than as the denial it is.
+PROBE_IMAGE = "python:3.12-alpine"
 PROBE_CONTAINER = "netpol-probe"
 
 # Destinations that no application policy grants. Reaching one means the
@@ -118,7 +122,7 @@ def nodes(ctx):
     return [n["metadata"]["name"] for n in d["items"]]
 
 
-def guarded_pod_on(ctx, node):
+def guarded_pod_on(ctx, node, exclude_ns=()):
     """An existing pod on this node whose namespace denies egress by default.
 
     Deliberately an *existing* pod rather than one this script creates. A
@@ -129,7 +133,10 @@ def guarded_pod_on(ctx, node):
     that, and it is the state that actually matters.
 
     Host-network pods are skipped: they share the node's namespace, so they
-    are not subject to pod policy and would always look unenforced.
+    are not subject to pod policy and would always look unenforced. So is the
+    probe target's own namespace -- a pod there usually may reach its
+    neighbours, which is a permission rather than a failure to filter, and
+    reading it as one reports a healthy node as broken.
     """
     guarded = set()
     for p in json.loads(kubectl(ctx, "get", "networkpolicy", "-A", "-o", "json"))["items"]:
@@ -148,13 +155,17 @@ def guarded_pod_on(ctx, node):
             continue
         if p["metadata"]["namespace"] not in guarded:
             continue
-        # Skip pods that already carry a probe from an earlier run: an
-        # ephemeral container cannot be replaced, only added.
-        names = [c["name"] for c in p["spec"].get("ephemeralContainers", [])]
-        if PROBE_CONTAINER in names:
+        if p["metadata"]["namespace"] in exclude_ns:
             continue
-        return p["metadata"]["namespace"], p["metadata"]["name"]
-    return None, None
+        # An ephemeral container cannot be replaced or removed, so each run
+        # adds a new one rather than skipping pods it has probed before.
+        # Skipping them instead exhausts the candidates: after a few runs a
+        # node has no eligible pod left and reports INCONCLUSIVE, which reads
+        # as a fault in the cluster rather than in the check.
+        used = [c["name"] for c in p["spec"].get("ephemeralContainers", [])
+                if c["name"].startswith(PROBE_CONTAINER)]
+        return p["metadata"]["namespace"], p["metadata"]["name"], f"{PROBE_CONTAINER}-{len(used) + 1}"
+    return None, None, None
 
 
 def check_enforcement(ctx):
@@ -166,15 +177,15 @@ def check_enforcement(ctx):
             "-o", "jsonpath={.items[0].status.podIP}", check=False,
         )
         if out.strip():
-            target = (out.strip(), port)
+            target = (out.strip(), port, ns)
             break
     if not target:
         return [("-", None, "no probe target found; cannot test enforcement")]
 
-    host, port = target
+    host, port, target_ns = target
     results = []
     for node in nodes(ctx):
-        ns, pod = guarded_pod_on(ctx, node)
+        ns, pod, container = guarded_pod_on(ctx, node, exclude_ns=(target_ns,))
         if not pod:
             results.append((node, None, "no egress-denied pod running here to probe from"))
             continue
@@ -183,16 +194,14 @@ def check_enforcement(ctx):
         # it is filtered by exactly the chains that pod's traffic is.
         subprocess.run(
             ["kubectl", f"--context={ctx}", "debug", "-n", ns, pod,
-             f"--image={PROBE_IMAGE}", f"--container={PROBE_CONTAINER}", "-q", "--",
-             "sh", "-c",
-             "apk add --no-cache python3 >/dev/null 2>&1; "
-             f"python3 -c \"{probe_script(host, port)}\""],
+             f"--image={PROBE_IMAGE}", f"--container={container}", "-q", "--",
+             "python3", "-c", probe_script(host, port)],
             capture_output=True, text=True, timeout=180,
         )
 
         verdict, deadline = "ERROR no-result", time.time() + 180
         while time.time() < deadline:
-            out = kubectl(ctx, "logs", "-n", ns, pod, "-c", PROBE_CONTAINER, check=False)
+            out = kubectl(ctx, "logs", "-n", ns, pod, "-c", container, check=False)
             hit = [l for l in out.splitlines() if l.startswith(("ALLOWED", "BLOCKED", "ERROR"))]
             if hit:
                 verdict = hit[-1]
@@ -202,7 +211,11 @@ def check_enforcement(ctx):
         # The source namespace denies egress by default and nothing grants
         # this destination, so anything other than BLOCKED means this node is
         # not applying the policy.
-        results.append((node, verdict.startswith("BLOCKED"), f"{verdict}, from {ns}/{pod}"))
+        if verdict.startswith("ERROR"):
+            enforcing = None  # inconclusive, not a result
+        else:
+            enforcing = verdict.startswith("BLOCKED")
+        results.append((node, enforcing, f"{verdict}, from {ns}/{pod}"))
     return results
 
 
@@ -235,6 +248,10 @@ def main():
         for node, enforcing, detail in check_enforcement(ctx):
             if enforcing:
                 print(f"  {node:<24} enforcing        ({detail})")
+            elif enforcing is None:
+                failed = True
+                print(f"  {node:<24} INCONCLUSIVE     ({detail})")
+                print(f"  {'':<24} the probe produced no verdict; this is not evidence either way")
             else:
                 failed = True
                 print(f"  {node:<24} NOT ENFORCING    ({detail})")
