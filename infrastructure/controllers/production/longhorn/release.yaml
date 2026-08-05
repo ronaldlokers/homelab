@@ -45,6 +45,33 @@ spec:
       # degraded volumes entirely, which is why the 19/19 healthy precondition
       # matters before this merges.
       concurrentAutomaticEngineUpgradePerNodeLimit: 1
+      # Longhorn detects orphaned replica directories — data left on disk for
+      # replicas it has since rebuilt elsewhere — and files an Orphan resource
+      # for each. It deletes none of them unless this names the types to reap,
+      # and it defaults to empty.
+      #
+      # The result was 24 orphans holding 137.4G, every one detected on
+      # 2026-08-01 at 19:57 and 20:06 — the etcd NVMe migration, node by node.
+      # Each node was stopped, its NVMe remounted and restarted; Longhorn
+      # rescanned on re-registration, found replica directories whose replicas
+      # had been rebuilt during the outage, and correctly flagged them.
+      #
+      # Four days later they were still there, and they were the entire reason
+      # the three nodes looked so unevenly used:
+      #
+      #   node          used   orphaned      REAL
+      #   kube-srv-1    270G     101.8G     168.2G
+      #   kube-srv-2    157G       0.0G     157.0G
+      #   kube-srv-3    197G      35.6G     161.4G
+      #
+      # kube-srv-2 was migrated first and escaped: it is the rebuild onto the
+      # OTHER nodes that strands the old directory.
+      #
+      # So this is not a one-off cleanup — every future node reboot recreates
+      # the condition. orphan-resource-auto-deletion-grace-period is 300s, so a
+      # directory has to stay orphaned for five minutes before it is removed;
+      # nothing is deleted the instant it is detected.
+      orphanResourceAutoDeletion: "replica-data;instance"
     # Configure default StorageClass with 3 replicas
     persistence:
       defaultClass: true
