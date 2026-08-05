@@ -14,8 +14,10 @@ spec:
     global:
       volumes:
         - name: blueprints
-          configMap:
-            name: authentik-blueprints
+          secret:
+            # A Secret, not a ConfigMap: it carries the OIDC client secrets so
+            # that recreating authentik does not invalidate every client.
+            secretName: authentik-blueprints
       volumeMounts:
         - name: blueprints
           mountPath: /blueprints/custom

@@ -1,72 +1,42 @@
 # authentik's OIDC clients, declared rather than clicked or curl'd.
 #
-# The main objection to authentik over Authelia was that its configuration lives
-# in its own database and so is not reproducible from this repo. Blueprints are
-# authentik's answer to that: YAML applied on startup, re-applied hourly, and
-# rolled back atomically if any entry fails.
+# The objection to authentik over Authelia was that its configuration lives in
+# its own database and is not reproducible from this repo. Blueprints answer
+# that: applied on startup, re-applied hourly, rolled back atomically on error.
+# Verified enforcing: sub_mode was changed by hand and corrected on reapply.
 #
-# The chart mounts this ConfigMap at /blueprints/custom, which the container
-# watches, so a change here reaches authentik the same way every other change in
-# this repo reaches its cluster.
+# This is a Secret rather than a ConfigMap because it declares client_id and
+# client_secret. Letting authentik generate those leaves the working values only
+# in its database, so recreating it breaks every client at once — the coupling
+# that took Immich down in #268. Fixed here, authentik can be rebuilt from
+# nothing and the applications keep working.
 #
-# grant_types is spelled out because omitting it is silent and fatal. Creating
-# this provider through the API without it produced an empty list, and authentik
-# then rejected every authorization request with the generic OAuth error
-# `invalid_request` / "The request is otherwise malformed" — while logging the
-# real reason, "Invalid grant_type for provider", only server-side. The web UI
-# defaults this field; the API does not.
+# grant_types is spelled out because omitting it is silent and fatal: the field
+# defaults to empty via the API (the web UI defaults it properly), and authentik
+# then rejects every authorization with the generic `invalid_request` /
+# "The request is otherwise malformed", logging the real cause only server-side.
+# Note authentik REFUSES an explicitly empty list — omission is the only way to
+# reach that state, which is what makes it easy to hit and hard to see.
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
-  name: authentik-blueprints
-  namespace: authentik
-data:
-  mealie.yaml: |
-    version: 1
-    metadata:
-      name: mealie-staging
-    entries:
-      - model: authentik_providers_oauth2.oauth2provider
-        id: mealie-provider
-        state: present
-        identifiers:
-          name: mealie-staging
-        attrs:
-          client_type: confidential
-          # authorization_code is what the browser flow needs; refresh_token
-          # lets Mealie keep a session without bouncing the user back to
-          # authentik on every expiry.
-          grant_types:
-            - authorization_code
-            - refresh_token
-          # Mealie matches accounts on the email claim, so the subject must be
-          # the email rather than authentik's opaque user UUID — otherwise every
-          # login looks like a different person.
-          sub_mode: user_email
-          authorization_flow:
-            !Find [authentik_flows.flow, [slug, default-provider-authorization-explicit-consent]]
-          invalidation_flow:
-            !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
-          signing_key:
-            !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
-          property_mappings:
-            - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
-            - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
-            - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
-          redirect_uris:
-            # Mealie sends the browser to /login and completes the exchange at
-            # /api/auth/oauth/callback; both must be registered or authentik
-            # refuses the request.
-            - matching_mode: strict
-              url: https://mealie.staging.ronaldlokers.nl/login
-            - matching_mode: strict
-              url: https://mealie.staging.ronaldlokers.nl/api/auth/oauth/callback
-      - model: authentik_core.application
-        state: present
-        identifiers:
-          slug: mealie-staging
-        attrs:
-          name: Mealie (staging)
-          provider: !KeyOf mealie-provider
-          meta_launch_url: https://mealie.staging.ronaldlokers.nl
-          meta_description: Recipe manager
+    name: authentik-blueprints
+    namespace: authentik
+type: Opaque
+stringData:
+    mealie.yaml: ENC[AES256_GCM,data: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,iv:TeW9L3khYsPhelgRZFY7i4H4MaG7V9Xy4E25nW8AymI=,tag:GWC4jNxSeaSkThQpwIHjCw==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBzenV5cGUreGNqS1ZsTE5r
+            cGpXK1NKTk5NTjB4djBXaktXZk5CTUlGejFZClNiY29ibjBtdzNwYlc1ejJHMGQ2
+            M3ZxY0hwYjBjci9zRU1BVitTdlJIakkKLS0tIHZNQmc3U3hveElsbHN2aE5ubkVI
+            Ym80dDgyYWZKa3Z3Q2luVDZvazdiYVEKx+7UgjbyZoDwIHQcnBiHuSuxshoiYD1Q
+            II/WzrJcYoBqGnZ4h8+vBAJPzsaaS/5Yc6sqZW954tde8ZKg6GU5vA==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1uq9nturwsx36q045qtrm85lkg8qmzpgk9srduqesxs2ahjurw53sp9rhm6
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-08-05T21:28:01Z"
+    mac: ENC[AES256_GCM,data:Njhj5jT/jzPEh6+GakF78EYq5K+kAGq+NYGqpojJsgAv3YpGpQu0QzOm2fxsZ0sGbdY8xYppYq35KLJ5VCaV7isCLn9UdxU15WBF64CeZINFLz/czaaaT4eUggRuWabjfzwSVki+sRdpIiyAjZGilT76nJ/epqk/MN2n2LI2n8k=,iv:GiN4CeO50bFBRYDV+WIftZE07dmIhqQE+OjIFCnEc9Q=,tag:MMZ2bkIMhtBsNS9D2Mlr+Q==,type:str]
+    version: 3.13.3
