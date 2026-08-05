@@ -6,5 +6,6 @@ resources:
 - postgres-credentials-secret.yaml
 - ../../base/mealie/
 - ingress.yaml
+- network-policy-oidc.yaml
 patches:
 - path: deployment-postgres-patch.yaml
