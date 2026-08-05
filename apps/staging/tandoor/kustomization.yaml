@@ -4,6 +4,7 @@ namespace: tandoor
 resources:
   - postgres-credentials-secret.yaml
   - tandoor-secret.yaml
+  - tandoor-oidc-secret.yaml
   - ../../base/tandoor/
   - ingress.yaml
 patches:
