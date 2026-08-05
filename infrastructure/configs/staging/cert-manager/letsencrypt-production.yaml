@@ -1,0 +1,41 @@
+# Real, publicly-trusted certificates for staging.
+#
+# staging previously issued only from letsencrypt-staging, whose root —
+# "(STAGING) Dastardly Durum YR1" — is in no trust store anywhere. In a browser
+# that is a warning you click past, so it went unnoticed for a long time. It is
+# not survivable for anything that verifies TLS without a human present:
+#
+#   SSL: CERTIFICATE_VERIFY_FAILED — unable to get local issuer certificate
+#
+# That is Mealie failing to fetch authentik's OIDC discovery document. Every
+# server-to-server integration hits the same wall, so staging could not
+# rehearse SSO at all — which is precisely what staging exists to do.
+#
+# Rate limits are not a concern at this size: Let's Encrypt allows 50
+# certificates per registered domain per week, and staging issues exactly one
+# wildcard, renewed roughly every 60 days.
+#
+# letsencrypt-staging is kept alongside this, unused, as an escape hatch for
+# any future change that might burn through issuance attempts.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-production
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: ronald@lokers.email
+    privateKeySecretRef:
+      # A distinct ACME account key from the staging issuer's. Sharing one
+      # across ACME environments does not work — the account is registered per
+      # directory endpoint.
+      name: letsencrypt-production
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
+        selector:
+          dnsZones:
+            - ronaldlokers.nl

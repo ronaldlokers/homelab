@@ -5,8 +5,16 @@ metadata:
   namespace: kube-system
 spec:
   secretName: wildcard-staging-ronaldlokers-nl-tls
+  # letsencrypt-production, not -staging. The staging ACME root is trusted by
+  # nothing, which is invisible in a browser (one click) and fatal to any
+  # server-to-server call that verifies TLS. See letsencrypt-production.yaml.
+  #
+  # This secret is also Traefik's default certificate (traefik-default-cert.yaml),
+  # so it is what every staging hostname actually presents — the per-namespace
+  # `tls.secretName` on each Ingress refers to a Secret that does not exist in
+  # that namespace and silently falls back to this one.
   issuerRef:
-    name: letsencrypt-staging
+    name: letsencrypt-production
     kind: ClusterIssuer
   dnsNames:
     - "*.staging.ronaldlokers.nl"
