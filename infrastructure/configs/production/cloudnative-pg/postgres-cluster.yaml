@@ -103,10 +103,16 @@ spec:
 
   postgresql:
     # Load DocumentDB extensions
+    # pg_documentdb_core and pg_documentdb are gone: the extension they back was
+    # dropped from this cluster once Nightscout moved to its own (#249).
+    #
+    # pg_cron stays. It was only ever here for DocumentDB's four maintenance
+    # jobs, all now unscheduled, so nothing uses it today — but removing it
+    # means a postmaster restart AND leaves cron.database_name pointing at an
+    # extension that no longer exists, and it costs nothing idle. Left for a
+    # change that is about pg_cron rather than a side effect of this one.
     shared_preload_libraries:
       - pg_cron
-      - pg_documentdb_core
-      - pg_documentdb
     parameters:
       max_connections: "100"
       shared_buffers: "256MB"

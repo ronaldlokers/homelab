@@ -14,5 +14,4 @@ resources:
   - commafeed-database.yaml
   - linkding-database.yaml
   - mealie-database.yaml
-  - nightscout-database.yaml
   - tandoor-database.yaml
