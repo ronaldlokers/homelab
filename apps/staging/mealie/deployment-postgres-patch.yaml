@@ -14,7 +14,40 @@ spec:
             requests:
               cpu: 25m
           image: ghcr.io/mealie-recipes/mealie:v3.22.0
+          # OIDC via authentik (#270). Non-secret settings are here so they are
+          # readable; the client id and secret come from the SOPS-encrypted
+          # mealie-oidc Secret.
+          #
+          # OIDC_SIGNUP_ENABLED lets a successful authentik login create the
+          # Mealie account on first use. Without it every user must be created
+          # by hand first, which defeats the point of federating login. It is
+          # safe here because authentik decides who may reach the application at
+          # all — Mealie never sees an unauthorised user.
+          #
+          # The provider is reached over HTTPS at its public hostname rather
+          # than a cluster-internal Service, because the issuer in the token
+          # must match the issuer Mealie validates against, and the browser
+          # necessarily sees the public one. That only works now that staging
+          # issues real certificates; against the Let's Encrypt staging root
+          # this call failed with CERTIFICATE_VERIFY_FAILED.
+          envFrom:
+            - secretRef:
+                name: mealie-oidc
           env:
+            - name: OIDC_AUTH_ENABLED
+              value: "true"
+            - name: OIDC_CONFIGURATION_URL
+              value: "https://authentik.staging.ronaldlokers.nl/application/o/mealie-staging/.well-known/openid-configuration"
+            - name: OIDC_PROVIDER_NAME
+              value: "authentik"
+            - name: OIDC_SIGNUP_ENABLED
+              value: "true"
+            # Leave the normal login form reachable. Auto-redirect would send
+            # every visit straight to authentik, which locks you out of the
+            # local admin account if the provider is ever misconfigured — not a
+            # trade worth making while this is the first client being proven.
+            - name: OIDC_AUTO_REDIRECT
+              value: "false"
             - name: DB_ENGINE
               value: "postgres"
             - name: POSTGRES_SERVER
