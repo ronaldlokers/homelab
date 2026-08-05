@@ -1,0 +1,47 @@
+# Exports the #219 isolation invariant as Prometheus metrics.
+#
+# The isolation is enforced by hand-run SQL — REVOKE CONNECT ... FROM PUBLIC per
+# database — and nothing declarative reproduces or checks it. That is survivable
+# for production, which bootstraps by physical restore and therefore carries
+# pg_database.datacl with it (verified 2026-08-05: a scratch cluster restored
+# from B2 came back byte-for-byte identical, streaming_replica grant included).
+# It is not survivable for staging, which bootstraps with initdb and would come
+# back on PostgreSQL's defaults, with PUBLIC able to connect everywhere.
+#
+# The sharper problem is that nobody would notice either way. On 2026-08-05 the
+# revoke on the `postgres` database removed the only CONNECT grant
+# streaming_replica had — CloudNativePG's replication role, which is
+# deliberately NOT a superuser and so does not bypass the check. Replica rejoin
+# was broken for four hours while every signal stayed green, because existing
+# replicas keep streaming on connections that were already open and the broken
+# path only runs when a replica restarts.
+#
+# So this measures both halves: can PUBLIC still reach a database it should not,
+# and can the replication role still reach the one database it needs.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cnpg-isolation-queries
+  namespace: database
+data:
+  isolation.yaml: |
+    pg_database_access:
+      query: |
+        SELECT d.datname AS datname,
+               CASE WHEN has_database_privilege('public', d.datname, 'CONNECT')
+                    THEN 1 ELSE 0 END AS public_connect,
+               CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'streaming_replica')
+                     AND has_database_privilege('streaming_replica', d.datname, 'CONNECT')
+                    THEN 1 ELSE 0 END AS replica_connect
+        FROM pg_database d
+        WHERE d.datistemplate = false
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Database name"
+        - public_connect:
+            usage: "GAUGE"
+            description: "1 if PUBLIC still holds CONNECT on this database"
+        - replica_connect:
+            usage: "GAUGE"
+            description: "1 if streaming_replica holds CONNECT on this database"
