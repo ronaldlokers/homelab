@@ -7,5 +7,19 @@ spec:
     # Nothing under `authentik:` — existingSecret makes the chart ignore it (see
     # the base release). Staging's error reporting is disabled via
     # AUTHENTIK_ERROR_REPORTING__ENABLED in authentik-secret.yaml instead.
+    # Mount the blueprint ConfigMap where authentik looks for custom blueprints.
+    # It watches this directory and re-applies hourly, so the OIDC providers in
+    # blueprints.yaml are reconciled the way everything else in this repo is
+    # rather than existing only in authentik's database.
+    global:
+      volumes:
+        - name: blueprints
+          configMap:
+            name: authentik-blueprints
+      volumeMounts:
+        - name: blueprints
+          mountPath: /blueprints/custom
+          readOnly: true
+
     server:
       replicas: 1
