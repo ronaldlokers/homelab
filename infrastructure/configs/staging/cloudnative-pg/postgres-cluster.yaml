@@ -66,6 +66,11 @@ spec:
         login: true
         passwordSecret:
           name: pg-role-nightscout
+      - name: authentik
+        ensure: present
+        login: true
+        passwordSecret:
+          name: pg-role-authentik
 
   priorityClassName: homelab-database
   postgresUID: 999

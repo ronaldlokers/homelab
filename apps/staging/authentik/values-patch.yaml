@@ -1,0 +1,16 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: authentik
+spec:
+  values:
+    authentik:
+      # Staging is not reachable from the internet and holds no real identities,
+      # so error reporting stays off rather than shipping staging noise upstream.
+      error_reporting:
+        enabled: false
+      # Told explicitly, because authentik builds absolute URLs for OAuth
+      # redirects and e-mail links from this. Getting it wrong produces flows
+      # that redirect to the wrong host after a successful login.
+      web:
+        path: /

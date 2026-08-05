@@ -1,0 +1,55 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: authentik
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: authentik
+      version: "2026.5.6"
+      sourceRef:
+        kind: HelmRepository
+        name: authentik
+      interval: 12h
+  values:
+    # No Redis. authentik removed it in 2025.10 — caching, the embedded
+    # outpost's session store and WebSocket IPC all moved to PostgreSQL, after
+    # background tasks moved there in 2025.8. The requirements are now just
+    # server, worker and PostgreSQL 14-18. Expect ~50% more database
+    # connections than the old architecture used, which is why max_connections
+    # on the shared cluster is worth watching after this lands.
+    #
+    # The chart still ships a Bitnami PostgreSQL subchart behind
+    # postgresql.enabled; it stays off. This uses the shared postgres-cluster
+    # with its own role and database, like every other app here (#219).
+    postgresql:
+      enabled: false
+
+    authentik:
+      postgresql:
+        host: postgres-cluster-rw.database.svc.cluster.local
+        port: 5432
+        name: authentik
+        user: authentik
+      # secret_key and the postgresql password come from a SOPS-encrypted
+      # Secret rather than these values, so neither is ever in plain text in
+      # git. Changing secret_key after first install invalidates every existing
+      # session and any encrypted field in the database — it is not rotatable
+      # in place.
+      existingSecret:
+        secretName: authentik-secret
+
+    server:
+      replicas: 1
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+
+    worker:
+      replicas: 1
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi

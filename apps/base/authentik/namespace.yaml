@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: authentik
+  labels:
+    # Lets the database namespace's allow-apps-ingress policy admit connections
+    # from here; that policy selects on this label rather than naming namespaces.
+    homelab.io/needs-database: "true"
