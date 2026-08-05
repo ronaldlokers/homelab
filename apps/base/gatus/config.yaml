@@ -20,13 +20,12 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[CERTIFICATE_EXPIRATION] > 240h"
-  - name: immich
-    group: homelab
-    url: "https://immich.staging.ronaldlokers.nl/api/server/ping"
-    interval: 60s
-    conditions:
-      - "[STATUS] == 200"
-      - "[CERTIFICATE_EXPIRATION] > 240h"
+  # Immich is not deployed on staging — it was removed from
+  # apps/staging/kustomization.yaml as the largest contributor to the
+  # convergence storm after a host reboot. Monitoring it here reported DOWN
+  # permanently, which is worse than not monitoring it: a status page that is
+  # always partly red is one nobody reads. Restore this endpoint in the same
+  # change that restores the app.
   - name: mealie
     group: homelab
     url: "https://mealie.staging.ronaldlokers.nl/api/app/about"
