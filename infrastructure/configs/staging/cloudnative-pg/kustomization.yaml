@@ -11,6 +11,7 @@ resources:
   # so its dedicated PostgreSQL cluster is not created either. The file is kept
   # for when it is re-enabled.
   - scheduled-backup.yaml
+  - authentik-database.yaml
   - commafeed-database.yaml
   - linkding-database.yaml
   - mealie-database.yaml

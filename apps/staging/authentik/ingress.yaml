@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: authentik
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - secretName: wildcard-staging-ronaldlokers-nl-tls
+      hosts:
+        - authentik.staging.ronaldlokers.nl
+  rules:
+    - host: authentik.staging.ronaldlokers.nl
+      http:
+        paths:
+          - backend:
+              service:
+                name: authentik-server
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix
