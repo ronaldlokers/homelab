@@ -10,6 +10,7 @@ resources:
   - immich-cluster.yaml
   - postgres-alerts.yaml
   - scheduled-backup.yaml
+  - authentik-database.yaml
   - commafeed-database.yaml
   - gatus-database.yaml
   - linkding-database.yaml
