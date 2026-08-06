@@ -302,4 +302,98 @@ if uncovered:
     sys.exit(1)
 PY
 
+
+# ---------------------------------------------------------------------------
+# Credentials in manifests that are not Secrets.
+#
+# The check above proves every Secret is encrypted. It has nothing to say about
+# a credential written into a ConfigMap, which is the shape that actually
+# leaked: the Immich API key sat in cleartext in homepage's ConfigMap while
+# every other widget in the same file read its credential from a SOPS Secret
+# through HOMEPAGE_VAR_*. Encrypted Secrets, green CI, and a live credential in
+# git (#315).
+#
+# Deliberately narrow. It looks only at values under credential-shaped keys,
+# and ignores anything that is plainly a reference rather than a value —
+# placeholders, ENC[...], paths, URLs, age recipients, image digests. The
+# alternative, entropy scanning every string, produces enough noise to be
+# switched off, which is worse than not having it.
+# ---------------------------------------------------------------------------
+
+echo "INFO - Checking for credentials outside Secrets"
+python3 - <<'PY'
+import pathlib, re, sys, yaml
+
+SENSITIVE = re.compile(
+    r"(^|_|-)(password|passwd|secret|token|apikey|api_key|credential)s?$"
+    r"|^key$|^client_secret$|^secretkey$|^accesskey$",
+    re.I,
+)
+
+# A value that is a reference, a placeholder or a public identifier, not a
+# credential. Anything matching is not reported.
+SAFE = (
+    lambda v: len(v) < 12,                      # too short to be a real secret
+    lambda v: "{{" in v or "${" in v or "$__env{" in v,  # templated at runtime
+    lambda v: v.startswith(("ENC[", "/", "http://", "https://", "age1", "sha256:")),
+    lambda v: v.lower() in ("true", "false", "none", "null", "changeme"),
+    lambda v: v.isdigit(),
+)
+
+findings = []
+
+def walk(node, path, doc_kind, file):
+    if isinstance(node, dict):
+        # {name: <secret>, key: <field>} is a reference to a key by name, not a
+        # credential — SecretKeySelector, ConfigMapKeySelector, CNPG's
+        # s3Credentials. Reporting those buries the real finding under 32 of
+        # them, which is how a check gets switched off.
+        # Likewise {key, operator, values} is a label selector requirement,
+        # where `key` is a label name.
+        is_key_ref = "name" in node or "operator" in node
+        for k, v in node.items():
+            if isinstance(v, str) and isinstance(k, str) and SENSITIVE.search(k):
+                if k.lower() == "key" and is_key_ref:
+                    pass
+                elif not any(pred(v) for pred in SAFE):
+                    findings.append((file, doc_kind, "%s.%s" % (path, k) if path else k, v))
+            walk(v, "%s.%s" % (path, k) if path else str(k), doc_kind, file)
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            walk(v, "%s[%d]" % (path, i), doc_kind, file)
+
+for root in ("clusters", "infrastructure", "apps", "monitoring"):
+    for path in sorted(pathlib.Path(root).rglob("*.yaml")):
+        try:
+            docs = list(yaml.safe_load_all(path.read_text()))
+        except Exception:
+            continue  # rendered elsewhere, or not parseable standalone
+        for doc in docs:
+            if not isinstance(doc, dict):
+                continue
+            kind = doc.get("kind", "?")
+            if kind == "Secret":
+                continue  # covered by the encryption check above
+            # ConfigMap payloads are strings containing more YAML; parse them.
+            if kind == "ConfigMap":
+                for name, blob in (doc.get("data") or {}).items():
+                    if not isinstance(blob, str):
+                        continue
+                    try:
+                        inner = list(yaml.safe_load_all(blob))
+                    except Exception:
+                        continue
+                    for d in inner:
+                        walk(d, "data.%s" % name, kind, path)
+            walk(doc, "", kind, path)
+
+if findings:
+    print("\nERROR - %d credential-shaped value(s) outside a Secret:" % len(findings))
+    for file, kind, where, value in findings:
+        print("  %s  (%s)  %s = %s…" % (file, kind, where, value[:6]))
+    print("\n  Move the value into a SOPS-encrypted Secret and reference it")
+    print("  from the manifest — see apps/production/homepage for the pattern.")
+    sys.exit(1)
+PY
+
 echo "INFO - Validation passed"
