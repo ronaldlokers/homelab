@@ -1,0 +1,48 @@
+# Ingress for the two widget targets that live outside homepage's own reach.
+#
+# Egress from homepage is already permitted for both, but each destination
+# namespace denies ingress by default, so the connection is refused at the far
+# end — which looks identical to the service being down.
+---
+# Prometheus, for the targets-up/down widget.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-homepage-to-prometheus
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: homepage
+      ports:
+        - protocol: TCP
+          port: 9090
+---
+# Traefik's read-only API. Only homepage may reach it; it is a ClusterIP port
+# with no Ingress, so this is the whole of its exposure.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-homepage-to-traefik-api
+  namespace: kube-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: homepage
+      ports:
+        - protocol: TCP
+          port: 9000

@@ -21,6 +21,30 @@ spec:
   policyTypes:
     - Egress
 ---
+# Traefik's read-only API, for the traefik widget. Port 9000 is the container
+# port as well as the Service port, so no post-DNAT surprise here — unlike the
+# Kubernetes API, which is reached on 6443 despite a Service on 443.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-homepage-to-traefik-api
+  namespace: homepage
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 9000
+---
 # Allow DNS queries from homepage namespace to kube-system
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
