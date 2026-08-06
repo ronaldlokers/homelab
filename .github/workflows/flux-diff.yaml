@@ -11,6 +11,11 @@ name: Flux diff
 
 on:
   pull_request:
+    # `labeled` matters: the gate below accepts a `no-op` label as a declared
+    # intentional no-op, but the default trigger types do not include label
+    # changes — so applying the label left the failed run in place and the
+    # only way to act on it was to push a commit.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -180,11 +185,24 @@ jobs:
           # Only these trees are rendered by Flux. A PR confined to CI, docs,
           # scripts or skills has no reason to produce a diff, so it is not
           # gated — that is the common case for repo-maintenance PRs.
+          # Not everything under those trees is a manifest. `.sops.yaml` holds
+          # creation rules for the sops CLI and is never listed as a resource,
+          # so Flux does not render it — but it lives in clusters/, which is
+          # what made the age key rotation in #218 unmergeable: 43 encrypted
+          # Secrets, all exempt, plus two `.sops.yaml` files that could not
+          # produce a diff by construction. Markdown next to manifests is the
+          # same case.
+          is_rendered() {
+            case "$1" in
+              */.sops.yaml|.sops.yaml|*.md) return 1 ;;
+              clusters/*|infrastructure/*|apps/*|monitoring/*) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
           flux_touched=false
           while IFS= read -r f; do
-            case "$f" in
-              clusters/*|infrastructure/*|apps/*|monitoring/*) flux_touched=true; break ;;
-            esac
+            if is_rendered "$f"; then flux_touched=true; break; fi
           done < <(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')
 
           if [ "$flux_touched" = false ]; then
@@ -203,10 +221,7 @@ jobs:
           # does not apply.
           only_secrets=true
           while IFS= read -r f; do
-            case "$f" in
-              clusters/*|infrastructure/*|apps/*|monitoring/*) ;;
-              *) continue ;;
-            esac
+            is_rendered "$f" || continue
             # Deleted files cannot be inspected; treat them as ordinary changes.
             # The helper parses the file rather than grepping it — see its
             # docstring for the multi-document bypass that motivated it.
