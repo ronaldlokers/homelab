@@ -6,6 +6,8 @@ resources:
 - ../../base/linkding/
 - linkding-container-env-secret.yaml
 - ingress.yaml
+- network-policy-oidc.yaml
+- linkding-oidc-secret.yaml
 patches:
 - path: deployment-postgres-patch.yaml
 # Opt in to Reloader: roll this workload when a mounted ConfigMap or Secret

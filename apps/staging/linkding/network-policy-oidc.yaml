@@ -1,0 +1,25 @@
+# Egress to authentik, for the half of OIDC the browser never touches.
+#
+# linkding fetches the token and userinfo endpoints itself, server to server,
+# against authentik's public URL. Without this the login fails after authentik
+# has already said yes, with the error surfacing on linkding's side.
+#
+# Staging's ingress is a k3d container outside the cluster network, so the
+# address the hostname resolves to is the right thing to name here. Production
+# needs a different rule for the same intent — see its copy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-oidc-egress
+  namespace: linkding
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.40.52/32
+      ports:
+        - protocol: TCP
+          port: 443
