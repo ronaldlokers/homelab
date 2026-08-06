@@ -72,7 +72,12 @@ spec:
         - protocol: UDP
           port: 7844
 ---
-# Allow egress to the origin services cloudflared fronts: ntfy and immich.
+# Allow egress to the origin services cloudflared fronts.
+#
+# ntfy only. Immich was removed: it was the one application reachable from the
+# internet over plain http, because tunnel traffic never passes the Traefik
+# router that carries the https-redirect middleware (#304). It is now LAN-only
+# like everything else, reached from outside over Tailscale.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -90,10 +95,3 @@ spec:
       ports:
         - protocol: TCP
           port: 80
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: immich
-      ports:
-        - protocol: TCP
-          port: 2283
