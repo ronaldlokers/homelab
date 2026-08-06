@@ -64,17 +64,21 @@ spec:
     # Traefik's read-only API, for homepage's traefik widget: router, service
     # and middleware counts, and TLS certificate state.
     #
-    # `insecure` is the chart's name for "serve the API on the traefik
-    # entrypoint without its own auth", which sounds worse than it is here and
-    # is still worth stating plainly: port 9000 is a ClusterIP port with no
-    # Ingress and no LoadBalancer exposure, so it is reachable only from inside
-    # the cluster, and a NetworkPolicy limits that to the homepage namespace.
+    # Set as an argument, not as `api.insecure`. That value belongs to
+    # Traefik's own configuration, not to this chart, so the chart accepted it
+    # and dropped it — the rendered pod kept its default arguments and the
+    # entrypoint answered 404 on every API path while /ping returned 200.
+    # Unknown values fail silently in Helm; only the running args are evidence.
     #
-    # The dashboard stays off. It is the same API with a UI attached, and
-    # nothing here needs the UI.
-    api:
-      insecure: true
-      dashboard: false
+    # "insecure" means the API is served on the traefik entrypoint with no auth
+    # of its own, which is worth stating plainly: port 8080 is a ClusterIP port
+    # with no Ingress and no LoadBalancer, and a NetworkPolicy admits only the
+    # homepage namespace.
+    #
+    # The dashboard is left at the chart's default rather than disabled — it is
+    # the same API with a UI, reachable only over the same restricted path.
+    additionalArguments:
+      - "--api.insecure=true"
     ports:
       traefik:
         expose:
