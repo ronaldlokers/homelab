@@ -1,0 +1,32 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: authentik
+spec:
+  values:
+    # Nothing under `authentik:` — existingSecret makes the chart ignore it
+    # (see the base release). Everything, including the non-secret settings,
+    # lives in authentik-secret.yaml.
+    #
+    # The blueprints are mounted where authentik watches for custom ones. It
+    # re-applies them hourly, so the OIDC providers are reconciled the way
+    # everything else in this repo is rather than existing only in authentik's
+    # database.
+    global:
+      volumes:
+        - name: blueprints
+          secret:
+            # A Secret, not a ConfigMap: it carries the OIDC client secrets so
+            # that recreating authentik does not invalidate every client.
+            secretName: authentik-blueprints
+      volumeMounts:
+        - name: blueprints
+          mountPath: /blueprints/custom
+          readOnly: true
+
+    # Two servers, one worker. The server is what a login blocks on, so it
+    # gets the redundancy; the worker runs background tasks where a restart
+    # delays work rather than failing it. Both fit the ARM64 nodes at the
+    # base chart's requests.
+    server:
+      replicas: 2
