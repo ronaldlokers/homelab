@@ -49,23 +49,26 @@ FORBIDDEN_PROBES = [
     ("monitoring", "app.kubernetes.io/name=prometheus", 9090),
 ]
 
-# (source namespace, source deployment, destination, port, expect_allowed, why)
+# (context, source namespace, source deployment, destination, port,
+#  expect_allowed, why). The context matters: the two clusters do not run the
+# same set of applications, and asserting production must do what only staging
+# does produces a permanent failure that teaches people to ignore the output.
 EXPECTATIONS = [
     (
-        "mealie", "mealie", "postgres-cluster-rw.database.svc.cluster.local", 5432,
+        "*", "mealie", "mealie", "postgres-cluster-rw.database.svc.cluster.local", 5432,
         True, "mealie stores everything in postgres; without this it does not start",
     ),
     (
-        "tandoor", "tandoor", "postgres-cluster-rw.database.svc.cluster.local", 5432,
+        "*", "tandoor", "tandoor", "postgres-cluster-rw.database.svc.cluster.local", 5432,
         True, "same for tandoor",
     ),
     (
-        "mealie", "mealie", "INGRESS", 443,
+        "*", "mealie", "mealie", "INGRESS", 443,
         True, "server-side half of the OIDC login: discovery and token exchange",
     ),
     (
-        "tandoor", "tandoor", "INGRESS", 443,
-        True, "same for tandoor, via allauth",
+        "staging", "tandoor", "tandoor", "INGRESS", 443,
+        True, "same for tandoor, via allauth -- staging only, tandoor has no authentik client in production",
     ),
 ]
 
@@ -221,7 +224,9 @@ def check_enforcement(ctx):
 
 def check_expectations(ctx):
     rows = []
-    for ns, deploy, host, port, expect_allowed, why in EXPECTATIONS:
+    for want_ctx, ns, deploy, host, port, expect_allowed, why in EXPECTATIONS:
+        if want_ctx != "*" and want_ctx != ctx:
+            continue
         if host == "INGRESS":
             host = INGRESS_IP.get(ctx)
             if not host:

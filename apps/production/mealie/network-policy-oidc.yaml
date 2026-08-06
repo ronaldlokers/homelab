@@ -1,19 +1,21 @@
 # Egress to authentik, for the half of OIDC the browser never touches.
 #
-# The login redirect happens in the user's browser and needs nothing from this
-# policy. Mealie itself then fetches the discovery document and exchanges the
-# authorization code for a token, server to server, against authentik's public
-# URL — which resolves to the cluster's own ingress address:
+# Mealie fetches the discovery document and exchanges the authorization code
+# for a token itself, server to server, against authentik's public URL. Without
+# this the login fails at the token exchange — after authentik has already said
+# yes — and the error surfaces on Mealie's side, pointing away from the cause.
 #
-#   authentik.ronaldlokers.nl -> 10.0.40.100
+# The destination is Traefik, not the address the hostname resolves to.
+# authentik.ronaldlokers.nl resolves to the MetalLB VIP 10.0.40.100, but
+# kube-proxy rewrites that to a Traefik pod address before the egress rules
+# are evaluated, so a rule naming the VIP matches nothing and the connection is
+# rejected. Staging's equivalent rule *can* name its address, because there the
+# ingress is a container outside the cluster network rather than a VIP inside
+# it — the same intent needs a different rule per environment.
 #
-# That address is inside 10.0.0.0/8, which allow-internet-egress excludes on
-# purpose as an SSRF guard. Without this rule the login fails at the token
-# exchange, after authentik has already said yes, and the error appears on
-# Mealie's side pointing away from the cause.
-#
-# Unlike staging, production actually enforces NetworkPolicy (#282), so this
-# is load-bearing here rather than documentation.
+# Ports are Traefik's container ports, not the Service ports: 8443 backs 443.
+# This mirrors apps/production/gatus/network-policy-egress.yaml, which reaches
+# the same hostnames the same way.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -25,8 +27,12 @@ spec:
     - Egress
   egress:
     - to:
-        - ipBlock:
-            cidr: 10.0.40.100/32
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
       ports:
         - protocol: TCP
-          port: 443
+          port: 8443
