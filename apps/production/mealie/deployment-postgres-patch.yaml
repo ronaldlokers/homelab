@@ -10,7 +10,57 @@ spec:
       containers:
         - name: mealie
           image: ghcr.io/mealie-recipes/mealie:v3.22.0
+          # OIDC via authentik (#270). Non-secret settings are here so they are
+          # readable; the client id and secret come from the SOPS-encrypted
+          # mealie-oidc Secret, and are declared on the authentik side too so
+          # that rebuilding authentik does not invalidate them.
+          #
+          # The provider is reached over HTTPS at its public hostname rather
+          # than a cluster-internal Service, because the issuer in the token
+          # must match the issuer Mealie validates against, and the browser
+          # necessarily sees the public one. That path needs
+          # network-policy-oidc.yaml, which production enforces for real.
+          envFrom:
+            - secretRef:
+                name: mealie-oidc
           env:
+            - name: OIDC_AUTH_ENABLED
+              value: "true"
+            - name: OIDC_CONFIGURATION_URL
+              value: "https://authentik.ronaldlokers.nl/application/o/mealie-production/.well-known/openid-configuration"
+            - name: OIDC_PROVIDER_NAME
+              value: "authentik"
+            # A successful authentik login creates the Mealie account on first
+            # use. Safe because authentik decides who may reach the application
+            # at all — Mealie never sees an unauthorised user — and it is the
+            # only thing that makes federated login worth having, since
+            # ALLOW_SIGNUP is false and every account would otherwise be made
+            # by hand.
+            - name: OIDC_SIGNUP_ENABLED
+              value: "true"
+            # Leave the normal login form reachable. Auto-redirect would send
+            # every visit straight to authentik, which locks you out of the
+            # local admin account if the provider is ever misconfigured.
+            - name: OIDC_AUTO_REDIRECT
+              value: "false"
+            # authentik's built-in email scope mapping hardcodes
+            # "email_verified": False, and Mealie refuses a login without it:
+            #
+            #   [OIDC] email_verified claim is missing or false; refusing to
+            #          authenticate
+            #
+            # The claim is accurate — this instance has no SMTP and no
+            # verification flow, so no address here has ever been proven. The
+            # alternative fix is editing that mapping to return True, which is
+            # worse: it asserts the claim to every client, so one relaxation
+            # silently weakens every future integration.
+            #
+            # REVISIT IF SELF-ENROLMENT IS EVER ENABLED. Today addresses are
+            # only ever set by an administrator. If users can register
+            # themselves, an unverified address plus email-based account
+            # matching lets someone claim another person's account.
+            - name: OIDC_REQUIRES_EMAIL_VERIFICATION
+              value: "false"
             - name: DB_ENGINE
               value: "postgres"
             - name: POSTGRES_SERVER
