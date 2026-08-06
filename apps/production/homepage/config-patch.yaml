@@ -22,6 +22,12 @@ data:
             description: Single sign-on — switch between apps
             widget:
               type: authentik
+              # Without this the widget calls /events/events/per_month/, which
+              # this authentik build answers with 404. Version 2 uses
+              # /events/events/volume/?action=login&history_days=1, which it
+              # serves. The widget reports "API Error" either way, naming
+              # neither the endpoint nor the version.
+              version: 2
               # The Service publishes 80 and forwards to 9000; this is the
               # Service port, while the NetworkPolicy names 9000. They are the
               # same hop seen from either side of DNAT.
@@ -106,6 +112,13 @@ data:
             widget:
               type: ntfy
               url: http://ntfy.ntfy.svc.cluster.local
+              # A topic is required: without one the widget requests the web UI
+              # root and tries to parse the HTML as JSON. ntfy denies anonymous
+              # reads on every topic, so this reads as its own account —
+              # read-only on this one topic, unable to publish.
+              topic: homelab-gatus
+              username: homepage
+              password: "{{HOMEPAGE_VAR_NTFY_PASSWORD}}"
         - Speedtest:
             icon: speedtest-tracker.png
             href: https://speedtest.ronaldlokers.nl
