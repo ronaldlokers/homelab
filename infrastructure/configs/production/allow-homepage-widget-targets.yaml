@@ -45,4 +45,4 @@ spec:
               kubernetes.io/metadata.name: homepage
       ports:
         - protocol: TCP
-          port: 9000
+          port: 8080
