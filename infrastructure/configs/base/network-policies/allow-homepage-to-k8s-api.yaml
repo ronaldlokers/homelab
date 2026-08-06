@@ -1,0 +1,41 @@
+# Homepage reads the Kubernetes API for its cluster and node widgets, and to
+# discover Ingresses.
+#
+# Without this it fails with ECONNREFUSED to 10.43.0.1:443, which reads as the
+# ClusterIP being unreachable. It is not: egress policy is evaluated after
+# DNAT, so the destination that matters is a control plane node on 6443, and
+# homepage's other rules allow only 80, 443 and 8006. The ClusterIP is named
+# here as well because the pre-DNAT rule is what some CNIs match on.
+#
+# The database and monitoring namespaces already carry the same pair for the
+# same reason; homepage was the one that reads the API and never got it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-homepage-to-k8s-api
+  namespace: homepage
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # The kubernetes Service ClusterIP.
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
+    # The control plane nodes behind it, which is where the packets actually
+    # go. Production only in effect: staging's single server is not in this
+    # range, and its policies are not enforced anyway (#282).
+    - to:
+        - ipBlock:
+            cidr: 10.0.40.101/32
+        - ipBlock:
+            cidr: 10.0.40.102/32
+        - ipBlock:
+            cidr: 10.0.40.103/32
+      ports:
+        - protocol: TCP
+          port: 6443
