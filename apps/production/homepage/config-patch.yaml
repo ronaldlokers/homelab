@@ -12,22 +12,34 @@ data:
         - Authentik:
             icon: authentik.png
             href: https://authentik.ronaldlokers.nl/if/user/#/library
+            siteMonitor: https://authentik.ronaldlokers.nl/if/user/#/library
             description: Single sign-on — switch between apps
+            siteMonitor: https://authentik.ronaldlokers.nl/-/health/live/
+            widget:
+              type: authentik
+              # The Service publishes 80 and forwards to 9000; this is the
+              # Service port, while the NetworkPolicy names 9000. They are the
+              # same hop seen from either side of DNAT.
+              url: http://authentik-server.authentik.svc.cluster.local
+              key: "{{HOMEPAGE_VAR_AUTHENTIK_KEY}}"
 
     - Bookmarks:
         - Linkding:
             icon: linkding.png
             href: https://linkding.ronaldlokers.nl
+            siteMonitor: https://linkding.ronaldlokers.nl
             description: Bookmark manager
 
     - Media:
         - Commafeed:
             icon: commafeed.png
             href: https://commafeed.ronaldlokers.nl
+            siteMonitor: https://commafeed.ronaldlokers.nl
             description: RSS feed reader
         - Immich:
             icon: immich.png
             href: https://immich.ronaldlokers.nl
+            siteMonitor: https://immich.ronaldlokers.nl
             description: Photo management
             widget:
               type: immich
@@ -39,21 +51,25 @@ data:
         - Mealie:
             icon: mealie.png
             href: https://mealie.ronaldlokers.nl
+            siteMonitor: https://mealie.ronaldlokers.nl
             description: Recipe manager
         - Tandoor:
             icon: tandoor-recipes.png
             href: https://tandoor.ronaldlokers.nl
+            siteMonitor: https://tandoor.ronaldlokers.nl
             description: Recipe manager
 
     - Health:
         - Nightscout:
             icon: nightscout.png
             href: https://nightscout.ronaldlokers.nl
+            siteMonitor: https://nightscout.ronaldlokers.nl
             description: CGM remote monitoring
     - DevOps:
         - Grafana:
             icon: grafana.png
             href: https://grafana.ronaldlokers.nl
+            siteMonitor: https://grafana.ronaldlokers.nl
             description: Metrics and dashboards
             widget:
               type: grafana
@@ -63,10 +79,26 @@ data:
         - Prometheus:
             icon: prometheus.png
             href: https://prometheus.ronaldlokers.nl
+            siteMonitor: https://prometheus.ronaldlokers.nl
             description: Metrics collection and storage
+            widget:
+              type: prometheus
+              url: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+        - Traefik:
+            icon: traefik.png
+            # No href: traefik has no ingress of its own and its dashboard is
+            # off, so there is nothing to link to. The widget is the point.
+            description: Ingress controller
+            widget:
+              type: traefik
+              # Read-only API, ClusterIP only, reachable from this namespace
+              # alone. Port 8080 on both sides here — Traefik's documented
+              # default of 9000 is not what this build listens on.
+              url: http://traefik.kube-system.svc.cluster.local:8080
         - Gatus:
             icon: gatus.png
             href: https://gatus.ronaldlokers.nl
+            siteMonitor: https://gatus.ronaldlokers.nl
             description: Uptime monitoring
             widget:
               type: gatus
@@ -74,10 +106,15 @@ data:
         - Ntfy:
             icon: ntfy.png
             href: https://ntfy.ronaldlokers.nl
+            siteMonitor: https://ntfy.ronaldlokers.nl
             description: Push notifications
+            widget:
+              type: ntfy
+              url: http://ntfy.ntfy.svc.cluster.local
         - Speedtest:
             icon: speedtest-tracker.png
             href: https://speedtest.ronaldlokers.nl
+            siteMonitor: https://speedtest.ronaldlokers.nl
             description: Network speed test
             widget:
               type: speedtest
@@ -92,6 +129,7 @@ data:
         - Proxmox:
             icon: proxmox.png
             href: https://proxmox.ronaldlokers.nl
+            siteMonitor: https://proxmox.ronaldlokers.nl
             node: gandalf
             description: Virtualization platform
             widget:
@@ -102,18 +140,22 @@ data:
         - TrueNAS:
             icon: truenas.png
             href: https://truenas.ronaldlokers.nl
+            siteMonitor: https://truenas.ronaldlokers.nl
             description: Network-attached storage
         - Longhorn:
             icon: longhorn.png
             href: https://longhorn.ronaldlokers.nl
+            siteMonitor: https://longhorn.ronaldlokers.nl
             description: Distributed block storage
         - pgAdmin:
             icon: pgadmin.png
             href: https://pgadmin.ronaldlokers.nl
+            siteMonitor: https://pgadmin.ronaldlokers.nl
             description: PostgreSQL admin
         - Mikrotik:
             icon: mikrotik.png
             href: https://10.0.1.1
+            siteMonitor: https://10.0.1.1
             description: Mikrotik Router
             widget:
               type: mikrotik
