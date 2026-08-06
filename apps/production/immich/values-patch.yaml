@@ -28,6 +28,19 @@ spec:
               # read-only as a result.
               IMMICH_CONFIG_FILE:
                 value: /config/immich.json
+              # Immich's web frontend builds the OAuth redirect_uri from the
+              # page URL, and that URL is rendered server-side. Behind Traefik
+              # the server sees plain http, so it produced
+              # http://immich.ronaldlokers.nl/auth/login and authentik refused
+              # it with redirect_uri_no_match — an error that names the URI
+              # but not the scheme, so it reads as a misconfigured client.
+              #
+              # Trusting the proxy makes it honour X-Forwarded-Proto. The
+              # value is the pod network rather than specific addresses:
+              # Traefik pods are the only thing that reaches this service, and
+              # their addresses change on every reschedule.
+              IMMICH_TRUSTED_PROXIES:
+                value: "10.42.0.0/16"
             image:
               tag: v2.3.1
             # Measured: 3m CPU, 414Mi memory at rest. 4Gi was a 10x
