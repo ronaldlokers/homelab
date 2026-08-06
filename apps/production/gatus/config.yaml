@@ -134,13 +134,18 @@ endpoints:
       - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
       - type: ntfy
+  # Checked on its Service, not through the ingress. Grafana's router carries
+  # the local-network-only middleware, which sees a pod address for an
+  # in-cluster prober and answers 403 — so this row was red continuously while
+  # grafana was healthy, which is worse than not checking it. The trade is
+  # that the ingress path for grafana is not covered; the LAN gate itself is
+  # what makes that untestable from here.
   - name: grafana
     group: homelab
-    url: "https://grafana.ronaldlokers.nl"
+    url: "http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local:3000/api/health"
     interval: 60s
     conditions:
-      - "[STATUS] < 400"
-      - "[CERTIFICATE_EXPIRATION] > 336h"
+      - "[STATUS] == 200"
     alerts:
       - type: ntfy
   - name: gatus
