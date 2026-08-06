@@ -1,0 +1,71 @@
+# Alerts for authentik.
+#
+# It gates mealie, linkding, grafana and immich, so its failure is four
+# applications' failure — and until #311 nothing scraped it at all. These are
+# written against metrics the instance actually exposes, checked by reading
+# /metrics and querying the series rather than from the documentation.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: authentik-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+    app.kubernetes.io/name: kube-prometheus-stack
+spec:
+  groups:
+    - name: authentik
+      rules:
+        # The one that matters. If authentik is unreachable, every OIDC login
+        # fails — including grafana's, which is where you would go to find out
+        # why. Both server replicas have to be gone before this fires, so a
+        # single pod restart during a rollout does not page.
+        - alert: AuthentikDown
+          annotations:
+            summary: "authentik is not reachable"
+            description: >-
+              No authentik server has been scrapeable for 5 minutes. Every
+              application behind SSO — mealie, linkding, grafana, immich — will
+              fail to log anyone in. Grafana and mealie keep a local login form
+              for exactly this case.
+          expr: |
+            absent(up{job="authentik-server-metrics"} == 1)
+          for: 5m
+          labels:
+            severity: critical
+
+        # Background tasks: sending events, syncing outposts, applying
+        # blueprints. Logins keep working without a worker, which is what makes
+        # this worth alerting on — the failure is silent and the first symptom
+        # is a blueprint change that never takes effect.
+        - alert: AuthentikNoWorkers
+          annotations:
+            summary: "authentik has no task workers"
+            description: >-
+              authentik_tasks_workers reports zero workers on the worker
+              deployment. Logins continue, but blueprints stop being applied and
+              scheduled tasks stop running, so configuration in git silently
+              stops reaching the running instance.
+          expr: |
+            max(authentik_tasks_workers{job="authentik-worker-metrics"}) == 0
+          for: 15m
+          labels:
+            severity: warning
+
+        # The embedded outpost terminates the flows the browser talks to.
+        # `expected` is a label carrying how many connections it should have,
+        # and comparing a gauge against a label value takes a label_replace
+        # dance that is harder to read than it is useful — zero connections is
+        # the condition that matters and every non-zero value is fine.
+        - alert: AuthentikOutpostDisconnected
+          annotations:
+            summary: "authentik outpost {{ $labels.outpost }} is disconnected"
+            description: >-
+              Outpost {{ $labels.outpost }} reports zero connections while
+              expecting {{ $labels.expected }}. Flows served by this outpost
+              will fail even though authentik itself answers.
+          expr: |
+            authentik_outposts_connected == 0
+          for: 10m
+          labels:
+            severity: warning

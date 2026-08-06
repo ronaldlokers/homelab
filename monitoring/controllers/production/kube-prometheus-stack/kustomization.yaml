@@ -9,3 +9,4 @@ resources:
   - grafana-oidc-secret.yaml
   - alertmanager-config.yaml
   - job-alerts.yaml
+  - authentik-alerts.yaml
