@@ -1,0 +1,26 @@
+# Egress to authentik, for the half of OIDC the browser never touches.
+#
+# Immich validates the ID token and calls userinfo itself, server to server.
+# The destination is Traefik rather than the address the hostname resolves
+# to: kube-proxy rewrites the MetalLB VIP to a Traefik pod address before
+# egress rules are evaluated, so a rule naming the VIP matches nothing (#293).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-oidc-egress
+  namespace: immich
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 8443

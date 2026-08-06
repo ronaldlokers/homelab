@@ -7,10 +7,27 @@ spec:
     spec:
       version: "0.10.3"
   values:
+    persistence:
+      config:
+        enabled: true
+        type: secret
+        name: immich-config
+        advancedMounts:
+          main:
+            main:
+              - path: /config
+                readOnly: true
+
     controllers:
       main:
         containers:
           main:
+            env:
+              # Move the source of truth for immich's settings out of its
+              # database and into git. The admin settings page becomes
+              # read-only as a result.
+              IMMICH_CONFIG_FILE:
+                value: /config/immich.json
             image:
               tag: v2.3.1
             # Measured: 3m CPU, 414Mi memory at rest. 4Gi was a 10x
