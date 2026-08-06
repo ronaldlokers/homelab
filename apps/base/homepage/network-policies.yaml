@@ -21,6 +21,57 @@ spec:
   policyTypes:
     - Egress
 ---
+# The public hostnames, for siteMonitor's per-service status dots.
+#
+# Every https://*.ronaldlokers.nl resolves to the MetalLB VIP, and kube-proxy
+# rewrites that to a Traefik pod on 8443 before egress rules are evaluated —
+# so a rule naming 443 matches nothing (#293). This is the same rule gatus
+# carries for the same reason.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-homepage-to-ingress
+  namespace: homepage
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 8443
+---
+# authentik's API, for the authentik widget's user and login counts.
+#
+# Port 9000, not the 80 the Service advertises: egress is evaluated after DNAT
+# and authentik-server maps 80 -> 9000. The existing app-namespace rule allows
+# 80/443/2283/3000/3003/8006/8080, none of which match, so the connection was
+# refused.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-homepage-to-authentik
+  namespace: homepage
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: authentik
+      ports:
+        - protocol: TCP
+          port: 9000
+---
 # Traefik's read-only API, for the traefik widget.
 #
 # Port 8080 on both sides, which took a second attempt: the chart's docs and
