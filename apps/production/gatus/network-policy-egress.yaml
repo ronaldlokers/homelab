@@ -31,6 +31,24 @@ spec:
       ports:
         - protocol: TCP
           port: 8006 # proxmox backend
+    # Grafana is checked on its Service rather than through the ingress, and
+    # deliberately so. Its router carries the local-network-only middleware,
+    # which sees a pod address for an in-cluster prober and answers 403 — so
+    # the check reported DOWN continuously while grafana was perfectly
+    # healthy. A row that is always red is one nobody reads.
+    #
+    # Port 3000, not 80: egress is evaluated after DNAT and the Service maps
+    # 80 -> 3000.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+      ports:
+        - protocol: TCP
+          port: 3000
     # Reach Traefik so checks can go through the real ingress path — the same
     # TLS termination and routing an external client hits — rather than
     # bypassing it via ClusterIP over plain HTTP.
