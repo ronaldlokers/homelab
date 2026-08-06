@@ -7,6 +7,18 @@ resources:
   - blueprints.yaml
   - ingress.yaml
 patches:
+  # Opt in to Reloader: roll this workload when a Secret it reads changes.
+  # Without it a SOPS secret rotation applies cleanly and the pod keeps serving
+  # the old value, because env and envFrom are injected only at pod creation.
+  - target:
+      kind: Deployment
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: placeholder
+        annotations:
+          reloader.stakater.com/auto: "true"
   - path: values-patch.yaml
     target:
       kind: HelmRelease
