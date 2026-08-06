@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Without this the namespace-less resources in the base land in `default` and
+# the HelmRelease is rejected by the API server — a failure that neither
+# `kustomize build` nor validate.sh can see, because both are happy with a
+# manifest that has no namespace.
+namespace: authentik
+resources:
+  - ../../base/authentik
+  - authentik-secret.yaml
+  - blueprints.yaml
+  - ingress.yaml
+patches:
+  - path: values-patch.yaml
+    target:
+      kind: HelmRelease
+      name: authentik

@@ -1,0 +1,31 @@
+# authentik's OIDC clients, declared rather than clicked or curl'd.
+#
+# A Secret rather than a ConfigMap because it declares client_id and
+# client_secret. Letting authentik generate those leaves the working values
+# only in its database, so recreating it breaks every client at once. Declared
+# here, authentik can be rebuilt from nothing and the applications keep working.
+#
+# Tandoor is deliberately absent: staging has it, production does not yet.
+apiVersion: v1
+kind: Secret
+metadata:
+    name: authentik-blueprints
+    namespace: authentik
+type: Opaque
+stringData:
+    mealie.yaml: ENC[AES256_GCM,data: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,iv:jC9Ud4ziZS8Qt+RgVZimWn2+qX8asjO42vA06ciiU0c=,tag:sRLUwl3jHKa5yK+wyVAoJQ==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB6NERZN3d2UXpXRlowK3RM
+            WjlYV1JqT084cnluWUNzRU1qUlBDUGF1WVNjCk52M2FKcEVSeC9jL2JrQU0vVkVp
+            UTZUOHR0ckl3VnNTOGJoc1JaYWRzZDgKLS0tIHIwcXlQRkxPenJjRjI1L2pIWDNQ
+            T1lWMnV3UGVJRFhuOXNJMXVsTDdoVnMKEWLzQcVwixIBhYTpiQHf+ANA4GEre5dy
+            LeMeR4z9TS/iNcB2qXznJ6SSxaEjJeTIgyULaKzgyiKGh+pP8BHWrw==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1hh6cdyljk2ks5mkmxqx6g65c7a8rgndy5p2s2d7w2gvqx4h53ggqtwr7rh
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-08-06T00:18:25Z"
+    mac: ENC[AES256_GCM,data:1n6aiufdUEU8DYnQ3YdThpumyhXkHz3dFtxerOVzUGOpOB6DUDMz2XofLvJBUG/LnXoAZ7tSr5f2gJLB6GnAGKW0XnyMA/d7SDh6VUJPIqwKoXy2xEetWJrCGQlxaGR5lQlBKp0MKQ2Do1LqJFA8FU44tu6N5+921NhLSJrJuhA=,iv:czg5BpmaXz859yRZnGmxRgmSnqLagmmLuXl/oQcQPcc=,tag:x3FKeaTUwXi7gVieMTFEUw==,type:str]
+    version: 3.13.3
