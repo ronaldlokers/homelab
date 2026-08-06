@@ -1,0 +1,15 @@
+# authentik's database, owned by its own role from the start.
+#
+# New apps skip the migration in docs/runbooks/postgres-per-app-role-migration.md
+# entirely: there are no existing objects owned by `app` to transfer, so setting
+# the owner here and revoking PUBLIC's CONNECT once is the whole job.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: authentik
+  namespace: database
+spec:
+  cluster:
+    name: postgres-cluster
+  name: authentik
+  owner: authentik
