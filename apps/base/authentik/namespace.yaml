@@ -6,3 +6,12 @@ metadata:
     # Lets the database namespace's allow-apps-ingress policy admit connections
     # from here; that policy selects on this label rather than naming namespaces.
     homelab.io/needs-database: "true"
+    # Same idea for scraping. Prometheus's egress rule selects namespaces by
+    # this label, so without it the ServiceMonitors are discovered and every
+    # target sits DOWN — the metrics endpoint answers fine from inside the
+    # namespace, and Prometheus simply cannot reach it.
+    #
+    # It also admits homepage and gatus, which is wanted: homepage links to
+    # authentik, and gatus should be able to check it internally as well as
+    # through the ingress.
+    homelab.io/app: "true"
