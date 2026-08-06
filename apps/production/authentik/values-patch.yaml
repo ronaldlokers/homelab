@@ -30,9 +30,34 @@ spec:
           mountPath: /blueprints/custom
           readOnly: true
 
+    # Metrics. authentik is now the single front door to four applications and
+    # was the least observed thing in the cluster: no ServiceMonitor existed,
+    # so failed logins, lockouts and flow errors reached neither Prometheus nor
+    # the ntfy alerts.
+    #
+    # The chart does not expose metrics by default — the Service carries only
+    # http/https — so both the metrics Service and the ServiceMonitor have to
+    # be turned on. The `release: kube-prometheus-stack` label is what makes
+    # this Prometheus select it; without it the ServiceMonitor exists and is
+    # ignored, which looks identical to working.
+    #
     # Two servers, one worker. The server is what a login blocks on, so it
     # gets the redundancy; the worker runs background tasks where a restart
     # delays work rather than failing it. Both fit the ARM64 nodes at the
     # base chart's requests.
     server:
       replicas: 2
+      metrics:
+        enabled: true
+        serviceMonitor:
+          enabled: true
+          labels:
+            release: kube-prometheus-stack
+
+    worker:
+      metrics:
+        enabled: true
+        serviceMonitor:
+          enabled: true
+          labels:
+            release: kube-prometheus-stack
