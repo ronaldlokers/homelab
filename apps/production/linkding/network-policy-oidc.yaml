@@ -1,0 +1,31 @@
+# Egress to authentik, for the half of OIDC the browser never touches.
+#
+# linkding fetches the token and userinfo endpoints itself, server to server,
+# against authentik's public URL. Without this the login fails after authentik
+# has already said yes, with the error surfacing on linkding's side.
+#
+# The destination is Traefik, not the address the hostname resolves to.
+# kube-proxy rewrites the MetalLB VIP to a Traefik pod address before egress
+# rules are evaluated, so a rule naming the VIP matches nothing and the
+# connection is rejected (#293). Ports are Traefik's container ports: 8443
+# backs 443.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-oidc-egress
+  namespace: linkding
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 8443

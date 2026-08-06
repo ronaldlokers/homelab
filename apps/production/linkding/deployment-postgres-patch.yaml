@@ -8,7 +8,34 @@ spec:
       containers:
         - name: linkding
           image: sissbruecker/linkding:1.45.0
+          envFrom:
+            - secretRef:
+                name: linkding-oidc
           env:
+            # OIDC via authentik. linkding uses mozilla-django-oidc, which takes
+            # each endpoint separately rather than a discovery URL, so these are
+            # spelled out. The client id and secret come from the SOPS-encrypted
+            # linkding-oidc Secret.
+            #
+            # linkding matches an OIDC login to a local account BY E-MAIL. An
+            # account whose e-mail does not match the claim gets a second,
+            # empty account instead of access to the existing bookmarks, and
+            # nothing reports this as an error.
+            - name: LD_ENABLE_OIDC
+              value: "True"
+            - name: OIDC_OP_AUTHORIZATION_ENDPOINT
+              value: "https://authentik.ronaldlokers.nl/application/o/authorize/"
+            - name: OIDC_OP_TOKEN_ENDPOINT
+              value: "https://authentik.ronaldlokers.nl/application/o/token/"
+            - name: OIDC_OP_USER_ENDPOINT
+              value: "https://authentik.ronaldlokers.nl/application/o/userinfo/"
+            - name: OIDC_OP_JWKS_ENDPOINT
+              value: "https://authentik.ronaldlokers.nl/application/o/linkding-production/jwks/"
+            # The documented default is "oidc email profile", which is a typo
+            # for the standard scope name — a request for "oidc" gets no
+            # identity claims back.
+            - name: OIDC_RP_SCOPES
+              value: "openid email profile"
             - name: LD_DB_ENGINE
               value: "postgres"
             - name: LD_DB_HOST
