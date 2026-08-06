@@ -170,9 +170,35 @@ spec:
         existingSecret: grafana-admin
         userKey: admin-user
         passwordKey: admin-password
+      # Client id and secret come from the grafana-oidc Secret via $__env{},
+      # so they never appear in the rendered HelmRelease.
+      envFromSecret: grafana-oidc
       grafana.ini:
         server:
           root_url: https://grafana.ronaldlokers.nl
+        auth.generic_oauth:
+          enabled: true
+          name: authentik
+          client_id: $__env{GF_AUTH_GENERIC_OAUTH_CLIENT_ID}
+          client_secret: $__env{GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET}
+          scopes: openid email profile
+          auth_url: https://authentik.ronaldlokers.nl/application/o/authorize/
+          token_url: https://authentik.ronaldlokers.nl/application/o/token/
+          api_url: https://authentik.ronaldlokers.nl/application/o/userinfo/
+          # Everyone who gets in is an admin. This is a single-operator
+          # homelab, and a viewer-by-default rule would mean logging in and
+          # then not being able to do anything, with no second person to
+          # promote you.
+          role_attribute_path: "'Admin'"
+          # Do not send people straight to authentik. Grafana's local admin
+          # account is the way back in if the provider is misconfigured, and
+          # this is the surface used to diagnose an authentik outage.
+          auto_login: false
+        auth:
+          # Keep the local login form. See above — this is deliberately not
+          # the same choice as mealie, because grafana is where you look when
+          # authentik is the thing that is broken.
+          disable_login_form: false
       ingress:
         enabled: true
         ingressClassName: traefik

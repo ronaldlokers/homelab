@@ -6,5 +6,6 @@ resources:
   - ../../base/kube-prometheus-stack/
   - release.yaml
   - grafana-admin-secret.yaml
+  - grafana-oidc-secret.yaml
   - alertmanager-config.yaml
   - job-alerts.yaml
