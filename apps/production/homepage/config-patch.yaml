@@ -58,6 +58,10 @@ data:
             icon: tandoor-recipes.png
             href: https://tandoor.ronaldlokers.nl
             description: Recipe manager
+            widget:
+              type: tandoor
+              url: http://tandoor.tandoor.svc.cluster.local
+              key: "{{HOMEPAGE_VAR_TANDOOR_KEY}}"
 
     - Health:
         - Nightscout:
