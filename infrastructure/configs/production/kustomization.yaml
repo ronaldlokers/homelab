@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - ../base/network-policies
   - allow-gatus-to-grafana.yaml
+  - allow-homepage-widget-targets.yaml
   - allow-grafana-oidc-egress.yaml
   - cert-manager
   - cloudnative-pg

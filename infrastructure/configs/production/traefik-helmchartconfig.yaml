@@ -61,3 +61,21 @@ spec:
         externalTrafficPolicy: Local
     deployment:
       kind: DaemonSet
+    # Traefik's read-only API, for homepage's traefik widget: router, service
+    # and middleware counts, and TLS certificate state.
+    #
+    # `insecure` is the chart's name for "serve the API on the traefik
+    # entrypoint without its own auth", which sounds worse than it is here and
+    # is still worth stating plainly: port 9000 is a ClusterIP port with no
+    # Ingress and no LoadBalancer exposure, so it is reachable only from inside
+    # the cluster, and a NetworkPolicy limits that to the homepage namespace.
+    #
+    # The dashboard stays off. It is the same API with a UI attached, and
+    # nothing here needs the UI.
+    api:
+      insecure: true
+      dashboard: false
+    ports:
+      traefik:
+        expose:
+          default: true
