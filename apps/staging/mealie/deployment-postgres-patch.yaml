@@ -46,7 +46,27 @@ spec:
             # every visit straight to authentik, which locks you out of the
             # local admin account if the provider is ever misconfigured — not a
             # trade worth making while this is the first client being proven.
+            # Send every visit straight to authentik. The local login page
+            # is still reachable at /login?direct=1, but with
+            # ALLOW_PASSWORD_LOGIN false it renders without the password
+            # fields, so that is a way to see the page rather than a way in.
             - name: OIDC_AUTO_REDIRECT
+              value: "true"
+            # Hide the username and password inputs. Note what this is and is
+            # not: the documentation describes it as controlling whether the
+            # fields are *displayed*. Treat it as removing the front door from
+            # the UI, not as disabling password authentication in the API.
+            #
+            # BREAK-GLASS. With this set there is no route back in through the
+            # browser if authentik is unavailable. Recovery is to set this back
+            # to true and roll out:
+            #
+            #   kubectl set env deploy/mealie -n mealie ALLOW_PASSWORD_LOGIN=true
+            #
+            # which Flux will revert on its next reconcile, so it buys a window
+            # rather than a permanent change — appropriate for an emergency and
+            # self-cleaning afterwards.
+            - name: ALLOW_PASSWORD_LOGIN
               value: "false"
             # Mealie refuses a login whose ID token lacks email_verified:
             #
