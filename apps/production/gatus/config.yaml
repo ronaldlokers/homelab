@@ -142,7 +142,7 @@ endpoints:
   # what makes that untestable from here.
   - name: grafana
     group: homelab
-    url: "http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local:3000/api/health"
+    url: "http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local/api/health"
     interval: 60s
     conditions:
       - "[STATUS] == 200"
