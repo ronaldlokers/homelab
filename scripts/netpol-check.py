@@ -210,13 +210,13 @@ def check_enforcement(ctx):
     return results
 
 
-def check_expectations(ctx):
+def check_expectations(ctx, ingress_ip=None):
     rows = []
     for want_ctx, ns, deploy, host, port, expect_allowed, why in EXPECTATIONS:
         if want_ctx != "*" and want_ctx != ctx:
             continue
         if host == "INGRESS":
-            host = INGRESS_IP.get(ctx)
+            host = ingress_ip or INGRESS_IP.get(ctx)
             if not host:
                 rows.append((ns, "INGRESS", port, None, "no ingress IP known for this context", why))
                 continue
@@ -229,6 +229,9 @@ def check_expectations(ctx):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--ingress-ip",
+                    help="ingress IP to probe; required when running without a "
+                         "context, where the name cannot be looked up")
     ap.add_argument("--context", default=None,
                     help="omit when running inside the cluster")
     ap.add_argument("--expectations-only", action="store_true",
@@ -253,7 +256,7 @@ def main():
         print()
 
     print(f"== do the policies match intent in {ctx}? ==")
-    for ns, host, port, ok, verdict, why in check_expectations(ctx):
+    for ns, host, port, ok, verdict, why in check_expectations(ctx, args.ingress_ip):
         mark = "ok  " if ok else ("skip" if ok is None else "FAIL")
         if ok is False:
             failed = True

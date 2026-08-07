@@ -34,14 +34,15 @@ spec:
               args:
                 - |
                   set -o pipefail
-                  python3 /opt/check/netpol-check.py 2>&1 | tee /tmp/out.txt
+                  python3 /opt/check/netpol-check.py --ingress-ip 10.0.40.52 2>&1 | tee /tmp/out.txt
                   rc=$?
                   if [ "$rc" != "0" ]; then
                     curl -s -u "netpolcheck:$NTFY_PASSWORD" \
                       -H "Title: staging NetworkPolicy check failed" \
                       -H "Priority: high" -H "Tags: warning" \
                       -d "$(tail -c 700 /tmp/out.txt)" \
-                      https://ntfy.ronaldlokers.nl/homelab-gatus-staging >/dev/null
+                      -o /dev/null -w 'ntfy responded %{http_code}\n' \
+                      https://ntfy.ronaldlokers.nl/homelab-gatus-staging
                   fi
                   exit $rc
               env:
