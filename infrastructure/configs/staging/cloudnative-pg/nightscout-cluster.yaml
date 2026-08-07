@@ -101,6 +101,11 @@ spec:
 
   backup:
     retentionPolicy: "14d"
+    # Same reason as production (#376), and not currently load-bearing: this
+    # cluster runs one instance, so prefer-standby already falls back to the
+    # primary. Set explicitly so growing it to three does not silently stop
+    # backups, which is exactly how production failed for three nights.
+    target: primary
     barmanObjectStore:
       # Own prefix. Sharing one with another cluster trips barman's "Expected
       # empty archive" check, and makes a restore ambiguous about which cluster
