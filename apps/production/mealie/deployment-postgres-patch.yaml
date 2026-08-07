@@ -62,15 +62,18 @@ spec:
               value: "mealie"
             # Was the shared `app` role. Taken from the Secret so the role name
             # and its password can never drift apart (#219).
+            # pg-role-mealie is mirrored here from the database namespace by
+            # reflector, so this is the same object CNPG reconciles the role
+            # against rather than a copy that can drift (#268).
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: postgres-app-credentials
+                  name: pg-role-mealie
                   key: username
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-app-credentials
+                  name: pg-role-mealie
                   key: password
             - name: BASE_URL
               value: "https://mealie.ronaldlokers.nl"
