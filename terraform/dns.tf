@@ -1,12 +1,5 @@
-# The zone's A and CNAME records. TXT records are deliberately not managed
-# here: they are verification and mail records issued by other services, and
-# adopting them into terraform would mean this repo owns values it does not
-# generate.
-#
-# ttl = 1 means "automatic", which is what the dashboard sets.
-
-# Everything on the LAN answers on the MetalLB VIP through this wildcard.
-# Immich returned to it when its tunnel hostname was removed (#304).
+# A and CNAME records. TXT records are excluded: other services issue them.
+# ttl = 1 is Cloudflare's "automatic".
 resource "cloudflare_dns_record" "wildcard" {
   zone_id = var.zone_id
   name    = "*.ronaldlokers.nl"
@@ -34,7 +27,7 @@ resource "cloudflare_dns_record" "wildcard_staging" {
   proxied = false
 }
 
-# Outside the cluster, so it needs its own record rather than the wildcard.
+# Outside the cluster, so not covered by the wildcard.
 resource "cloudflare_dns_record" "truenas" {
   zone_id = var.zone_id
   name    = "truenas.ronaldlokers.nl"
@@ -44,8 +37,7 @@ resource "cloudflare_dns_record" "truenas" {
   proxied = false
 }
 
-# The only record that points anywhere public. Proxied, so Cloudflare
-# terminates TLS and the origin is reached through the tunnel.
+# The only public record.
 resource "cloudflare_dns_record" "ntfy" {
   zone_id = var.zone_id
   name    = "ntfy.ronaldlokers.nl"

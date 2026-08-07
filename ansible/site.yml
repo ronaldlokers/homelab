@@ -1,21 +1,10 @@
-# Host state for the k3s control plane nodes.
-#
-# Everything here previously existed only as copy-paste bash inside runbooks
-# (#159). A rebuilt CM5 came back without it — most importantly without the
-# etcd bind mount onto NVMe, silently returning to the eMMC card whose 1200ms
-# apply latency this estate spent a day diagnosing.
-#
-# Usage, always in this order:
-#
-#   ansible-playbook site.yml --check --diff     # what would change
-#   ansible-playbook site.yml                    # change it
+# Host state for the k3s control plane nodes (#159).
+# Run with --check --diff first; see README.md.
 ---
 - name: k3s control plane node configuration
   hosts: k3s_servers
   gather_facts: true
-  # One node at a time. These are all three control plane members, and the
-  # journald restart is brief but real — converging them in parallel would
-  # take the whole control plane's logging out at once for no reason.
+  # All three are control plane members; the journald restart is brief but real.
   serial: 1
   roles:
     - k3s_node

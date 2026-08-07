@@ -6,14 +6,9 @@
     update_cache: true
     cache_valid_time: 3600
 
-# /etc/sysctl.conf is not read on these nodes. Debian normally symlinks it into
-# /etc/sysctl.d/99-sysctl.conf, and that symlink does not exist here — so the
-# inotify limits written into /etc/sysctl.conf have never applied on any node:
-#
-#   configured: fs.inotify.max_user_watches=524288  max_user_instances=512
-#   runtime:    129511                              128
-#
-# A drop-in in /etc/sysctl.d is read directly and does not depend on that.
+# /etc/sysctl.conf is not read here: Debian's symlink into
+# /etc/sysctl.d/99-sysctl.conf is missing, so settings placed there never
+# applied. A drop-in in /etc/sysctl.d is read directly.
 - name: Inotify limits, in a file systemd-sysctl actually reads
   ansible.builtin.copy:
     dest: /etc/sysctl.d/90-homelab-inotify.conf
@@ -45,10 +40,7 @@
     group: systemd-journal
     mode: "2755"
 
-# The drop-in directory does not exist on a stock install. --check mode did not
-# catch this: it reports what the copy *would* write without evaluating whether
-# the destination is reachable, so the dry run was clean and the real run failed
-# on the first node.
+# Absent on a stock install, and --check does not catch a missing parent.
 - name: Journald drop-in directory
   ansible.builtin.file:
     path: /etc/systemd/journald.conf.d
@@ -70,17 +62,11 @@
       SystemMaxUse=1G
   notify: Restart journald
 
-# etcd on NVMe.
-#
-# This is the one piece that cannot simply be converged. Bind-mounting over a
-# directory that already holds live etcd data hides that data from the running
-# cluster, so the task refuses to act in exactly the case where acting would be
-# destructive, and points at the runbook that handles moving the data.
-#
-# The three states:
-#   already mounted        -> verify it is the NVMe device and move on
-#   empty or absent target -> a rebuilt node; create it
-#   populated, not mounted -> stop, and tell a human which runbook applies
+# etcd on NVMe. Bind-mounting over a directory holding live etcd data hides it
+# from k3s, so this refuses in that case rather than converging:
+#   mounted   -> verify the device
+#   empty     -> create it (a rebuilt node)
+#   populated -> stop, see docs/runbooks/etcd-migrate-to-nvme.md
 - name: Check the etcd mount state
   ansible.builtin.stat:
     path: "{{ etcd_target_dir }}"

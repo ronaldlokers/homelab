@@ -1,9 +1,4 @@
-# Cloudflare configuration, which until now existed only in a dashboard.
-#
-# #308: the tunnel's ingress rules and the zone's DNS decide what of this
-# estate is reachable from the internet, and neither was visible from this
-# repository. Removing Immich's network path in-cluster left it serving anyway,
-# because the hostname lived somewhere nothing here could see.
+# Cloudflare: tunnel ingress, DNS and zone settings (#308).
 terraform {
   required_version = ">= 1.9"
 
@@ -14,16 +9,9 @@ terraform {
     }
   }
 
-  # State lives in Backblaze B2, reached through its S3-compatible API.
-  #
-  # The skip_* flags are not optional: the AWS SDK asserts things about the
-  # endpoint that are only true of AWS. skip_s3_checksum in particular is the
-  # one that bites — without it every write fails on a checksum header B2 does
-  # not implement.
-  #
-  # Credentials come from AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY at run
-  # time. They are a B2 application key restricted to this bucket, and they are
-  # deliberately not in this repository — see README.md.
+  # Backblaze B2 over its S3 API. The skip_* flags are required: the AWS SDK
+  # asserts things only true of AWS, and without skip_s3_checksum every write
+  # fails. Credentials come from the environment — see README.md.
   backend "s3" {
     bucket = "lokilabs-homelab-terraform-state"
     key    = "cloudflare/terraform.tfstate"
@@ -41,6 +29,5 @@ terraform {
   }
 }
 
-# The token is read from CLOUDFLARE_API_TOKEN. It is account-owned and scoped
-# to DNS edit, zone settings edit and tunnel edit — no broader.
+# Reads CLOUDFLARE_API_TOKEN.
 provider "cloudflare" {}
