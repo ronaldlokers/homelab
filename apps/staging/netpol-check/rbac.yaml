@@ -26,6 +26,10 @@ rules:
   - apiGroups: [""]
     resources: [pods/ephemeralcontainers]
     verbs: [get, patch, update]
+  # `kubectl exec deploy/x` resolves the Deployment to a pod first.
+  - apiGroups: ["apps"]
+    resources: [deployments]
+    verbs: [get]
   - apiGroups: ["networking.k8s.io"]
     resources: [networkpolicies]
     verbs: [get, list]
