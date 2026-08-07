@@ -7,4 +7,3 @@ resources:
   - kyverno
   - reflector
   - reloader
-  - renovate
