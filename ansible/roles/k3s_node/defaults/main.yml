@@ -1,13 +1,11 @@
 ---
-# Raised because Longhorn, Flux and the kubelet each hold thousands of watches;
-# the default was exhausted on this cluster and surfaced as controllers
-# silently not reconciling (docs/runbooks/inotify-limits-exhausted.md).
+# Longhorn, Flux and the kubelet each hold thousands of watches; the default
+# was exhausted here (docs/runbooks/inotify-limits-exhausted.md).
 inotify_max_user_watches: 524288
 inotify_max_user_instances: 512
 
-# The NVMe partition that carries etcd. Named rather than discovered: a
-# playbook that guesses which disk to mount etcd on is a playbook that can
-# destroy a cluster on a node whose disks enumerate differently.
+# Named rather than discovered: guessing which disk carries etcd is how a
+# playbook destroys a cluster.
 etcd_nvme_device: /dev/nvme0n1p1
 etcd_nvme_mountpoint: /mnt/longhorn
 etcd_source_dir: /mnt/longhorn/etcd
