@@ -10,9 +10,27 @@ spec:
     spec:
       template:
         spec:
+          # Renovate talks to GitHub and to container registries. It has no
+          # reason to hold a Kubernetes API credential, and the default
+          # ServiceAccount token is mounted into every pod unless refused.
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
           containers:
             - name: renovate
-              image: renovate/renovate:latest
+              # Pinned by digest as well as tag. The tag is what Renovate
+              # updates when a new release appears; the digest is what actually
+              # runs, so a moved tag cannot change it silently.
+              #
+              # This matters here more than most places: whatever reaches main
+              # is applied by kustomize-controller with cluster-admin, and this
+              # pod holds a token that can push to main. An unpinned mutable
+              # tag made one upstream image the whole cluster. The estate has
+              # already seen a real upstream integrity failure — Longhorn's
+              # published chart index digest not matching its artifact (#153).
+              image: renovate/renovate:44.14.3@sha256:b6bcb741cbdd5e3675f9903a639ba43a74eb9665a0b850ac018acf0b32b59c11
               args:
                 - ronaldlokers/homelab
               envFrom:
@@ -20,5 +38,24 @@ spec:
                     name: renovate-container-env
                 - configMapRef:
                     name: renovate-configmap
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                # Not readOnlyRootFilesystem: the image writes to /home/ubuntu
+                # as well as its base dir, and running it read-only would need
+                # a mount per path for no benefit this pod does not already get
+                # from dropping privileges.
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 512Mi
+                limits:
+                  # Renovate's memory use scales with the number of
+                  # dependencies it resolves at once. No CPU limit: it is a
+                  # batch job on an hourly schedule, so throttling it only
+                  # makes it hold its token for longer.
+                  memory: 2Gi
 
           restartPolicy: Never
