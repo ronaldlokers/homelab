@@ -47,12 +47,12 @@ spec:
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: postgres-app-credentials
+                  name: pg-role-tandoor
                   key: username
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-app-credentials
+                  name: pg-role-tandoor
                   key: password
             - name: SECRET_KEY
               valueFrom:

@@ -19,10 +19,10 @@ spec:
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: postgres-app-credentials
+                  name: pg-role-gatus
                   key: username
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-app-credentials
+                  name: pg-role-gatus
                   key: password

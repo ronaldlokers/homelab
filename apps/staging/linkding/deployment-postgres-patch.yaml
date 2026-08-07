@@ -55,10 +55,10 @@ spec:
             - name: LD_DB_USER
               valueFrom:
                 secretKeyRef:
-                  name: postgres-app-credentials
+                  name: pg-role-linkding
                   key: username
             - name: LD_DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-app-credentials
+                  name: pg-role-linkding
                   key: password

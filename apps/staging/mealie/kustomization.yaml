@@ -3,7 +3,6 @@ kind: Kustomization
 namespace: mealie
 resources:
 - mealie-oidc-secret.yaml
-- postgres-credentials-secret.yaml
 - ../../base/mealie/
 - ingress.yaml
 - network-policy-oidc.yaml
