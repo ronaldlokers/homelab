@@ -6,6 +6,7 @@ resources:
   - cloudnative-pg
   - longhorn
   - metallb
+  - reflector
   - reloader
   - renovate
   - tailscale
