@@ -50,11 +50,13 @@ loki.process "scrub" {
   }
 
   // Credentials as query parameters or logfmt fields — the Nightscout case.
+  // `pwd` is matched case-sensitively: sudo logs `PWD=<cwd>`, which is a
+  // working directory, and redacting it cost the line its only useful field.
   // This also redacts the VALUE of any `secret=` field, which in a Kubernetes
   // event may be a Secret's name rather than its contents. Losing a resource
   // name from a log line is a deliberate trade against leaking a live token.
   stage.replace {
-    expression = "(?i)\\b(?:token|secret|api[-_]?key|apikey|access[-_]?token|password|passwd|pwd)=([^&\\s\"]+)"
+    expression = "\\b(?:(?i:token|secret|api[-_]?key|apikey|access[-_]?token|password|passwd)|pwd)=([^&\\s\"]+)"
     replace    = "REDACTED"
   }
 }
