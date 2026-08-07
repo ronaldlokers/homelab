@@ -28,76 +28,20 @@ spec:
       defaultDataPath: /mnt/longhorn
       backupTarget: "s3://longhorn-backups@us-east-1/"
       backupTargetCredentialSecret: "longhorn-s3-secret"
-      # Volume engines do not follow the manager version unless this is > 0,
-      # and it defaults to 0. The result was silent version drift: the manager
-      # went to 1.8.2 in #133 while 95 volume references stayed on engine
-      # v1.7.2, where they had been for 242 days across more than one manager
-      # upgrade. default-engine-image was already v1.8.2, so only *new* volumes
-      # picked it up and nothing surfaced the gap.
-      #
-      # That drift blocks the upgrade path. Longhorn supports live engine
-      # upgrade to v1.9.2 only from v1.8.x, so raising the manager to 1.9.2
-      # (PR #143) while engines sit on 1.7.2 leaves an offline upgrade —
-      # detaching every volume — as the only way to reconcile them.
-      #
-      # 1 upgrades one engine per node at a time, on healthy volumes only, so
-      # replicas rebuild sequentially rather than all at once. Longhorn skips
-      # degraded volumes entirely, which is why the 19/19 healthy precondition
-      # matters before this merges.
+      # Volume engines do not follow the manager version unless this is > 0, and it
+      # defaults to 0. The manager went to 1.8.2 in #133 while 95 volume references
+      # stayed on engine v1.7.2.
       concurrentAutomaticEngineUpgradePerNodeLimit: 1
-      # Longhorn detects orphaned replica directories — data left on disk for
-      # replicas it has since rebuilt elsewhere — and files an Orphan resource
-      # for each. It deletes none of them unless this names the types to reap,
-      # and it defaults to empty.
-      #
-      # The result was 24 orphans holding 137.4G, every one detected on
-      # 2026-08-01 at 19:57 and 20:06 — the etcd NVMe migration, node by node.
-      # Each node was stopped, its NVMe remounted and restarted; Longhorn
-      # rescanned on re-registration, found replica directories whose replicas
-      # had been rebuilt during the outage, and correctly flagged them.
-      #
-      # Four days later they were still there, and they were the entire reason
-      # the three nodes looked so unevenly used:
-      #
-      #   node          used   orphaned      REAL
-      #   kube-srv-1    270G     101.8G     168.2G
-      #   kube-srv-2    157G       0.0G     157.0G
-      #   kube-srv-3    197G      35.6G     161.4G
-      #
-      # kube-srv-2 was migrated first and escaped: it is the rebuild onto the
-      # OTHER nodes that strands the old directory.
-      #
-      # So this is not a one-off cleanup — every future node reboot recreates
-      # the condition. orphan-resource-auto-deletion-grace-period is 300s, so a
-      # directory has to stay orphaned for five minutes before it is removed;
-      # nothing is deleted the instant it is detected.
+      # Longhorn files an Orphan resource for each orphaned replica directory but
+      # deletes none unless this names the types to reap.
       orphanResourceAutoDeletion: "replica-data;instance"
     # Configure default StorageClass with 3 replicas
     persistence:
       defaultClass: true
       defaultClassReplicaCount: 3
-      # Chart default is Delete, which means removing a PVC destroys the
-      # Longhorn volume and its data. Because Flux runs `prune: true`, deleting
-      # one line from a kustomization is enough to trigger that — no explicit
-      # delete required, and no confirmation anywhere. Every volume here was
-      # exposed: all three postgres instances, Immich's database, Loki, and
-      # every app volume.
-      #
-      # Retain keeps the PV and the underlying Longhorn volume when the claim
-      # goes away. The trade is that a released PV is no longer recycled
-      # automatically — it sits in Released and has to be cleaned up by hand.
-      # That is the right way round for data whose only other copy is a NAS
-      # backup that has never been restore-tested (#160).
-      #
-      # reclaimPolicy is immutable on a StorageClass, so the existing class has
-      # to be deleted for longhorn-manager to recreate it from the updated
-      # ConfigMap. Deleting a StorageClass does not affect bound PVCs — it is
-      # only consulted when provisioning.
-      #
-      # This governs NEW volumes only. A StorageClass is read at provision
-      # time, so volumes that already existed keep whatever policy they were
-      # created with — those were patched to Retain as a one-time remediation
-      # when this landed (#172).
+      # Chart default is Delete: removing a PVC destroys the volume and its data.
+      # With Flux running prune: true, deleting one line from a kustomization is
+      # enough to trigger that.
       reclaimPolicy: Retain
     # Enable Prometheus metrics
     metrics:

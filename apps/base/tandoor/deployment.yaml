@@ -18,41 +18,14 @@ spec:
       labels:
         app: tandoor
     spec:
-      # Kubernetes injects an environment variable per Service in the namespace,
-      # named after it. The Service here is `tandoor`, so it sets
-      # TANDOOR_PORT=tcp://10.43.x.x:80 — and boot.sh substitutes $TANDOOR_PORT
-      # straight into nginx's listen directive:
-      #
-      #   nginx: [emerg] invalid host in "tcp://10.43.209.23:80" of the
-      #   "listen" directive in /etc/nginx/http.d/Recipes.conf:9
-      #
-      # nginx then never starts, gunicorn runs behind nothing, and port 80 stays
-      # closed — so the pod looks like a slow boot rather than a config error.
-      # boot.sh's `${TANDOOR_PORT:-80}` default cannot save it, because the
-      # variable is set, just to the wrong kind of value.
-      #
-      # Turning the injection off removes the collision at the source, and the
-      # explicit TANDOOR_PORT below keeps it correct even if this is ever
-      # re-enabled. Nothing here discovers other services by environment
-      # variable; everything uses DNS.
+      # Kubernetes injects TANDOOR_PORT=tcp://… for the `tandoor` Service, and
+      # boot.sh substitutes it into the nginx config. Set explicitly to override.
       enableServiceLinks: false
       securityContext:
         fsGroup: 65534
       containers:
-        # One container. The image bundles nginx on port 80 in front of gunicorn,
-        # which binds a unix socket at /tmp/tandoor.sock. Verified in the pod:
-        #
-        #   tcp 0.0.0.0:80 LISTEN 11/nginx.pid
-        #   PID 11 nginx: master process
-        #   PID  7 gunicorn --bind unix:/tmp/tandoor.sock
-        #
-        # An nginx sidecar is NOT needed and actively breaks it — containers in
-        # a pod share a network namespace, so a second nginx fails with
-        # "bind() to 0.0.0.0:80 failed (98: Address in use)".
-        #
-        # The trap: nginx starts at the END of boot.sh, after migrations,
-        # collectstatic and gunicorn. Run netstat mid-boot and nothing is
-        # listening, which reads exactly like an image that serves no HTTP.
+        # One container: the image bundles nginx on port 80 in front of gunicorn on a
+        # unix socket.
         - name: tandoor
           ports:
             - name: http
@@ -95,14 +68,8 @@ spec:
             # up and then nobody can log in.
             - name: SECURE_PROXY_SSL_HEADER
               value: "True"
-          # First boot applies 240+ Django migrations, then collectstatic, and
-          # only then starts nginx — well over five minutes on ARM64.
-          #
-          # 60 x 5s was not enough: the probe killed the container mid-migration
-          # and each restart began the whole sequence again, so it never
-          # converged. 120 x 5s covers the measured cold start with room spare.
-          # This only delays detection of a container dead at startup;
-          # livenessProbe still catches one that dies later.
+          # First boot runs 240+ migrations then collectstatic before nginx starts —
+          # well over five minutes on ARM64, so the startup probe allows for it.
           startupProbe:
             httpGet:
               path: /

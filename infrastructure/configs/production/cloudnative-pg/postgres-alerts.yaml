@@ -8,27 +8,13 @@ metadata:
     app.kubernetes.io/name: cloudnativepg
 spec:
   groups:
-    # #219 gave every application its own database and enforced it by revoking
-    # PUBLIC's CONNECT. That is hand-run SQL with nothing reproducing or
-    # checking it, and on 2026-08-05 it broke replication for four hours without
-    # a single signal turning red. These two alerts are the check that was
-    # missing.
+    # #219's isolation is hand-run SQL with nothing reproducing or checking it,
+    # and on 2026-08-05 it broke replication for four hours (#263).
     - name: postgres_isolation_alerts
       rules:
-        # The exact failure of 2026-08-05. REVOKE CONNECT ON DATABASE postgres
-        # FROM PUBLIC removed the only grant streaming_replica had —
-        # CloudNativePG's replication role is deliberately not a superuser, so
-        # unlike pg_cron it does not bypass CONNECT — and CNPG uses
-        # database=postgres for the connection a replica makes when it rejoins.
-        #
-        # Nothing surfaced it, because CONNECT is evaluated at connection time:
-        # replicas already streaming carried on, and the broken path only runs
-        # when one restarts. It took a planned switchover to expose it, thirteen
-        # minutes of a demoted instance retrying every five seconds.
-        #
-        # Critical rather than warning: the cluster is serving fine, but it can
-        # no longer rebuild a replica, so the next node failure is the one that
-        # finds out.
+        # The exact failure of 2026-08-05: revoking PUBLIC's CONNECT on `postgres`
+        # removed the only grant streaming_replica had, and it is not a superuser.
+        # Invisible in pg_stat_activity because it only connects on replica rejoin.
         - alert: PostgreSQLReplicationRoleCannotConnect
           annotations:
             summary: "streaming_replica cannot connect to the postgres database on {{ $labels.pod }}"
@@ -38,11 +24,8 @@ spec:
           for: 5m
           labels:
             severity: critical
-        # The isolation itself. app and nightscout are deliberately excluded:
-        # `app` is CloudNativePG's own default database and `nightscout` is an
-        # empty leftover that nothing reads — FerretDB stores the glucose data
-        # in the shared postgres database, which is why #249 gave Nightscout its
-        # own cluster rather than its own database here.
+        # `app` and `nightscout` were excluded here as unused; both were revoked by
+        # hand later (#296).
         - alert: PostgreSQLDatabaseNotIsolated
           annotations:
             summary: "PUBLIC can connect to database {{ $labels.datname }}"
@@ -55,20 +38,8 @@ spec:
 
     - name: postgres_archiving_alerts
       rules:
-        # Fires when the most recent archive attempt failed, i.e. archiving is
-        # broken *now*.
-        #
-        # This previously used `cnpg_pg_stat_archiver_failed_count > 0`. That is
-        # a cumulative counter since stats_reset, so a single transient failure
-        # latches the alert on forever. It did exactly that: immich-cluster-2
-        # recorded one failure, archiving recovered and kept succeeding, and the
-        # alert stayed critical indefinitely with `increase(...[1h])` at 0.
-        #
-        # Comparing the two timestamps asks the right question — is the newest
-        # failure more recent than the newest success? Note both metrics use -1
-        # as their "never happened" sentinel rather than 0, which this handles
-        # naturally: -1 never exceeds a real timestamp, and a cluster that has
-        # failed but never succeeded (positive > -1) correctly fires.
+        # Fires when the most recent archive attempt failed. The previous expression
+        # used a cumulative counter, which never returns to zero.
         - alert: PostgreSQLWALArchivingFailing
           annotations:
             summary: "PostgreSQL WAL archiving is failing on {{ $labels.pod }}"
@@ -94,22 +65,8 @@ spec:
             severity: warning
             component: database
 
-        # Replaces PostgreSQLContinuousArchivingFailed, which fired
-        # unconditionally and had nothing to do with archiving.
-        #
-        # Its expression was:
-        #   cnpg_collector_up{...} == 1 unless cnpg_collector_last_collection_error{...} == 0
-        #
-        # `unless` is a set operation requiring identical label sets on both
-        # sides. They do not match here, so nothing was ever excluded and all 6
-        # instances fired permanently — while last_collection_error was 0 on
-        # every one of them. Six standing criticals that could not respond to
-        # the cluster's actual state, alongside a description warning about WAL
-        # filling PVCs that no part of the expression measured.
-        #
-        # What it *should* have measured is kept below at warning severity,
-        # because a failing collector blinds the archiving alerts above rather
-        # than being an outage in itself.
+        # Replaces an alert whose expression tested collector liveness rather than
+        # archiving, and fired unconditionally.
         - alert: CNPGMetricsCollectorFailing
           annotations:
             summary: "CloudNativePG metrics collector is erroring on {{ $labels.pod }}"
@@ -123,11 +80,9 @@ spec:
 
     - name: postgres_backup_alerts
       rules:
-        # WAL archiving without a base backup provides zero recoverability:
-        # firstRecoverabilityPoint stays empty and PITR is impossible. This
-        # happened silently to immich-cluster for 4 months — see
-        # docs/war-stories/cnpg-invisible-backup-gap.md. Only the primary
-        # reports a non-zero timestamp, hence max by cluster.
+        # WAL archiving without a base backup means PITR is impossible;
+        # firstRecoverabilityPoint stays empty. It happened to immich-cluster for four
+        # months.
         - alert: PostgreSQLBackupTooOld
           annotations:
             summary: "Last base backup of {{ $labels.cnpg_io_cluster }} is older than 26 hours"
