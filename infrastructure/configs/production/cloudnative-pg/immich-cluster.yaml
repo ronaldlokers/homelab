@@ -4,19 +4,6 @@ metadata:
   name: immich-cluster
   namespace: database
 spec:
-  # Propagated to everything CNPG creates for this cluster, including the
-  # generated <cluster>-app Secret. That Secret cannot be patched from git —
-  # it does not exist until the operator makes it — so this is the only
-  # declarative way to let reflector mirror it into the immich namespace.
-  #
-  # Immich held a stale copy of this credential for four hours after a
-  # recreate regenerated it (#268).
-  inheritedMetadata:
-    annotations:
-      reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
-      reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "immich"
-      reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
-      reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "immich"
   instances: 3
   # Applications are useless until this is serving, and an app whose database
   # is down crash-loops and adds load while achieving nothing. Ranked above
