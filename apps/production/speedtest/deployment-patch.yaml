@@ -27,10 +27,10 @@ spec:
             - name: DB_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: postgres-app-credentials
+                  name: pg-role-speedtest
                   key: username
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-app-credentials
+                  name: pg-role-speedtest
                   key: password

@@ -21,10 +21,10 @@ spec:
             - name: QUARKUS_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: postgres-app-credentials
+                  name: pg-role-commafeed
                   key: username
             - name: QUARKUS_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-app-credentials
+                  name: pg-role-commafeed
                   key: password

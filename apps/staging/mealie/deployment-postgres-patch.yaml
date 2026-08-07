@@ -95,12 +95,12 @@ spec:
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: postgres-app-credentials
+                  name: pg-role-mealie
                   key: username
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-app-credentials
+                  name: pg-role-mealie
                   key: password
             - name: BASE_URL
               value: "https://mealie.staging.ronaldlokers.nl"
