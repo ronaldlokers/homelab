@@ -1,21 +1,23 @@
 apiVersion: v1
-data:
-    RENOVATE_TOKEN: ENC[AES256_GCM,data:HwvKHGCc3Z7F5hAz3fV6xE0zZ9RXan07LBok3EGS2PrimkbtqW8qL2booOVYbc4zzjtHZlVldCs=,iv:XnD7B2FoSf7E8/WV0AYqxLUVlz52Pe3+a6maPUnf3+s=,tag:EcVh1YRR8OKMAky8Y6XeYQ==,type:str]
 kind: Secret
 metadata:
     name: renovate-container-env
+    namespace: renovate
+type: Opaque
+stringData:
+    RENOVATE_TOKEN: ENC[AES256_GCM,data:5YdxhCc9mffgDtdhYCL2x8hSY3sURbB6sn87hxORx8JcAGmWTqAGhZ+fLJMaVyphkYIk8iwM8VOQP8OIj2CqnG8wj6qJePrbdg6cWq7Npxgph6wUSfbetJ3ioiwl,iv:5T8goeqGsyem89Aevq/BHlZHmE11rOEx0GpDc/4v0EY=,tag:oEjYwdvbOTinsivwu7DE3w==,type:str]
 sops:
     age:
-        - recipient: age1hh6cdyljk2ks5mkmxqx6g65c7a8rgndy5p2s2d7w2gvqx4h53ggqtwr7rh
-          enc: |
+        - enc: |
             -----BEGIN AGE ENCRYPTED FILE-----
-            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByRVlra28vdVY2KzZXdytu
-            RHBqdGlZUGNhZUIzYmd0KzFpUmF3Yy8xdmo0CkhCcmVnRkpGdi9QbzgxTEorOFhz
-            Y2R3cGFhTmNabUw5VHA1bVh2V3ZZLzQKLS0tIFZuVElQSUVWancyZjlidU91Qzd6
-            d1QxZWwxZmUwTFk2cEQ3SDJ2RWZJZXMKTCtT2eV1fZjfZvTJyhwLvfHSX/i9a2BS
-            cFb3Q/cSw4rwkQg80mRjJzeYQpMRTGenB/yCMyL62ORsMUqFwqgY+g==
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBlZmtwMlFobTRWLzhKYW5m
+            TjFINGxIOUtxdFJVT3hUVXFiZ0FmNnBSbWxFCjZ2d2krKzV5ZC9id2JBNHJWYTB1
+            RUNZZEpVREpPVWhMbW16eFRiTnA5NDgKLS0tIG9HeG03OUpVNlNLR291NHJETHRr
+            M0JWMTMwU1R4dnNIRTdvRmhBQTE2WEkK2mmrDF++mJA+kuEgun7r3on3XK5X+6UV
+            brS1tULmsWSaL8dtwRlZmcd3qYCDBd79Xb5/fABGdi24CFhzIM/m9A==
             -----END AGE ENCRYPTED FILE-----
-    lastmodified: "2025-12-02T17:27:39Z"
-    mac: ENC[AES256_GCM,data:aoWZki7JAR3rTpOiBq0fc8ndmCb74l6gc4mXij/LGosmsA6TBK7OSBSw39we3LXyD5o0Zsycle1ekgp1hkXSie3wRUFQT/AOCbXVtpZrepeV3wekve8nAiEqXEkRJ73bPDWia88a64u/1SXOqYFVq6LF5tu9EpALsWHUCYHyBk8=,iv:uzxZmXY6sMq+PoQKDRMMnRVeZ4FTC9JnA1WyPFtPrrQ=,tag:T64WXSmh5VVQt1cdVVl68Q==,type:str]
+          recipient: age1hh6cdyljk2ks5mkmxqx6g65c7a8rgndy5p2s2d7w2gvqx4h53ggqtwr7rh
     encrypted_regex: ^(data|stringData)$
-    version: 3.11.0
+    lastmodified: "2026-08-07T13:01:56Z"
+    mac: ENC[AES256_GCM,data:6LsWoH6gyGq+0uZP9QIu3GTe4cRo4AQ1I/qAQ8nS5ED+2J0gCJft1OgWEtfyXChmO8KBfvC8SKKgHFxe1mGDFrA+LgVIgK+K1fcymjlh/t04Ns+dEtfkehUY4RM1Sn6Pbbr9ZpzaBPWwSPrk05BcL5ZzYwg1mjI9mJofOv/6JSE=,iv:skHcEF48Z1XPbcIHC+3lOipPVr0chMN2DXm4G0mufPA=,tag:YigivUvUdlo3UTzX006eRA==,type:str]
+    version: 3.13.3
