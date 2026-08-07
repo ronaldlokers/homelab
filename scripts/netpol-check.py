@@ -246,7 +246,7 @@ def main():
     failed = False
 
     if not args.expectations_only:
-        print(f"== is {ctx} enforcing NetworkPolicy at all? ==")
+        print(f"== is {ctx or 'this cluster'} enforcing NetworkPolicy at all? ==")
         for node, enforcing, detail in check_enforcement(ctx):
             if enforcing:
                 print(f"  {node:<24} enforcing        ({detail})")
@@ -260,7 +260,7 @@ def main():
                 print(f"  {'':<24} every policy on this node is inert; results below mean nothing for it")
         print()
 
-    print(f"== do the policies match intent in {ctx}? ==")
+    print(f"== do the policies match intent in {ctx or 'this cluster'}? ==")
     for ns, host, port, ok, verdict, why in check_expectations(ctx, args.ingress_ip):
         mark = "ok  " if ok else ("skip" if ok is None else "FAIL")
         if ok is False:
