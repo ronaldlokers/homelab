@@ -36,3 +36,68 @@ patches:
           reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "mealie"
           reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
           reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "mealie"
+  - target:
+      kind: Secret
+      name: pg-role-commafeed
+    patch: |-
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: pg-role-commafeed
+        annotations:
+          reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+          reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "commafeed"
+          reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
+          reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "commafeed"
+  - target:
+      kind: Secret
+      name: pg-role-gatus
+    patch: |-
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: pg-role-gatus
+        annotations:
+          reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+          reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "gatus"
+          reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
+          reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "gatus"
+  - target:
+      kind: Secret
+      name: pg-role-linkding
+    patch: |-
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: pg-role-linkding
+        annotations:
+          reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+          reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "linkding"
+          reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
+          reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "linkding"
+  - target:
+      kind: Secret
+      name: pg-role-speedtest
+    patch: |-
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: pg-role-speedtest
+        annotations:
+          reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+          reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "speedtest"
+          reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
+          reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "speedtest"
+  - target:
+      kind: Secret
+      name: pg-role-tandoor
+    patch: |-
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: pg-role-tandoor
+        annotations:
+          reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+          reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "tandoor"
+          reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
+          reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "tandoor"
