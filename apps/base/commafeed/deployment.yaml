@@ -37,7 +37,7 @@ spec:
       # image pull.
       initContainers:
         - name: wait-for-postgres
-          image: busybox:1.37
+          image: busybox:1.38
           command:
             - sh
             - -c
@@ -56,7 +56,7 @@ spec:
               memory: 32Mi
       containers:
         - name: commafeed
-          image: athou/commafeed:7.2.0-postgresql
+          image: athou/commafeed:7.2.1-postgresql
           ports:
             - name: http
               containerPort: 8082
