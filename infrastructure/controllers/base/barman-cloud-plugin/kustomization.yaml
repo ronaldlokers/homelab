@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - manifest.yaml
+
+# Replaces the Secret stripped from the vendored manifest. The name is the one
+# the Deployment's secretKeyRef expects, so the suffix hash must stay off.
+#
+# Keep the tag equal to the plugin version in manifest.yaml: the sidecar runs
+# beside every PostgreSQL instance and speaks to this plugin.
+secretGenerator:
+  - name: plugin-barman-cloud-f998mh5292
+    namespace: cnpg-system
+    literals:
+      - SIDECAR_IMAGE=ghcr.io/cloudnative-pg/plugin-barman-cloud-sidecar:v0.14.0
+
+generatorOptions:
+  disableNameSuffixHash: true
