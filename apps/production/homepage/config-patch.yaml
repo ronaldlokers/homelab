@@ -27,6 +27,10 @@ data:
               # same hop seen from either side of DNAT.
               url: http://authentik-server.authentik.svc.cluster.local
               key: "{{HOMEPAGE_VAR_AUTHENTIK_KEY}}"
+              # Without this the widget calls /events/events/per_month/, which
+              # this build answers with 404. Version 2 uses
+              # /events/events/volume/?action=login&history_days=1.
+              version: 2
 
     - Bookmarks:
         - Linkding:
@@ -58,6 +62,10 @@ data:
               type: mealie
               url: http://mealie.mealie.svc.cluster.local:9000
               key: "{{HOMEPAGE_VAR_MEALIE_KEY}}"
+              # statisticsv1 maps to groups/statistics, statisticsv2 to
+              # households/statistics. This build serves only the latter, so
+              # without a version the widget asks for a path that 404s.
+              version: 2
         - Tandoor:
             icon: tandoor-recipes.png
             href: https://tandoor.ronaldlokers.nl
