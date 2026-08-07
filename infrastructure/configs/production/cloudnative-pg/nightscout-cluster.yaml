@@ -117,6 +117,14 @@ spec:
 
   backup:
     retentionPolicy: "7d"
+    # Not the default prefer-standby. DocumentDB grants USAGE on
+    # documentdb_core to postgres and documentdb_admin_role only, so CNPG's
+    # non-superuser roles cannot run a query on this cluster at all — the
+    # instance manager on a replica fails to read WAL archiving status and the
+    # backup stalls at walArchivingFailing. The primary is superuser and is
+    # unaffected. Costs the primary the backup I/O; a backup that runs beats a
+    # backup that does not (#376).
+    target: primary
     barmanObjectStore:
       # Own prefix. Sharing one with another cluster trips barman's "Expected
       # empty archive" check, and makes a restore ambiguous about which cluster
