@@ -45,6 +45,18 @@
     group: systemd-journal
     mode: "2755"
 
+# The drop-in directory does not exist on a stock install. --check mode did not
+# catch this: it reports what the copy *would* write without evaluating whether
+# the destination is reachable, so the dry run was clean and the real run failed
+# on the first node.
+- name: Journald drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: Journald keeps logs across reboots
   ansible.builtin.copy:
     dest: /etc/systemd/journald.conf.d/90-homelab-persistent.conf
