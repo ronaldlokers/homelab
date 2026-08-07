@@ -6,6 +6,7 @@ resources:
   - tandoor-secret.yaml
   - ../../base/tandoor/
   - ingress.yaml
+  - network-policy-homepage.yaml
 patches:
   # Opt in to Reloader: roll this workload when a Secret it reads changes.
   # Without it a SOPS secret rotation applies cleanly and the pod keeps serving

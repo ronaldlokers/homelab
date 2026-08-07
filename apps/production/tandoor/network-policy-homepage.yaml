@@ -1,0 +1,28 @@
+# Let homepage's dashboard widget read the recipe count.
+#
+# Purely additive: this namespace already has default-deny-ingress plus
+# explicit allows for traefik, gatus and prometheus, so adding one more source
+# widens nothing that was previously open.
+#
+# That distinction is the whole lesson from the traefik outage earlier today.
+# kube-system had *no* policy, so traefik was reachable by everything; adding a
+# first policy there to restrict one port silently denied every other source
+# and took the entire ingress down. A namespace that already denies by default
+# cannot fail that way — a new allow rule can only add.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-homepage-ingress
+  namespace: tandoor
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: homepage
+      ports:
+        - protocol: TCP
+          port: 80
