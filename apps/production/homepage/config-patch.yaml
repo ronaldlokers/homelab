@@ -4,17 +4,9 @@ metadata:
   name: homepage
 data:
   services.yaml: |
-    # No siteMonitor entries here, deliberately. It probes from this pod, and
-    # https://*.ronaldlokers.nl resolves to the MetalLB VIP, which is not
-    # reachable pod -> VIP from inside the cluster — the same constraint gatus
-    # documents in its own egress policy. Probing the in-cluster Services
-    # instead would mean opening homepage's egress to a further port on each
-    # app, to duplicate what gatus already checks through the real ingress
-    # path. Gatus is the status page; this is the launcher.
-    # authentik's own application library is the app switcher: it lists every
-    # application the signed-in user may reach and links straight into each,
-    # so it stays correct as clients are added rather than needing a second
-    # list maintained here.
+    # No siteMonitor: it probes from this pod, and the MetalLB VIP is not
+    # reachable pod -> VIP. Gatus covers this through the real ingress path.
+    # authentik's application library doubles as the app switcher.
     - Identity:
         - Authentik:
             icon: authentik.png
@@ -22,14 +14,10 @@ data:
             description: Single sign-on — switch between apps
             widget:
               type: authentik
-              # The Service publishes 80 and forwards to 9000; this is the
-              # Service port, while the NetworkPolicy names 9000. They are the
-              # same hop seen from either side of DNAT.
+              # Service port 80; the NetworkPolicy names 9000, post-DNAT.
               url: http://authentik-server.authentik.svc.cluster.local
               key: "{{HOMEPAGE_VAR_AUTHENTIK_KEY}}"
-              # Without this the widget calls /events/events/per_month/, which
-              # this build answers with 404. Version 2 uses
-              # /events/events/volume/?action=login&history_days=1.
+              # v1 calls /events/events/per_month/, which this build 404s.
               version: 2
 
     - Bookmarks:
@@ -62,9 +50,8 @@ data:
               type: mealie
               url: http://mealie.mealie.svc.cluster.local:9000
               key: "{{HOMEPAGE_VAR_MEALIE_KEY}}"
-              # statisticsv1 maps to groups/statistics, statisticsv2 to
-              # households/statistics. This build serves only the latter, so
-              # without a version the widget asks for a path that 404s.
+              # v1 asks for groups/statistics; this build serves only
+              # households/statistics.
               version: 2
         - Tandoor:
             icon: tandoor-recipes.png
@@ -99,14 +86,11 @@ data:
               url: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
         - Traefik:
             icon: traefik.png
-            # No href: traefik has no ingress of its own and its dashboard is
-            # off, so there is nothing to link to. The widget is the point.
+            # No href: traefik has no ingress and its dashboard is off.
             description: Ingress controller
             widget:
               type: traefik
-              # Read-only API, ClusterIP only, reachable from this namespace
-              # alone. Port 8080 on both sides here — Traefik's documented
-              # default of 9000 is not what this build listens on.
+              # Port 8080, not the documented 9000, on both sides.
               url: http://traefik.kube-system.svc.cluster.local:8080
         - Gatus:
             icon: gatus.png
@@ -122,10 +106,8 @@ data:
             widget:
               type: ntfy
               url: http://ntfy.ntfy.svc.cluster.local
-              # A topic is required: without one the widget requests the web UI
-              # root and tries to parse the HTML as JSON. ntfy denies anonymous
-              # reads on every topic, so this reads as its own account —
-              # read-only on this one topic, unable to publish.
+              # Without a topic the widget parses the web UI as JSON. ntfy
+              # denies anonymous reads, hence its own read-only account.
               topic: homelab-gatus
               username: homepage
               password: "{{HOMEPAGE_VAR_NTFY_PASSWORD}}"

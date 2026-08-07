@@ -147,11 +147,8 @@ spec:
             matchLabels:
               app.kubernetes.io/name: prometheus
 ---
-# Allow authentik to connect to PostgreSQL in the database namespace.
-#
-# Since 2025.10 this is its ONLY backing store — caching, the embedded
-# outpost's session store and WebSocket IPC all moved to PostgreSQL when Redis
-# was removed. If this policy is wrong authentik does not degrade, it stops.
+# PostgreSQL is authentik's only backing store since 2025.10 — caching,
+# sessions and IPC all moved there. If this is wrong, authentik stops.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -170,14 +167,8 @@ spec:
         - protocol: TCP
           port: 5432
 ---
-# Allow authentik pods to talk to each other.
-#
-# Without this the namespace's default-deny-ingress blocks server<->worker
-# traffic, and it is not obvious that anything is wrong: both Deployments still
-# report 1/1 because kubelet's probes are not subject to NetworkPolicy. The
-# symptom is a pod inside the namespace being unable to reach
-# authentik-server at all, which is also what makes the API unusable from
-# anywhere except Traefik.
+# server <-> worker. Without it both Deployments still report 1/1, since
+# kubelet probes are not subject to NetworkPolicy.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

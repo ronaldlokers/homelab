@@ -8,11 +8,8 @@ ui:
   header: "Homelab Status (staging)"
 
 endpoints:
-  # Staging moved to the Let's Encrypt *production* issuer in #275, so these
-  # certificates are publicly trusted and verification is on. Expiry is
-  # checked here too now that the certificates are real ones worth watching —
-  # a renewal that silently stops working is otherwise invisible until the
-  # browser says so.
+  # Staging uses the production issuer since #275, so verification and expiry
+  # checks are meaningful here.
   - name: linkding
     group: homelab
     url: "https://linkding.staging.ronaldlokers.nl/health"
@@ -20,12 +17,7 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[CERTIFICATE_EXPIRATION] > 240h"
-  # Immich is not deployed on staging — it was removed from
-  # apps/staging/kustomization.yaml as the largest contributor to the
-  # convergence storm after a host reboot. Monitoring it here reported DOWN
-  # permanently, which is worse than not monitoring it: a status page that is
-  # always partly red is one nobody reads. Restore this endpoint in the same
-  # change that restores the app.
+  # Immich is not deployed on staging; restore this check with the app.
   - name: mealie
     group: homelab
     url: "https://mealie.staging.ronaldlokers.nl/api/app/about"
@@ -33,10 +25,8 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[CERTIFICATE_EXPIRATION] > 240h"
-  # authentik is deliberately watched from Gatus rather than the other way
-  # round. Gatus itself stays outside SSO precisely so that this check is
-  # readable during an authentik outage — a status page that needs the thing
-  # it is reporting on tells you nothing at the only moment it matters.
+  # Gatus stays outside SSO so this check is readable during an authentik
+  # outage.
   - name: authentik
     group: homelab
     url: "https://authentik.staging.ronaldlokers.nl/-/health/live/"

@@ -30,55 +30,26 @@ spec:
               value: "https://authentik.ronaldlokers.nl/application/o/mealie-production/.well-known/openid-configuration"
             - name: OIDC_PROVIDER_NAME
               value: "authentik"
-            # A successful authentik login creates the Mealie account on first
-            # use. Safe because authentik decides who may reach the application
-            # at all — Mealie never sees an unauthorised user — and it is the
-            # only thing that makes federated login worth having, since
-            # ALLOW_SIGNUP is false and every account would otherwise be made
-            # by hand.
+            # authentik decides who reaches the app at all, so first-login
+            # account creation adds no exposure.
             - name: OIDC_SIGNUP_ENABLED
               value: "true"
-            # Leave the normal login form reachable. Auto-redirect would send
-            # every visit straight to authentik, which locks you out of the
-            # local admin account if the provider is ever misconfigured.
-            # Send every visit straight to authentik. The local login page
-            # is still reachable at /login?direct=1, but with
-            # ALLOW_PASSWORD_LOGIN false it renders without the password
-            # fields, so that is a way to see the page rather than a way in.
+
+            # /login?direct=1 still renders, but without password fields.
             - name: OIDC_AUTO_REDIRECT
               value: "true"
-            # Hide the username and password inputs. Note what this is and is
-            # not: the documentation describes it as controlling whether the
-            # fields are *displayed*. Treat it as removing the front door from
-            # the UI, not as disabling password authentication in the API.
-            #
-            # BREAK-GLASS. With this set there is no route back in through the
-            # browser if authentik is unavailable. Recovery is to set this back
-            # to true and roll out:
-            #
+            # Hides the fields; does not disable password auth in the API
+            # (#295). BREAK-GLASS if authentik is down:
             #   kubectl set env deploy/mealie -n mealie ALLOW_PASSWORD_LOGIN=true
-            #
-            # which Flux will revert on its next reconcile, so it buys a window
-            # rather than a permanent change — appropriate for an emergency and
-            # self-cleaning afterwards.
+            # Flux reverts it on the next reconcile.
             - name: ALLOW_PASSWORD_LOGIN
               value: "false"
-            # authentik's built-in email scope mapping hardcodes
-            # "email_verified": False, and Mealie refuses a login without it:
+            # authentik's email mapping hardcodes email_verified false and
+            # Mealie refuses the login without it. Relaxed here rather than in
+            # the mapping, which would assert the claim to every client.
             #
-            #   [OIDC] email_verified claim is missing or false; refusing to
-            #          authenticate
-            #
-            # The claim is accurate — this instance has no SMTP and no
-            # verification flow, so no address here has ever been proven. The
-            # alternative fix is editing that mapping to return True, which is
-            # worse: it asserts the claim to every client, so one relaxation
-            # silently weakens every future integration.
-            #
-            # REVISIT IF SELF-ENROLMENT IS EVER ENABLED. Today addresses are
-            # only ever set by an administrator. If users can register
-            # themselves, an unverified address plus email-based account
-            # matching lets someone claim another person's account.
+            # REVISIT IF SELF-ENROLMENT IS ENABLED: unverified addresses plus
+            # email matching is an account-takeover path.
             - name: OIDC_REQUIRES_EMAIL_VERIFICATION
               value: "false"
             - name: DB_ENGINE

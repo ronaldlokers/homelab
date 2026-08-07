@@ -306,18 +306,13 @@ PY
 # ---------------------------------------------------------------------------
 # Credentials in manifests that are not Secrets.
 #
-# The check above proves every Secret is encrypted. It has nothing to say about
-# a credential written into a ConfigMap, which is the shape that actually
-# leaked: the Immich API key sat in cleartext in homepage's ConfigMap while
-# every other widget in the same file read its credential from a SOPS Secret
-# through HOMEPAGE_VAR_*. Encrypted Secrets, green CI, and a live credential in
-# git (#315).
+# The check above proves Secrets are encrypted; it says nothing about a
+# credential written into a ConfigMap, which is how the Immich API key leaked
+# (#315).
 #
-# Deliberately narrow. It looks only at values under credential-shaped keys,
-# and ignores anything that is plainly a reference rather than a value —
-# placeholders, ENC[...], paths, URLs, age recipients, image digests. The
-# alternative, entropy scanning every string, produces enough noise to be
-# switched off, which is worse than not having it.
+# Narrow on purpose: only values under credential-shaped keys, ignoring
+# references and placeholders. Entropy-scanning every string produces enough
+# noise to get switched off.
 # ---------------------------------------------------------------------------
 
 echo "INFO - Checking for credentials outside Secrets"
@@ -344,12 +339,8 @@ findings = []
 
 def walk(node, path, doc_kind, file):
     if isinstance(node, dict):
-        # {name: <secret>, key: <field>} is a reference to a key by name, not a
-        # credential — SecretKeySelector, ConfigMapKeySelector, CNPG's
-        # s3Credentials. Reporting those buries the real finding under 32 of
-        # them, which is how a check gets switched off.
-        # Likewise {key, operator, values} is a label selector requirement,
-        # where `key` is a label name.
+        # {name, key} is a key reference (SecretKeySelector and friends) and
+        # {key, operator} a label selector — neither is a credential.
         is_key_ref = "name" in node or "operator" in node
         for k, v in node.items():
             if isinstance(v, str) and isinstance(k, str) and SENSITIVE.search(k):
