@@ -12,7 +12,7 @@
   },
   "customManagers": [
     {
-      "description": "Chart versions pinned per environment in overlay kustomize patches. The flux manager only sees spec.chart.spec.version in the base HelmRelease, and these patches override it — so without this, Renovate raises PRs against a value neither cluster actually renders.",
+      "description": "Chart versions pinned per environment in overlay kustomize patches. The flux manager only sees spec.chart.spec.version in the base HelmRelease, and these patches override it \u2014 so without this, Renovate raises PRs against a value neither cluster actually renders.",
       "customType": "regex",
       "managerFilePatterns": [
         "/^infrastructure/controllers/(staging|production)/.+/kustomization\\.yaml$/"
@@ -24,8 +24,10 @@
   ],
   "packageRules": [
     {
-      "description": "These base HelmReleases are version-overridden by every consuming overlay, so their spec.chart.spec.version is never rendered. Left enabled, the flux manager would keep raising PRs against it that change nothing in either cluster — the exact no-op this config exists to stop. The overlay pins are tracked by the custom manager above instead.",
-      "matchManagers": ["flux"],
+      "description": "These base HelmReleases are version-overridden by every consuming overlay, so their spec.chart.spec.version is never rendered. Left enabled, the flux manager would keep raising PRs against it that change nothing in either cluster \u2014 the exact no-op this config exists to stop. The overlay pins are tracked by the custom manager above instead.",
+      "matchManagers": [
+        "flux"
+      ],
       "matchFileNames": [
         "infrastructure/controllers/base/cert-manager/**",
         "infrastructure/controllers/base/cloudnative-pg/**"
@@ -34,24 +36,47 @@
     },
     {
       "description": "Keep staging and production bumps in separate PRs so an upgrade can soak on staging before it is promoted.",
-      "matchManagers": ["custom.regex"],
-      "matchFileNames": ["infrastructure/controllers/staging/**"],
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchFileNames": [
+        "infrastructure/controllers/staging/**"
+      ],
       "additionalBranchPrefix": "staging-",
       "commitMessageSuffix": "(staging)"
     },
     {
       "description": "Promoting to production is a deliberate step, so these wait for approval on the dependency dashboard rather than opening a PR on their own.",
-      "matchManagers": ["custom.regex"],
-      "matchFileNames": ["infrastructure/controllers/production/**"],
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchFileNames": [
+        "infrastructure/controllers/production/**"
+      ],
       "additionalBranchPrefix": "production-",
       "commitMessageSuffix": "(production)",
       "dependencyDashboardApproval": true
     },
     {
-      "description": "Longhorn only supports upgrading one minor at a time — 1.8.x to 1.9.x, then 1.9.x to 1.10.x, and so on. Left at the default, Renovate collapses every available minor into a single PR to the newest version (PR #48 proposed 1.8.2 -> 1.12.0, skipping three minors), which passes CI and looks routine while being an unsupported upgrade of the cluster's storage layer. separateMultipleMinor makes Renovate raise one PR per minor instead, so the supported path is the path of least resistance and each step can be soaked before the next.",
-      "matchPackageNames": ["longhorn"],
+      "description": "Longhorn only supports upgrading one minor at a time \u2014 1.8.x to 1.9.x, then 1.9.x to 1.10.x, and so on. Left at the default, Renovate collapses every available minor into a single PR to the newest version (PR #48 proposed 1.8.2 -> 1.12.0, skipping three minors), which passes CI and looks routine while being an unsupported upgrade of the cluster's storage layer. separateMultipleMinor makes Renovate raise one PR per minor instead, so the supported path is the path of least resistance and each step can be soaked before the next.",
+      "matchPackageNames": [
+        "longhorn"
+      ],
       "separateMajorMinor": true,
       "separateMultipleMinor": true
+    },
+    {
+      "description": "Chart 7.0.0 turned grafana.github.io's loki chart into the Grafana Enterprise Logs chart; the OSS chart was forked to grafana-community/helm-charts at 6.55.0. Taking v7 would silently move this cluster onto the enterprise product, so hold at 6.x until the migration to the community chart is decided.",
+      "matchDatasources": [
+        "helm"
+      ],
+      "matchPackageNames": [
+        "loki"
+      ],
+      "matchRepositories": [
+        "https://grafana.github.io/helm-charts"
+      ],
+      "allowedVersions": "<7.0.0"
     }
   ]
 }
