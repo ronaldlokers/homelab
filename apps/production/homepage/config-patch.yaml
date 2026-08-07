@@ -58,10 +58,20 @@ data:
             icon: tandoor-recipes.png
             href: https://tandoor.ronaldlokers.nl
             description: Recipe manager
-            widget:
-              type: tandoor
-              url: http://tandoor.tandoor.svc.cluster.local
-              key: "{{HOMEPAGE_VAR_TANDOOR_KEY}}"
+            # No widget yet. Tandoor 2.x authenticates the API with
+            # SessionAuthentication and OAuth2Authentication only —
+            # TokenAuthentication is not in DEFAULT_AUTHENTICATION_CLASSES, so
+            # the authtoken_token table it still carries is a leftover and a
+            # row written there authenticates nothing.
+            #
+            # A working token has to be issued through Tandoor's own UI, which
+            # mints an OAuth2 access token. Re-enable by restoring these four
+            # lines with HOMEPAGE_VAR_TANDOOR_KEY set to it:
+            #
+            #   widget:
+            #     type: tandoor
+            #     url: http://tandoor.tandoor.svc.cluster.local
+            #     key: "{{HOMEPAGE_VAR_TANDOOR_KEY}}"
 
     - Health:
         - Nightscout:
