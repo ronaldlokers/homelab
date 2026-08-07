@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: immich
 resources:
   - postgres-credentials-secret.yaml
+  - postgres-credentials-mirror.yaml
   - immich-config-secret.yaml
   - network-policy-oidc.yaml
   - ../../base/immich
