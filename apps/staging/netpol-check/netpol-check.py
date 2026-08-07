@@ -80,7 +80,9 @@ def kubectl(ctx, *args, check=True, timeout=120):
     )
     if check and r.returncode != 0:
         raise RuntimeError(f"kubectl {' '.join(args)}: {r.stderr.strip()}")
-    return r.stdout
+    # stderr is returned too: a probe that could not run at all otherwise looks
+    # identical to one that ran and printed nothing.
+    return r.stdout if r.returncode == 0 else r.stdout + r.stderr
 
 
 def probe_script(host, port):
@@ -111,7 +113,10 @@ def run_in_pod(ctx, ns, deploy, host, port):
     except subprocess.TimeoutExpired:
         return "ERROR probe-timeout"
     line = [l for l in out.splitlines() if l.startswith(("ALLOWED", "BLOCKED", "ERROR"))]
-    return line[-1] if line else "ERROR no-output"
+    if line:
+        return line[-1]
+    detail = " ".join(out.split())[:90]
+    return f"ERROR probe-failed: {detail}" if detail else "ERROR no-output"
 
 
 def nodes(ctx):
