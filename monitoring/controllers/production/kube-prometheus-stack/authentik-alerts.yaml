@@ -1,9 +1,5 @@
-# Alerts for authentik.
-#
-# It gates mealie, linkding, grafana and immich, so its failure is four
-# applications' failure — and until #311 nothing scraped it at all. These are
-# written against metrics the instance actually exposes, checked by reading
-# /metrics and querying the series rather than from the documentation.
+# authentik gates four applications, so its failure is theirs. Written against
+# metrics this build actually exposes, not the documented set.
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -16,10 +12,7 @@ spec:
   groups:
     - name: authentik
       rules:
-        # The one that matters. If authentik is unreachable, every OIDC login
-        # fails — including grafana's, which is where you would go to find out
-        # why. Both server replicas have to be gone before this fires, so a
-        # single pod restart during a rollout does not page.
+        # absent() over the server job, so a rolling restart does not page.
         - alert: AuthentikDown
           annotations:
             summary: "authentik is not reachable"
@@ -34,10 +27,7 @@ spec:
           labels:
             severity: critical
 
-        # Background tasks: sending events, syncing outposts, applying
-        # blueprints. Logins keep working without a worker, which is what makes
-        # this worth alerting on — the failure is silent and the first symptom
-        # is a blueprint change that never takes effect.
+        # Logins keep working without a worker; blueprints stop applying.
         - alert: AuthentikNoWorkers
           annotations:
             summary: "authentik has no task workers"
@@ -52,11 +42,8 @@ spec:
           labels:
             severity: warning
 
-        # The embedded outpost terminates the flows the browser talks to.
-        # `expected` is a label carrying how many connections it should have,
-        # and comparing a gauge against a label value takes a label_replace
-        # dance that is harder to read than it is useful — zero connections is
-        # the condition that matters and every non-zero value is fine.
+        # Zero connections is the condition that matters; comparing against
+        # the `expected` label needs a label_replace dance for no gain.
         - alert: AuthentikOutpostDisconnected
           annotations:
             summary: "authentik outpost {{ $labels.outpost }} is disconnected"

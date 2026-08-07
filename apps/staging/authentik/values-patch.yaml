@@ -12,10 +12,8 @@ spec:
     # blueprints.yaml are reconciled the way everything else in this repo is
     # rather than existing only in authentik's database.
     global:
-      # Roll the server and worker when authentik-secret or the blueprint
-      # Secret changes. The kustomize-level Reloader patch other apps use
-      # targets a Deployment, and this one is created by Helm, so the
-      # annotation has to come through chart values instead.
+      # Via chart values: the Deployment is created by Helm, so a kustomize
+      # patch targeting Deployment matches nothing.
       deploymentAnnotations:
         reloader.stakater.com/auto: "true"
       volumes:

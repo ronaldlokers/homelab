@@ -61,22 +61,12 @@ spec:
         externalTrafficPolicy: Local
     deployment:
       kind: DaemonSet
-    # Traefik's read-only API, for homepage's traefik widget: router, service
-    # and middleware counts, and TLS certificate state.
+    # Traefik's read-only API, for homepage's widget. Passed as an argument
+    # because `api.insecure` is Traefik's own setting, not a chart value — the
+    # chart accepts and drops it silently.
     #
-    # Set as an argument, not as `api.insecure`. That value belongs to
-    # Traefik's own configuration, not to this chart, so the chart accepted it
-    # and dropped it — the rendered pod kept its default arguments and the
-    # entrypoint answered 404 on every API path while /ping returned 200.
-    # Unknown values fail silently in Helm; only the running args are evidence.
-    #
-    # "insecure" means the API is served on the traefik entrypoint with no auth
-    # of its own, which is worth stating plainly: port 8080 is a ClusterIP port
-    # with no Ingress and no LoadBalancer, and a NetworkPolicy admits only the
-    # homepage namespace.
-    #
-    # The dashboard is left at the chart's default rather than disabled — it is
-    # the same API with a UI, reachable only over the same restricted path.
+    # No auth on the API entrypoint, but 8080 is ClusterIP-only with no
+    # Ingress.
     additionalArguments:
       - "--api.insecure=true"
     ports:

@@ -1,12 +1,8 @@
-# Egress to authentik, for the half of OIDC the browser never touches.
+# Egress to authentik for the server-side half of OIDC: discovery and the
+# token exchange. Without it the login fails after authentik has said yes.
 #
-# linkding fetches the token and userinfo endpoints itself, server to server,
-# against authentik's public URL. Without this the login fails after authentik
-# has already said yes, with the error surfacing on linkding's side.
-#
-# Staging's ingress is a k3d container outside the cluster network, so the
-# address the hostname resolves to is the right thing to name here. Production
-# needs a different rule for the same intent — see its copy.
+# Staging's ingress is a container outside the cluster network, so naming
+# the address works here; production needs Traefik instead.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

@@ -1,21 +1,8 @@
-# Egress to authentik, for the half of OIDC the browser never touches.
+# Egress to authentik for the server-side half of OIDC: discovery and the
+# token exchange. Without it the login fails after authentik has said yes.
 #
-# Mealie fetches the discovery document and exchanges the authorization code
-# for a token itself, server to server, against authentik's public URL. Without
-# this the login fails at the token exchange — after authentik has already said
-# yes — and the error surfaces on Mealie's side, pointing away from the cause.
-#
-# The destination is Traefik, not the address the hostname resolves to.
-# authentik.ronaldlokers.nl resolves to the MetalLB VIP 10.0.40.100, but
-# kube-proxy rewrites that to a Traefik pod address before the egress rules
-# are evaluated, so a rule naming the VIP matches nothing and the connection is
-# rejected. Staging's equivalent rule *can* name its address, because there the
-# ingress is a container outside the cluster network rather than a VIP inside
-# it — the same intent needs a different rule per environment.
-#
-# Ports are Traefik's container ports, not the Service ports: 8443 backs 443.
-# This mirrors apps/production/gatus/network-policy-egress.yaml, which reaches
-# the same hostnames the same way.
+# The MetalLB VIP is rewritten to a Traefik pod before egress rules are
+# evaluated, so this names Traefik on 8443 rather than the VIP (#293).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

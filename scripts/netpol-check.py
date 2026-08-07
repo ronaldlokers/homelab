@@ -4,22 +4,13 @@
 Two things are checked, in this order, because the second is meaningless
 without the first.
 
-1. Is the cluster enforcing at all? On *every* node, an already-running pod
-   whose namespace denies egress by default is told to reach something no
-   policy permits. If it gets through, that node is not enforcing, and every
-   allow-result below is a coincidence rather than a permission.
+1. Is the cluster enforcing at all? On every node, an already-running pod in a
+   namespace that denies egress is told to reach something no policy permits.
+   If it gets through, that node is not enforcing and every result below is
+   meaningless. Staging enforced nothing for weeks while looking healthy.
 
-   This is not hypothetical. Staging looked entirely healthy for weeks while
-   enforcing nothing: the network policy controller had never started on the
-   agent node, and pods on the server node had their firewall chains
-   programmed onto the other node, where their traffic never passes. Both
-   failures are silent -- the policies exist, `kubectl get networkpolicy`
-   lists them, and nothing anywhere reports that they are inert.
-
-2. Do the individual policies match intent? Each expectation below names a
-   source workload, a destination, and whether it should be allowed. Denials
-   are as important as allows: a policy that permits everything passes every
-   allow-test.
+2. Do the policies match intent? Denials matter as much as allows: a cluster
+   enforcing nothing passes every allow-test.
 
 Usage:
     scripts/netpol-check.py --context staging
@@ -128,18 +119,12 @@ def nodes(ctx):
 def guarded_pod_on(ctx, node, exclude_ns=()):
     """An existing pod on this node whose namespace denies egress by default.
 
-    Deliberately an *existing* pod rather than one this script creates. A
-    freshly created canary reported staging's server node as enforcing while
-    every workload already running on it was unfiltered -- new pods were
-    getting firewall chains, the ones that had been there for hours were not.
-    A check that only ever probes from something it just made cannot see
-    that, and it is the state that actually matters.
+    An existing pod, not one this script creates: new pods were getting
+    firewall chains while hours-old ones were not, so a canary reported a
+    healthy node that was enforcing nothing.
 
-    Host-network pods are skipped: they share the node's namespace, so they
-    are not subject to pod policy and would always look unenforced. So is the
-    probe target's own namespace -- a pod there usually may reach its
-    neighbours, which is a permission rather than a failure to filter, and
-    reading it as one reports a healthy node as broken.
+    Host-network pods are skipped (not subject to pod policy), as is the probe
+    target's own namespace (reaching a neighbour there is a permission).
     """
     guarded = set()
     for p in json.loads(kubectl(ctx, "get", "networkpolicy", "-A", "-o", "json"))["items"]:

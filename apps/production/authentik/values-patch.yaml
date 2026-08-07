@@ -4,19 +4,11 @@ metadata:
   name: authentik
 spec:
   values:
-    # Nothing under `authentik:` — existingSecret makes the chart ignore it
-    # (see the base release). Everything, including the non-secret settings,
-    # lives in authentik-secret.yaml.
-    #
-    # The blueprints are mounted where authentik watches for custom ones. It
-    # re-applies them hourly, so the OIDC providers are reconciled the way
-    # everything else in this repo is rather than existing only in authentik's
-    # database.
+    # Nothing under `authentik:` — existingSecret makes the chart ignore it.
+    # Blueprints are mounted where authentik watches and re-applies hourly.
     global:
-      # Roll the server and worker when authentik-secret or the blueprint
-      # Secret changes. The kustomize-level Reloader patch other apps use
-      # targets a Deployment, and this one is created by Helm, so the
-      # annotation has to come through chart values instead.
+      # Via chart values: the Deployment is created by Helm, so a kustomize
+      # patch targeting Deployment matches nothing.
       deploymentAnnotations:
         reloader.stakater.com/auto: "true"
       volumes:
@@ -30,21 +22,11 @@ spec:
           mountPath: /blueprints/custom
           readOnly: true
 
-    # Metrics. authentik is now the single front door to four applications and
-    # was the least observed thing in the cluster: no ServiceMonitor existed,
-    # so failed logins, lockouts and flow errors reached neither Prometheus nor
-    # the ntfy alerts.
+    # The chart exposes no metrics by default, and the
+    # `release: kube-prometheus-stack` label is what makes Prometheus select
+    # the ServiceMonitor — without it the object exists and is ignored.
     #
-    # The chart does not expose metrics by default — the Service carries only
-    # http/https — so both the metrics Service and the ServiceMonitor have to
-    # be turned on. The `release: kube-prometheus-stack` label is what makes
-    # this Prometheus select it; without it the ServiceMonitor exists and is
-    # ignored, which looks identical to working.
-    #
-    # Two servers, one worker. The server is what a login blocks on, so it
-    # gets the redundancy; the worker runs background tasks where a restart
-    # delays work rather than failing it. Both fit the ARM64 nodes at the
-    # base chart's requests.
+    # Two servers, one worker: a login blocks on the server.
     server:
       replicas: 2
       metrics:

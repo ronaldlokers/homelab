@@ -22,29 +22,18 @@ spec:
               value: "1"
             - name: ALLOWED_HOSTS
               value: "tandoor.staging.ronaldlokers.nl,localhost"
-            # OIDC via authentik (#270). The provider block, which carries the
-            # client secret, comes from the tandoor-oidc Secret.
-            #
-            # SOCIAL_PROVIDERS names the allauth module to load; without it the
-            # provider config below is parsed and then ignored, which looks
-            # exactly like a working configuration that produces no login
-            # button.
+            # OIDC via authentik (#270). SOCIAL_PROVIDERS names the allauth
+            # module: without it the provider config is silently ignored and
+            # no login button appears.
             - name: SOCIAL_PROVIDERS
               value: "allauth.socialaccount.providers.openid_connect"
-            # Local accounts stay enabled. Tandoor already has a working admin
-            # account and locking it out would leave no way back in if the
-            # authentik login is misconfigured.
+            # Local accounts stay: the way back in if OIDC is misconfigured.
             - name: SOCIALACCOUNT_ONLY
               value: "0"
-            # A successful authentik login may create a Tandoor account. Safe
-            # for the same reason it is safe in mealie: authentik has no
-            # self-enrolment flow, so the only people who can reach this point
-            # are ones already created there by hand.
+            # Safe: authentik has no self-enrolment flow.
             - name: SOCIALACCOUNT_AUTO_SIGNUP
               value: "1"
-            # New social users land in a space with guest access rather than
-            # nothing at all, which otherwise means a successful login followed
-            # by an empty application.
+            # Without this a new user logs in to an empty application.
             - name: SOCIAL_DEFAULT_ACCESS
               value: "1"
             - name: SOCIAL_DEFAULT_GROUP
