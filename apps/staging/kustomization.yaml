@@ -20,4 +20,5 @@ resources:
   # restoring this one line.
   - gatus
   - netpol-check
+  - secret-refs-check
   - tandoor
