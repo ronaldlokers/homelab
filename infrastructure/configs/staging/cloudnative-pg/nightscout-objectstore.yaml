@@ -1,0 +1,30 @@
+# The plugin's replacement for spec.backup.barmanObjectStore, which
+# CloudNativePG removes in 1.31 (#377). Same bucket, same prefix, same
+# credentials — the plugin writes the barman layout the existing catalogue
+# already uses, so the backup history carries over rather than restarting.
+#
+# serverName is left unset: it defaults to the cluster name, which is what the
+# in-tree configuration used, and changing it would orphan the existing
+# backups under the old name.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: nightscout-store
+  namespace: database
+spec:
+  retentionPolicy: "14d"
+  configuration:
+    destinationPath: "s3://homelab-postgres-backups/staging-2026-08-nightscout/"
+    endpointURL: "https://s3.eu-central-003.backblazeb2.com"
+    s3Credentials:
+      accessKeyId:
+        name: b2-credentials
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: b2-credentials
+        key: ACCESS_SECRET_KEY
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+      jobs: 2
