@@ -11,29 +11,14 @@ spec:
   # Use DocumentDB-enabled PostgreSQL image for FerretDB v2.x (ARM64-compatible)
   imageName: 'ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0'
 
-  # DocumentDB image uses UID/GID 999
-  # Applications are useless until this is serving, and an app whose database
-  # is down crash-loops and adds load while achieving nothing. Ranked above
-  # applications, below the operator that manages it.
-  # Per-app roles. Until #219 every app authenticated as the shared `app` role,
-  # which owns every database — so any app that could read its own Secret held a
-  # credential valid against all of them. #166 stopped that being passwordless;
-  # it did not make it isolated.
+  # DocumentDB image uses UID/GID 999.
   #
-  # Declaring a role here is inert. It exists, it can log in, and nothing uses it
-  # until an application's connection string is switched over — which is
-  # deliberately a separate step, so the roles can be created and verified
-  # without any application noticing.
+  # Ranked above applications, below the operator that manages it: an app whose
+  # database is down crash-loops and adds load while achieving nothing.
   #
-  # Ownership of existing objects is NOT handled here, and neither is revoking
-  # PUBLIC's CONNECT — which is the mechanism that actually permits
-  # cross-database access. Both are per-database migrations rather than
-  # declarative config: docs/runbooks/postgres-per-app-role-migration.md.
-  #
-  # Do NOT reach for `REASSIGN OWNED BY app TO <role>` there. It also covers
-  # shared objects, and `app` owns every database in this cluster, so running it
-  # inside one database hands all of them to that role. The runbook uses scoped
-  # ALTER statements instead.
+  # Per-app roles: until #219 every app authenticated as the shared `app` role,
+  # which owns every database, so any app that could read its own Secret held a
+  # credential valid everywhere.
   managed:
     roles:
       - name: commafeed
@@ -88,15 +73,9 @@ spec:
         key: isolation.yaml
 
   postgresql:
-    # Load DocumentDB extensions
-    # pg_documentdb_core and pg_documentdb are gone: the extension they back was
-    # dropped from this cluster once Nightscout moved to its own (#249).
-    #
-    # pg_cron stays. It was only ever here for DocumentDB's four maintenance
-    # jobs, all now unscheduled, so nothing uses it today — but removing it
-    # means a postmaster restart AND leaves cron.database_name pointing at an
-    # extension that no longer exists, and it costs nothing idle. Left for a
-    # change that is about pg_cron rather than a side effect of this one.
+    # pg_documentdb_core and pg_documentdb are gone — the extension moved with
+    # Nightscout to its own cluster (#249). pg_cron stays: removing it needs a
+    # postmaster restart and would leave cron.database_name dangling.
     shared_preload_libraries:
       - pg_cron
     parameters:
@@ -111,20 +90,13 @@ spec:
       cron.database_name: 'postgres'
     # Allow password-less connections from within cluster
     pg_hba:
-      # Was `host all app all trust`: any pod that could reach port 5432
-      # authenticated as `app` against every database in the cluster, with no
-      # credential. NetworkPolicy was the only boundary, and it is
-      # namespace-granular rather than database-granular (#166).
-      #
-      # Every consumer was given this role's password first, while trust was
-      # still in effect and therefore ignoring it, so this line is the only
-      # thing that changes behaviour.
+      # Was `host all app all trust`: any pod reaching 5432 authenticated as `app`
+      # against every database with no credential, leaving NetworkPolicy — which is
+      # namespace-granular, not database-granular — as the only boundary (#166).
       - host all app all scram-sha-256
-      # Deliberately left as trust. The streaming_replica role has NO PASSWORD
-      # SET (verified in pg_authid), so requiring scram here would break
-      # replication immediately. CNPG authenticates replicas with client
-      # certificates over TLS, which makes this line redundant rather than
-      # load-bearing, but removing it needs its own verified change.
+      # trust, not scram: streaming_replica has no password set, so scram would
+      # break replication immediately. CNPG authenticates replicas with client
+      # certificates over TLS.
       - host all streaming_replica all trust
       - host all postgres all md5
 

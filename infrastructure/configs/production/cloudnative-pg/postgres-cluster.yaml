@@ -6,14 +6,9 @@ metadata:
 spec:
   instances: 3
 
-  # Requests only, deliberately no limits. Without these the instances run
-  # BestEffort and are the FIRST thing the kubelet evicts under node memory
-  # pressure — ahead of every application, all of which do set requests. A
-  # database holding the only copy of live data should not be the first
-  # casualty of an unrelated memory spike.
-  #
-  # Sized from measured usage (peak 507Mi across instances) with headroom. No limits: a hard memory
-  # cap on PostgreSQL turns a slow query into an OOM kill and a failover.
+  # Requests but no limits: without requests these run BestEffort and are
+  # evicted first, and a hard memory cap turns a slow query into an OOM kill.
+  # Sized from measured usage (peak 507Mi) with headroom.
   resources:
     requests:
       cpu: 100m
@@ -22,29 +17,14 @@ spec:
   # Use DocumentDB-enabled PostgreSQL image for FerretDB v2.x (ARM64-compatible)
   imageName: "ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0"
 
-  # DocumentDB image uses UID/GID 999
-  # Applications are useless until this is serving, and an app whose database
-  # is down crash-loops and adds load while achieving nothing. Ranked above
-  # applications, below the operator that manages it.
-  # Per-app roles. Until #219 every app authenticated as the shared `app` role,
-  # which owns every database — so any app that could read its own Secret held a
-  # credential valid against all of them. #166 stopped that being passwordless;
-  # it did not make it isolated.
+  # DocumentDB image uses UID/GID 999.
   #
-  # Declaring a role here is inert. It exists, it can log in, and nothing uses it
-  # until an application's connection string is switched over — which is
-  # deliberately a separate step, so the roles can be created and verified
-  # without any application noticing.
+  # Ranked above applications, below the operator that manages it: an app whose
+  # database is down crash-loops and adds load while achieving nothing.
   #
-  # Ownership of existing objects is NOT handled here, and neither is revoking
-  # PUBLIC's CONNECT — which is the mechanism that actually permits
-  # cross-database access. Both are per-database migrations rather than
-  # declarative config: docs/runbooks/postgres-per-app-role-migration.md.
-  #
-  # Do NOT reach for `REASSIGN OWNED BY app TO <role>` there. It also covers
-  # shared objects, and `app` owns every database in this cluster, so running it
-  # inside one database hands all of them to that role. The runbook uses scoped
-  # ALTER statements instead.
+  # Per-app roles: until #219 every app authenticated as the shared `app` role,
+  # which owns every database, so any app that could read its own Secret held a
+  # credential valid everywhere.
   managed:
     roles:
       - name: commafeed
@@ -107,99 +87,45 @@ spec:
         key: isolation.yaml
 
   postgresql:
-    # Load DocumentDB extensions
-    # pg_documentdb_core and pg_documentdb are gone: the extension they back was
-    # dropped from this cluster once Nightscout moved to its own (#249).
-    #
-    # pg_cron stays. It was only ever here for DocumentDB's four maintenance
-    # jobs, all now unscheduled, so nothing uses it today — but removing it
-    # means a postmaster restart AND leaves cron.database_name pointing at an
-    # extension that no longer exists, and it costs nothing idle. Left for a
-    # change that is about pg_cron rather than a side effect of this one.
+    # pg_documentdb_core and pg_documentdb are gone — the extension moved with
+    # Nightscout to its own cluster (#249). pg_cron stays: removing it needs a
+    # postmaster restart and would leave cron.database_name dangling.
     shared_preload_libraries:
       - pg_cron
     parameters:
       max_connections: "100"
       shared_buffers: "256MB"
       cron.database_name: "postgres"
-      # WAL retention. Was wal_keep_size: 8GB, which is the OLD mechanism: a fixed
-      # floor of WAL kept on disk so a lagging standby can catch up by streaming
-      # rather than fetching from the archive.
-      #
-      # CloudNativePG enables HA replication slots, which are the precise
-      # replacement — a slot retains exactly what its standby still needs. With
-      # both configured PostgreSQL keeps max(wal_keep_size, what the slots need),
-      # and the slots were holding 0 bytes with both replicas streaming at 0 lag.
-      # So the 8GB floor was protecting nothing and costing:
-      #
-      #   3 instances x 8.1G = 24.3G logical, x3 Longhorn replicas = 72.9G
-      #
-      # per cluster. Across immich-cluster and postgres-cluster that was 145.8G
-      # of physical disk, out of 256.8G in use across all of Longhorn.
-      #
-      # 512MB is CloudNativePG's own default, which nightscout-cluster has always
-      # run on without trouble.
+      # WAL retention by replication slot rather than a fixed wal_keep_size floor.
+      # CNPG's HA slots retain exactly what each standby still needs; with both set
+      # PostgreSQL keeps the larger of the two, so the floor only added disk.
       wal_keep_size: "512MB"
-      # The other half, and the reason the 8GB floor felt necessary. Slots retain
-      # WAL for as long as their standby needs it, and with no bound a standby
-      # that stays down long enough will grow its slot until the volume fills.
-      # This caps that: past 4GB the slot is invalidated and CloudNativePG
-      # re-clones the replica from the archive instead. Slower than streaming,
-      # but bounded — the failure mode becomes a rebuild rather than a full disk
-      # on the primary.
+      # Bounds slot retention: past 4GB the slot is invalidated and CNPG re-clones
+      # the replica from the archive. Slower than streaming, but not a full volume.
       max_slot_wal_keep_size: "4GB"
     # Allow password-less connections from within cluster
     pg_hba:
-      # Was `host all app all trust`: any pod that could reach port 5432
-      # authenticated as `app` against every database in the cluster, with no
-      # credential — including Nightscout's glucose store. NetworkPolicy was the
-      # only boundary, and it is namespace-granular rather than
-      # database-granular (#166).
-      #
-      # Every consumer was given this role's password first, while trust was
-      # still in effect and therefore ignoring it, so this line is the only
-      # thing that changes behaviour. Verified on staging before landing here:
-      # passwordless connections are refused, apps reconnect on restart.
+      # Was `host all app all trust`: any pod reaching 5432 authenticated as `app`
+      # against every database with no credential, leaving NetworkPolicy — which is
+      # namespace-granular, not database-granular — as the only boundary (#166).
       - host all app all scram-sha-256
-      # Deliberately left as trust. The streaming_replica role has NO PASSWORD
-      # SET (verified in pg_authid on all four clusters), so requiring scram
-      # here would break replication immediately. CNPG authenticates replicas
-      # with client certificates over TLS, which makes this line redundant
-      # rather than load-bearing, but removing it needs its own verified change.
+      # trust, not scram: streaming_replica has no password set, so scram would
+      # break replication immediately. CNPG authenticates replicas with client
+      # certificates over TLS.
       - host all streaming_replica all trust
       - host all postgres all md5
 
-  # Bootstrap from existing backup to restore data.
-  #
-  # This block only takes effect when the Cluster object is CREATED — i.e. if
-  # the cluster is deleted and Flux recreates it. That is exactly the scenario
-  # docs/war-stories/postgres-bootstrap-recovery.md exists for, so it has to be
-  # correct at all times even though it is inert day to day.
-  #
-  # It was not. Until now this recovered from "production/" with
-  # recoveryTarget.backupID pinned to "20260226T105921", while WAL has archived
-  # to "production-2026-03/" since 2026-03-05. A recreate would have restored a
-  # February snapshot from a prefix nothing has written to in five months — and
-  # reported Ready. No alert covers this because the config is valid and the
-  # cluster is healthy; only an actual restore test would surface it.
-  #
-  # The pin is removed so recovery targets the latest available backup, and the
-  # source now matches the prefix that is actually being written.
+  # Bootstrap recovery. Only takes effect when the Cluster object is CREATED, so
+  # it is inert day to day and has to be correct at all times anyway — see
+  # docs/war-stories/postgres-bootstrap-recovery.md. It was not: it recovered
+  # from a stale prefix for months while reporting healthy (#238).
   bootstrap:
     recovery:
       source: clusterBackup
 
-  # Reference to backup location in B2 (for bootstrap recovery only).
-  #
-  # NOTE: this now equals backup.barmanObjectStore.destinationPath below.
-  # immich-cluster.yaml deliberately keeps recover-from and archive-to on
-  # different prefixes so a recovered cluster starts a clean timeline. Doing the
-  # same here means bumping the archive prefix to a new generation, which moves
-  # the live WAL stream and leaves the new prefix without a base backup until
-  # the next ScheduledBackup runs. That is a deliberate operational step, not a
-  # side effect of fixing the stale pointer, so it is left for a follow-up —
-  # see the runbook. Recovering into the same prefix is safe for a single
-  # recovery; the constraint matters when recovering repeatedly.
+  # Equals backup.barmanObjectStore.destinationPath below, so a recovered
+  # cluster continues the same timeline. immich-cluster keeps them separate;
+  # doing that here needs a new prefix and a base backup first.
   externalClusters:
     - name: clusterBackup
       barmanObjectStore:

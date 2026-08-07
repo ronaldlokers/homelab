@@ -30,17 +30,9 @@ spec:
     kubeEtcd:
       enabled: false
 
-    # K3s runs the controller-manager, scheduler and kube-proxy inside the
-    # server process rather than as separately scrapeable components, so the
-    # jobs these expect never exist. Their alerts are absent(up{job="..."}),
-    # which is unconditionally true here — KubeControllerManagerDown,
-    # KubeSchedulerDown and KubeProxyDown were three standing criticals that
-    # could never clear and never indicated anything.
-    #
-    # Same reasoning as kubeEtcd above. Both halves are required: the component
-    # toggle stops a ServiceMonitor being created for an endpoint that does not
-    # exist, and the defaultRules toggle removes the absent() alert that fires
-    # regardless of whether a target was ever configured.
+    # K3s runs these inside the server process rather than as separately
+    # scrapeable components, so the jobs they expect never exist and their alerts
+    # fire permanently.
     kubeControllerManager:
       enabled: false
     kubeScheduler:
@@ -54,17 +46,9 @@ spec:
         kubeSchedulerAlerting: false
         kubeProxy: false
       disabled:
-        # Replaced by a time-bounded copy in job-alerts.yaml. The stock rule is
-        # kube_job_failed > 0 with no upper bound on age, and CronJobs keep
-        # their most recent failed Job by design (failedJobsHistoryLimit), so
-        # any single failure fires this alert permanently until someone deletes
-        # the Job object by hand.
-        #
-        # It was firing on a renovate Job that failed once 15 days ago and on a
-        # longhorn backup Job from 160 days ago. Both had long since recovered —
-        # renovate completed hourly throughout, and longhorn backups ran nightly.
-        # Two permanent alerts describing nothing, in a channel where that
-        # trains people to ignore the channel.
+        # Replaced by a time-bounded copy in job-alerts.yaml: the stock rule has no
+        # age bound, and CronJobs keep their most recent failed Job by design, so one
+        # failure fires forever.
         KubeJobFailed: true
 
     alertmanager:
@@ -75,44 +59,22 @@ spec:
             cpu: 25m
             memory: 128Mi
 
-        # Without this, NOTHING outside the monitoring namespace is ever
-        # delivered. prometheus-operator scopes each AlertmanagerConfig CRD to
-        # its own namespace by default (OnNamespace), so the ntfy-config in
-        # monitoring/ was rendered with a `namespace="monitoring"` matcher.
-        # Alertmanager's top-level route falls through to receiver "null", so
-        # every alert that did not carry that label was silently discarded:
-        #
-        #   PostgreSQLWALArchivingFailing   namespace=database        -> dropped
-        #   PostgreSQLContinuousArchiving   namespace=database        -> dropped
-        #   KubeJobFailed                   namespace=renovate        -> dropped
-        #   TargetDown                      namespace=metallb-system  -> dropped
-        #
-        # That is why a genuine KubeJobFailed fired unread for 15 days and why
-        # seven PostgreSQL criticals went unnoticed — not alert fatigue, which
-        # is what the cleanup in #145 assumed. They never arrived.
-        #
-        # "None" drops the injected namespace matcher so the single ntfy route
-        # receives every alert, which is what a one-operator cluster wants.
+        # Without this nothing outside the monitoring namespace is delivered:
+        # prometheus-operator scopes each AlertmanagerConfig to its own namespace.
         alertmanagerConfigMatcherStrategy:
           type: None
 
     prometheus:
       prometheusSpec:
-        # Measured 183m CPU / 1730Mi memory. Without requests Prometheus runs
-        # BestEffort and is evicted first under node pressure — losing
-        # observability exactly when something is going wrong. Requests only,
-        # no limits: a memory cap on Prometheus turns a heavy query into an OOM
-        # restart, which discards the WAL and is worse than the query being slow.
+        # Measured 183m CPU / 1730Mi. Without requests Prometheus runs BestEffort and
+        # is evicted first — losing observability exactly when it is needed.
         resources:
           requests:
             cpu: 200m
             memory: 2Gi
 
-        # Without storageSpec the TSDB lives on an emptyDir, so every pod
-        # restart discards it and the configured 10d retention never actually
-        # holds. Production carries ~353k active series at ~11.8k samples/sec,
-        # which is roughly 17GB over 10d; 30Gi leaves headroom for growth and
-        # compaction. Longhorn keeps 3 replicas, so this is ~90Gi of real disk.
+        # Without storageSpec the TSDB lives on an emptyDir, so every restart discards
+        # it and the configured retention never holds.
         storageSpec:
           volumeClaimTemplate:
             spec:
@@ -203,16 +165,11 @@ spec:
         enabled: true
         ingressClassName: traefik
         annotations:
-          # Grafana was the only admin surface without the LAN gate that
-          # Prometheus, Longhorn and pgAdmin all carry — and it proxies the Loki
-          # datasource, so it exposed 30 days of every pod log, node journal line
-          # and Kubernetes event to the internet behind one password.
+          # Grafana proxies the Loki datasource — 30 days of pod logs and node journals
+          # — and was the only admin surface without the LAN gate.
           #
-          # This gate is only meaningful because Traefik now runs
-          # externalTrafficPolicy: Local (#163). Before that the ipAllowList saw
-          # a masqueraded flannel address instead of the caller and returned 403
-          # to everyone, so adding it here would have locked Grafana out entirely
-          # rather than restricting it.
+          # The gate only works because Traefik runs externalTrafficPolicy: Local
+          # (#163); before that the allowlist saw a masqueraded address.
           traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd,kube-system-local-network-only@kubernetescrd
         hosts:
           - grafana.ronaldlokers.nl

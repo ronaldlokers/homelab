@@ -1,38 +1,14 @@
-# A PostgreSQL cluster that exists solely for Nightscout.
+# A PostgreSQL cluster for Nightscout alone.
 #
-# ## Why a whole cluster for one app
+# Nightscout talks MongoDB; FerretDB translates that onto PostgreSQL via the
+# DocumentDB extension, which depends on pg_cron. pg_cron can only be installed
+# in the single database named by `cron.database_name`, a cluster-wide
+# postmaster setting — so DocumentDB lives in exactly one database per cluster.
+# In the shared cluster that database was `postgres`, reachable by every role,
+# which is the cross-database access #219 set out to remove.
 #
-# #219 gave every application its own role owning its own database. Nightscout
-# was the one it could not fix, and the reason is a hard constraint rather than
-# an oversight.
-#
-# Nightscout talks MongoDB; FerretDB translates that onto PostgreSQL using the
-# DocumentDB extension. DocumentDB depends on pg_cron — it registers four
-# maintenance jobs (TTL expiry, two index builders, cursor cleanup) — and pg_cron
-# can only be installed in the single database named by `cron.database_name`,
-# which is a cluster-wide postmaster-context setting. Verified directly:
-#
-#   ERROR:  can only create extension in database postgres
-#   DETAIL: Jobs must be scheduled from the database configured in
-#           cron.database_name, since the pg_cron background worker reads job
-#           descriptions from this database.
-#
-# So DocumentDB can live in exactly ONE database per PostgreSQL cluster. In the
-# shared cluster that database is `postgres` — which every role could reach,
-# which is precisely the cross-database access #219 set out to remove. The
-# `nightscout` database in the shared cluster was always empty; nothing ever
-# read it.
-#
-# Giving Nightscout its own cluster is the only way to isolate it without
-# repointing `cron.database_name` on the cluster all seven other applications
-# depend on. immich-cluster already establishes the pattern here: a dedicated
-# CNPG cluster, its own image, its own backups.
-#
-# ## What isolation means here
-#
-# This cluster is single-tenant, so its `app` role is isolated by construction —
-# there is no second application whose credential it could reach. That is why
-# there are no per-app roles here, unlike postgres-cluster.
+# Single-tenant, so its `app` role is isolated by construction and there are no
+# per-app roles here.
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -47,15 +23,9 @@ spec:
   # applications, below the operator that manages it.
   priorityClassName: homelab-database
 
-  # Requests only, deliberately no limits. Without these the instances run
-  # BestEffort and are the FIRST thing the kubelet evicts under node memory
-  # pressure — ahead of every application, all of which do set requests. A
-  # database holding the only copy of live data should not be the first
-  # casualty of an unrelated memory spike.
-  #
-  # Sized from immich-cluster's measured shape (384Mi serves three instances
-  # there with headroom); this holds far less data. No limits: a hard memory cap
-  # on PostgreSQL turns a slow query into an OOM kill and a failover.
+  # Requests but no limits: without requests these run BestEffort and are
+  # evicted first, and a hard memory cap turns a slow query into an OOM kill
+  # and a failover. Sized from immich-cluster's measured shape.
   resources:
     requests:
       cpu: 100m
@@ -80,41 +50,17 @@ spec:
     parameters:
       max_connections: "100"
       shared_buffers: "256MB"
-      # Bounds how much WAL a replication slot may retain for a standby that has
-      # fallen behind or gone away. Without a cap (-1, the default) a long-absent
-      # standby grows its slot until the volume fills. Past this, the slot is
-      # invalidated and CloudNativePG re-clones the replica from the archive:
-      # slower than streaming, but a bounded failure instead of a full disk.
+      # Caps WAL retained for an absent standby. Past this the slot is invalidated
+      # and CNPG re-clones from the archive — bounded, unlike a full disk.
       max_slot_wal_keep_size: "4GB"
       # The database pg_cron keeps its metadata in, and therefore the only
       # database in this cluster that can hold the DocumentDB extension. Left at
       # the default so the extension lands where postInitSQL creates it.
       cron.database_name: "postgres"
-      # Both of these make DocumentDB's and pg_cron's OWN connections back into
-      # this server go over the Unix socket instead of TCP.
-      #
-      # They default to `localhost`, which is a TCP connection, which lands on
-      # `host all postgres all md5` in pg_hba and needs a password nothing
-      # supplies. Every one of the four DocumentDB maintenance jobs then fails:
-      #
-      #   jobid | status | count
-      #       1 | failed |    67     delete_expired_rows (TTL)
-      #       2 | failed |  2033     build_index_concurrently(1)
-      #       3 | failed |  2033     build_index_concurrently(2)
-      #       4 | failed |    67     cursor_directory_cleanup
-      #
-      # Zero successes. The same default breaks cursor continuation
-      # (`find().batchSize(n)` past the first batch) and
-      # documentdb_api.drop_collection, both with
-      # "password authentication failed for user app".
-      #
-      # Over the socket, `local all all peer` matches: the server's OS user is
-      # postgres, so requesting DB user postgres authenticates with no password
-      # and no trust rule. unix_socket_directories is /controller/run here.
-      #
-      # The shared postgres-cluster avoids the pg_cron half by accident — its
-      # jobs were scheduled when cron.host was empty, so their stored nodename
-      # is empty and they already use the socket.
+      # Send DocumentDB's and pg_cron's own connections over the Unix socket. They
+      # default to localhost, which is TCP, which hits `host all postgres all md5`
+      # and needs a password nothing supplies — every DocumentDB maintenance job
+      # then fails, along with cursor continuation and drop_collection.
       cron.host: "/controller/run"
       documentdb.localhost_connection_string: "host=/controller/run user=postgres"
     pg_hba:
@@ -122,23 +68,13 @@ spec:
       # consumer here, but a cluster that trusts unauthenticated connections is
       # still one NetworkPolicy mistake away from being readable.
       - host all app all scram-sha-256
-      # Deliberately left as trust. The streaming_replica role has NO PASSWORD
-      # SET, so requiring scram here would break replication immediately. CNPG
-      # authenticates replicas with client certificates over TLS, which makes
-      # this line redundant rather than load-bearing.
+      # trust, not scram: streaming_replica has no password. CNPG authenticates
+      # replicas with client certificates over TLS.
       - host all streaming_replica all trust
       - host all postgres all md5
-      # DocumentDB's internal connections go over the socket (see
-      # documentdb.localhost_connection_string above) but connect as the CALLING
-      # role, not as postgres — the connection string's user= is overridden. So
-      # plain peer auth rejects them:
-      #
-      #   FATAL:  Peer authentication failed for user "app"
-      #
-      # This maps the server's own OS user onto the app role for socket
-      # connections only, via the pg_ident map below. Narrower than a trust
-      # rule: it grants nothing to anything that is not already running as
-      # postgres inside this container.
+      # DocumentDB connects over the socket as the calling role, not as postgres,
+      # so plain peer auth rejects it. The pg_ident map below maps the server's OS
+      # user onto app for socket connections only.
       - local all app peer map=documentdb
 
     # Lets `local all app peer map=documentdb` above resolve: OS user postgres —
@@ -147,33 +83,14 @@ spec:
     pg_ident:
       - documentdb postgres app
 
-  # Recovery, not initdb. This block is inert day to day — bootstrap only takes
-  # effect when the Cluster object is CREATED — which is exactly why #238 exists:
-  # the shared cluster's recovery block pointed at a five-month-stale prefix for
-  # months, reported healthy, and would have restored February data.
+  # Recovery, not initdb. Inert day to day — bootstrap only applies at Cluster
+  # creation — which is why a stale prefix here goes unnoticed (#238). This
+  # prefix was verified by an actual restore on 2026-08-04: 22,306 entries,
+  # create_collection and drop_collection both functional.
   #
-  # So this one is not written from the documentation, it is copied from a
-  # restore that was actually performed and verified on 2026-08-04:
-  #
-  #   restored into a scratch cluster from the prefix below
-  #   entries 22,306 / auth_subjects 3 / profile 1 / treatments 13
-  #   documentdb_api.create_collection + drop_collection both functional
-  #
-  # The cluster was created with `initdb` and this postInitSQL, which is what
-  # installed the extension in the first place:
-  #
-  #   CREATE EXTENSION IF NOT EXISTS documentdb CASCADE;
-  #   GRANT documentdb_admin_role TO app;
-  #
-  # A recovered cluster carries the extension in its restored `postgres`
-  # database, so that step does not need repeating.
-  #
-  # NOTE: recover-from and archive-to are the same prefix. immich-cluster keeps
-  # them separate so a recovered cluster starts a clean WAL timeline; doing that
-  # here means bumping the archive prefix and leaving the new one without a base
-  # backup until the next ScheduledBackup. Same deliberate deferral as
-  # postgres-cluster. Safe for a single recovery; the constraint bites when
-  # recovering repeatedly.
+  # NOTE: recover-from and archive-to are the same prefix, so a recovered
+  # cluster continues the same WAL timeline. Safe once; the constraint bites
+  # when recovering repeatedly.
   bootstrap:
     recovery:
       source: clusterBackup
