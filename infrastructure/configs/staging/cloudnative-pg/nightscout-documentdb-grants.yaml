@@ -1,0 +1,68 @@
+# DocumentDB grants USAGE on documentdb_core to postgres and
+# documentdb_admin_role only — its four sibling schemas also grant
+# documentdb_readonly_role, but this one does not. Because the extension is in
+# shared_preload_libraries, any statement touching a relation resolves through
+# those schemas, so CNPG's non-superuser roles cannot read pg_stat_archiver,
+# pg_stat_wal or pg_available_extensions at all.
+#
+# That is what stopped backups for three nights (#376): the instance manager on
+# a replica could not read WAL archiving status. Backups now run on the primary,
+# which is superuser, so this is no longer load-bearing — but it still costs
+# 80% of a replica's log volume in stack traces (#381), and leaves the failure
+# one setting away from returning.
+#
+# A Job rather than postInitApplicationSQL: this cluster bootstraps from
+# recovery, and CNPG only runs post-init SQL for initdb. If the cluster is ever
+# rebuilt the extension reinstates its own ACLs and this must run again.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nightscout-documentdb-grants
+  namespace: database
+spec:
+  backoffLimit: 4
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: grant
+          # The cluster's own operand image, so no extra pull and psql matches
+          # the server version.
+          image: ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0
+          command:
+            - psql
+            - -v
+            - ON_ERROR_STOP=1
+            - -c
+            # Both statements are idempotent, so a re-run is a no-op. Granting
+            # the extension's own read-only role rather than naming schemas
+            # means a schema added by a future DocumentDB release is covered
+            # too, provided it grants that role like the other four.
+            - |
+              GRANT USAGE ON SCHEMA documentdb_core TO documentdb_readonly_role;
+              GRANT documentdb_readonly_role TO cnpg_metrics_exporter, streaming_replica;
+          env:
+            - name: PGHOST
+              value: nightscout-cluster-rw
+            - name: PGDATABASE
+              value: postgres
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: nightscout-cluster-superuser
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nightscout-cluster-superuser
+                  key: password
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
