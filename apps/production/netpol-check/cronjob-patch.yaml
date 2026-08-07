@@ -1,0 +1,17 @@
+# Production carries no ntfy credential: a failed Job already reaches ntfy
+# through the KubeJobFailed alert, which is namespace-agnostic and routed by
+# the ntfy AlertmanagerConfig. One fewer credential to keep alive.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: netpol-check
+spec:
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: check
+              args:
+                - |
+                  python3 /opt/check/netpol-check.py --ingress-ip 10.0.40.100

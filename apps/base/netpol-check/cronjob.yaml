@@ -2,8 +2,8 @@
 # (#282). A container restart fixed it and the cause was never established, so
 # this watches for the recurrence rather than trusting that it will not happen.
 #
-# Alerts to ntfy directly: staging has no AlertmanagerConfig, so a failing Job
-# here would otherwise be silent.
+# How a failure is reported differs per cluster, so the overlays supply the
+# container args.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -33,24 +33,7 @@ spec:
               command: ["/bin/sh", "-c"]
               args:
                 - |
-                  set -o pipefail
-                  python3 /opt/check/netpol-check.py --ingress-ip 10.0.40.52 2>&1 | tee /tmp/out.txt
-                  rc=$?
-                  if [ "$rc" != "0" ]; then
-                    curl -s -u "netpolcheck:$NTFY_PASSWORD" \
-                      -H "Title: staging NetworkPolicy check failed" \
-                      -H "Priority: high" -H "Tags: warning" \
-                      -d "$(tail -c 700 /tmp/out.txt)" \
-                      -o /dev/null -w 'ntfy responded %{http_code}\n' \
-                      https://ntfy.ronaldlokers.nl/homelab-gatus-staging
-                  fi
-                  exit $rc
-              env:
-                - name: NTFY_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: netpol-check-ntfy
-                      key: password
+                  python3 /opt/check/netpol-check.py
               securityContext:
                 allowPrivilegeEscalation: false
                 capabilities:
