@@ -35,10 +35,13 @@ spec:
                 value: "app"
               # Was `value: ""`: pg_hba said `host all app all trust`, so
               # Immich connected with no credential at all (#166).
+              # immich-cluster-app is mirrored into this namespace by reflector
+              # (#268), so this is the Secret CNPG generates rather than a copy
+              # that a cluster recreate silently invalidates.
               DB_PASSWORD:
                 valueFrom:
                   secretKeyRef:
-                    name: postgres-app-credentials
+                    name: immich-cluster-app
                     key: password
 
     # Server component
