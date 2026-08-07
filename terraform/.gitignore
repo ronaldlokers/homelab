@@ -1,0 +1,7 @@
+# State never belongs in git: it holds every resource attribute in plaintext,
+# and this one lives in B2 anyway.
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl.bak
+crash.log

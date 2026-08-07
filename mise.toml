@@ -12,6 +12,8 @@ kustomize = "latest"
 krew = "latest"
 sops = "latest"
 age = "latest"
+"pipx:ansible-core" = "latest"
+terraform = "latest"
 
 [env]
 MISE_ENV_FILE = ".env"
