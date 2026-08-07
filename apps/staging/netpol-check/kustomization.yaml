@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: netpol-check
+resources:
+  - namespace.yaml
+  - rbac.yaml
+  - netpol-check-ntfy-secret.yaml
+  - cronjob.yaml
+# A copy of scripts/netpol-check.py: kustomize refuses to read files outside
+# its own directory. validate.sh fails if the two diverge.
+configMapGenerator:
+  - name: netpol-check-script
+    files:
+      - netpol-check.py
+generatorOptions:
+  disableNameSuffixHash: true

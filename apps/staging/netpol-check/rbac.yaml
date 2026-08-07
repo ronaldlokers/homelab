@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: netpol-check
+  namespace: netpol-check
+---
+# Reads what it probes, and creates ephemeral containers to probe from pods
+# that already exist — a pod it created itself would be enforced correctly
+# while hours-old ones were not, which is how a canary reported a healthy node
+# that enforced nothing.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: netpol-check
+rules:
+  - apiGroups: [""]
+    resources: [pods, nodes, namespaces]
+    verbs: [get, list]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [pods/ephemeralcontainers]
+    verbs: [get, patch, update]
+  - apiGroups: ["networking.k8s.io"]
+    resources: [networkpolicies]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: netpol-check
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: netpol-check
+subjects:
+  - kind: ServiceAccount
+    name: netpol-check
+    namespace: netpol-check
