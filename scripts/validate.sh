@@ -396,9 +396,9 @@ PY
 # ---------------------------------------------------------------------------
 
 echo "INFO - Checking the netpol-check copies match"
-if ! cmp -s scripts/netpol-check.py apps/staging/netpol-check/netpol-check.py; then
-  printf "\nERROR - scripts/netpol-check.py and apps/staging/netpol-check/netpol-check.py differ\n"
-  echo "  cp scripts/netpol-check.py apps/staging/netpol-check/netpol-check.py"
+if ! cmp -s scripts/netpol-check.py apps/base/netpol-check/netpol-check.py; then
+  printf "\nERROR - scripts/netpol-check.py and apps/base/netpol-check/netpol-check.py differ\n"
+  echo "  cp scripts/netpol-check.py apps/base/netpol-check/netpol-check.py"
   exit 1
 fi
 
