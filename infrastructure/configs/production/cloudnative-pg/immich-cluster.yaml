@@ -4,6 +4,17 @@ metadata:
   name: immich-cluster
   namespace: database
 spec:
+  # Permission only, no auto-reflection. reflector requires the source to allow
+  # it; which object is actually mirrored is declared on the target, in
+  # apps/production/immich/postgres-credentials-mirror.yaml.
+  #
+  # This propagates to every Secret CNPG creates, including the superuser one —
+  # harmless, because "allowed" alone copies nothing. Adding the auto-* pair
+  # here instead mirrored the superuser credential into the app namespace.
+  inheritedMetadata:
+    annotations:
+      reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+      reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "immich"
   instances: 3
   # Applications are useless until this is serving, and an app whose database
   # is down crash-loops and adds load while achieving nothing. Ranked above
