@@ -6,6 +6,7 @@ resources:
 - ../../base/mealie/
 - pvc.yaml
 - ingress.yaml
+- network-policy-homepage.yaml
 - mealie-oidc-secret.yaml
 - network-policy-oidc.yaml
 patches:

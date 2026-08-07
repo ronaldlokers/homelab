@@ -54,6 +54,10 @@ data:
             icon: mealie.png
             href: https://mealie.ronaldlokers.nl
             description: Recipe manager
+            widget:
+              type: mealie
+              url: http://mealie.mealie.svc.cluster.local:9000
+              key: "{{HOMEPAGE_VAR_MEALIE_KEY}}"
         - Tandoor:
             icon: tandoor-recipes.png
             href: https://tandoor.ronaldlokers.nl
