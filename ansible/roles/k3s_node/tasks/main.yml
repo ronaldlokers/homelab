@@ -1,0 +1,108 @@
+---
+- name: Packages the cluster depends on
+  ansible.builtin.apt:
+    name: "{{ node_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+# /etc/sysctl.conf is not read on these nodes. Debian normally symlinks it into
+# /etc/sysctl.d/99-sysctl.conf, and that symlink does not exist here — so the
+# inotify limits written into /etc/sysctl.conf have never applied on any node:
+#
+#   configured: fs.inotify.max_user_watches=524288  max_user_instances=512
+#   runtime:    129511                              128
+#
+# A drop-in in /etc/sysctl.d is read directly and does not depend on that.
+- name: Inotify limits, in a file systemd-sysctl actually reads
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/90-homelab-inotify.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by ansible/roles/k3s_node. See docs/runbooks/inotify-limits-exhausted.md
+      fs.inotify.max_user_watches={{ inotify_max_user_watches }}
+      fs.inotify.max_user_instances={{ inotify_max_user_instances }}
+  notify: Reload sysctl
+
+- name: Apply the limits now as well as at boot
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/90-homelab-inotify.conf
+    reload: true
+    state: present
+  loop:
+    - { key: fs.inotify.max_user_watches, value: "{{ inotify_max_user_watches }}" }
+    - { key: fs.inotify.max_user_instances, value: "{{ inotify_max_user_instances }}" }
+
+- name: Persistent journal directory
+  ansible.builtin.file:
+    path: /var/log/journal
+    state: directory
+    owner: root
+    group: systemd-journal
+    mode: "2755"
+
+- name: Journald keeps logs across reboots
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/90-homelab-persistent.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by ansible/roles/k3s_node. See docs/runbooks/journald-make-persistent.md
+      [Journal]
+      Storage=persistent
+      SystemMaxUse=1G
+  notify: Restart journald
+
+# etcd on NVMe.
+#
+# This is the one piece that cannot simply be converged. Bind-mounting over a
+# directory that already holds live etcd data hides that data from the running
+# cluster, so the task refuses to act in exactly the case where acting would be
+# destructive, and points at the runbook that handles moving the data.
+#
+# The three states:
+#   already mounted        -> verify it is the NVMe device and move on
+#   empty or absent target -> a rebuilt node; create it
+#   populated, not mounted -> stop, and tell a human which runbook applies
+- name: Check the etcd mount state
+  ansible.builtin.stat:
+    path: "{{ etcd_target_dir }}"
+  register: etcd_target
+
+- name: Find out whether the target is already a mountpoint
+  ansible.builtin.command: findmnt --noheadings --output SOURCE --target "{{ etcd_target_dir }}"
+  register: etcd_mount
+  changed_when: false
+  failed_when: false
+
+- name: Refuse to bind-mount over existing etcd data
+  ansible.builtin.assert:
+    that:
+      - etcd_target_dir not in (etcd_mount.stdout | default(''))
+        or etcd_nvme_device in (etcd_mount.stdout | default(''))
+    fail_msg: >-
+      {{ etcd_target_dir }} holds data and is not mounted from
+      {{ etcd_nvme_device }}. Mounting over it would hide the live etcd
+      database from k3s. Follow docs/runbooks/etcd-migrate-to-nvme.md, which
+      stops k3s and copies the data first.
+
+- name: Directory on the NVMe volume that backs etcd
+  ansible.builtin.file:
+    path: "{{ etcd_source_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Bind mount, recorded in fstab so it survives a reboot
+  ansible.posix.mount:
+    src: "{{ etcd_source_dir }}"
+    path: "{{ etcd_target_dir }}"
+    fstype: none
+    opts: bind
+    state: mounted

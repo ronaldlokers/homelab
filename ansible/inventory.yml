@@ -1,0 +1,17 @@
+# The three CM5 control plane nodes. There are no agents: every node runs the
+# control plane and workloads, which is why they are identical apart from
+# --cluster-init on the first.
+all:
+  children:
+    k3s_servers:
+      hosts:
+        kube-srv-1:
+          ansible_host: 10.0.40.101
+          k3s_cluster_init: true
+        kube-srv-2:
+          ansible_host: 10.0.40.102
+        kube-srv-3:
+          ansible_host: 10.0.40.103
+      vars:
+        ansible_user: ronald
+        ansible_python_interpreter: /usr/bin/python3
