@@ -1,3 +1,29 @@
+# Renovate's GitHub credential.
+#
+# A fine-grained personal access token, scoped to ronaldlokers/homelab alone.
+# Its permissions, as granted:
+#
+#   Contents        read and write   push branches
+#   Pull requests   read and write   open and update PRs
+#   Issues          read and write   the Dependency Dashboard is an issue
+#   Workflows       read and write   update action versions in .github/workflows
+#   Metadata        read             mandatory
+#
+# The predecessor was a classic PAT carrying `repo`, which reached all 24
+# repositories on the account including the dotfiles one. Scope verified
+# against an endpoint public visibility does not grant, because every one of
+# those repositories is public and answers 200 to any authenticated request:
+#
+#   homelab/collaborators            200
+#   dotfiles/collaborators           403
+#   devtools-snippets/collaborators  403
+#
+# Workflows write is the one permission worth thinking about again: it lets a
+# compromised Renovate rewrite the CI that gates merges to main, and main is
+# applied by kustomize-controller with cluster-admin. Two things bound that
+# today — automerge is off everywhere in renovate.json, so every change still
+# needs a human to merge it, and the token cannot read or alter branch
+# protection (403). Enabling automerge would remove the first of those.
 apiVersion: v1
 kind: Secret
 metadata:
