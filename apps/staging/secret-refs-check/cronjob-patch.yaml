@@ -1,0 +1,34 @@
+# Staging publishes to ntfy itself: it has no AlertmanagerConfig, so a failing
+# Job here would otherwise be silent. Production leaves this to the existing
+# KubeJobFailed alert.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: secret-refs-check
+spec:
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: check
+              args:
+                - |
+                  set -o pipefail
+                  python3 /opt/check/secret-refs-check.py 2>&1 | tee /tmp/out.txt
+                  rc=$?
+                  if [ "$rc" != "0" ]; then
+                    curl -s -u "netpolcheck:$NTFY_PASSWORD" \
+                      -H "Title: staging Secret reference check failed" \
+                      -H "Priority: high" -H "Tags: warning" \
+                      -d "$(tail -c 700 /tmp/out.txt)" \
+                      -o /dev/null -w 'ntfy responded %{http_code}\n' \
+                      https://ntfy.ronaldlokers.nl/homelab-gatus-staging
+                  fi
+                  exit $rc
+              env:
+                - name: NTFY_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: netpol-check-ntfy
+                      key: password

@@ -395,11 +395,13 @@ PY
 # testing what the operator tests.
 # ---------------------------------------------------------------------------
 
-echo "INFO - Checking the netpol-check copies match"
-if ! cmp -s scripts/netpol-check.py apps/base/netpol-check/netpol-check.py; then
-  printf "\nERROR - scripts/netpol-check.py and apps/base/netpol-check/netpol-check.py differ\n"
-  echo "  cp scripts/netpol-check.py apps/base/netpol-check/netpol-check.py"
-  exit 1
-fi
+echo "INFO - Checking the scheduled-script copies match"
+for name in netpol-check secret-refs-check; do
+  if ! cmp -s "scripts/$name.py" "apps/base/$name/$name.py"; then
+    printf "\nERROR - scripts/%s.py and apps/base/%s/%s.py differ\n" "$name" "$name" "$name"
+    echo "  cp scripts/$name.py apps/base/$name/$name.py"
+    exit 1
+  fi
+done
 
 echo "INFO - Validation passed"
