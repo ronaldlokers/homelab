@@ -91,13 +91,21 @@ spec:
         enabled: true
         ingressClassName: traefik
         annotations:
-          cert-manager.io/cluster-issuer: letsencrypt-staging
           traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
         hosts:
           - grafana.staging.ronaldlokers.nl
+        # No secretName and no issuer annotation: traefik's default TLSStore
+        # serves the *.staging.ronaldlokers.nl wildcard, which every other
+        # application here relies on.
+        #
+        # This asked cert-manager for a certificate of its own from
+        # letsencrypt-staging, whose root nothing trusts. It stayed valid and
+        # Ready, so nothing reported a problem — the certificate was fine, its
+        # issuer was not, and browsers and server-to-server calls both refused
+        # it. That is the same untrusted root that broke the first authentik
+        # login attempt.
         tls:
-          - secretName: grafana-tls
-            hosts:
+          - hosts:
               - grafana.staging.ronaldlokers.nl
       additionalDataSources:
         - name: Loki
