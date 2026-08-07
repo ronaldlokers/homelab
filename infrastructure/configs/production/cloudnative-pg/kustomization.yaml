@@ -17,3 +17,22 @@ resources:
   - mealie-database.yaml
   - speedtest-database.yaml
   - tandoor-database.yaml
+
+# Let reflector mirror each role credential into the namespace that uses it, so
+# the app reads the same object rather than a SOPS copy that can drift (#268).
+# Applied as a patch: the Secrets are SOPS-encrypted and their MAC covers
+# unencrypted values too, so editing their metadata in place breaks decryption.
+patches:
+  - target:
+      kind: Secret
+      name: pg-role-mealie
+    patch: |-
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: pg-role-mealie
+        annotations:
+          reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+          reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "mealie"
+          reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
+          reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "mealie"
