@@ -120,6 +120,13 @@ data:
             widget:
               type: ntfy
               url: http://ntfy.ntfy.svc.cluster.local
+              # A topic is required: without one the widget requests the web UI
+              # root and tries to parse the HTML as JSON. ntfy denies anonymous
+              # reads on every topic, so this reads as its own account —
+              # read-only on this one topic, unable to publish.
+              topic: homelab-gatus
+              username: homepage
+              password: "{{HOMEPAGE_VAR_NTFY_PASSWORD}}"
         - Speedtest:
             icon: speedtest-tracker.png
             href: https://speedtest.ronaldlokers.nl
