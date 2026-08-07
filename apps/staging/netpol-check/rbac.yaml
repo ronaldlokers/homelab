@@ -19,6 +19,10 @@ rules:
   - apiGroups: [""]
     resources: [pods/log]
     verbs: [get]
+  # The intent probes run `kubectl exec` in the app's own pod.
+  - apiGroups: [""]
+    resources: [pods/exec]
+    verbs: [create]
   - apiGroups: [""]
     resources: [pods/ephemeralcontainers]
     verbs: [get, patch, update]
