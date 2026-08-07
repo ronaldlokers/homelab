@@ -16,4 +16,8 @@ spec:
             # localhost is required: the probes send Host: localhost, and Django
             # rejects anything not listed here with 400 DisallowedHost.
             - name: ALLOWED_HOSTS
-              value: "tandoor.ronaldlokers.nl,localhost"
+              # The service name is here for homepage's widget, which calls
+              # the API in-cluster. Django answers 400 DisallowedHost for any
+              # Host not listed — not 404, not 403 — so a missing entry reads
+              # as a broken URL rather than a rejected hostname.
+              value: "tandoor.ronaldlokers.nl,tandoor.tandoor.svc.cluster.local,localhost"
