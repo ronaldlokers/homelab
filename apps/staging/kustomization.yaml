@@ -21,4 +21,5 @@ resources:
   - gatus
   - netpol-check
   - secret-refs-check
+  - recovery-source-check
   - tandoor

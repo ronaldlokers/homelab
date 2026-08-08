@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+"""Check that every cluster's recovery source holds a backup worth recovering.
+
+`bootstrap.recovery` only runs when a Cluster object is CREATED, so a wrong
+`externalClusters` pointer is invisible until a rebuild — the one moment nobody
+is in a position to notice. It has been wrong three times:
+
+  #238  postgres-cluster recovered from a stale prefix for months, reporting
+        healthy the whole time.
+  #257  immich's pointer was six weeks stale; a rebuild would have restored an
+        old photo library and reported Ready.
+  #260  immich again, three days after #257, because the change advanced both
+        prefixes by one generation and so left recovery pointed at the one that
+        had just stopped receiving backups.
+
+Every one of those passed review. What was missing is an assertion against
+object storage rather than against the manifest.
+
+The check asks barman itself, from a pod of the cluster in question, because
+that is the tool a real restore would use — reimplementing the catalogue layout
+here would test this script's idea of barman rather than barman.
+
+Usage:
+    scripts/recovery-source-check.py --context production
+
+Exit code is non-zero if any recovery source is empty, unreadable, or behind
+the prefix the cluster actually archives to.
+"""
+
+import argparse
+import base64
+import json
+import re
+import subprocess
+import sys
+from datetime import datetime, timedelta, timezone
+
+# The invariant is NOT "the recovery source is recent". Absolute age misses the
+# thing that actually went wrong: on the morning #260 was found, the stale
+# source held a backup 3 days old against a 7d retention, so any sane age
+# threshold called it healthy while a rebuild would have lost 4 days.
+#
+# What distinguishes a live prefix from an abandoned one is the archive target.
+# If the cluster is writing newer backups somewhere else, the recovery pointer
+# is behind, and it is behind on day one rather than after a fortnight.
+#
+# A day of slack: the two prefixes are usually the same object, but when they
+# differ legitimately the nightly runs land minutes apart, never a day.
+MAX_LAG = timedelta(days=1)
+
+
+def kubectl(ctx, *args, check=True, timeout=180):
+    # ctx is None in-cluster, where kubectl uses the ServiceAccount and there
+    # is no context to name.
+    prefix = ["kubectl"] + ([f"--context={ctx}"] if ctx else [])
+    r = subprocess.run([*prefix, *args], capture_output=True, text=True, timeout=timeout)
+    if check and r.returncode != 0:
+        raise RuntimeError(f"kubectl {' '.join(args)}: {r.stderr.strip()}")
+    return r.stdout if r.returncode == 0 else r.stdout + r.stderr
+
+
+def secret_value(ctx, ns, name, key):
+    out = kubectl(ctx, "get", "secret", name, "-n", ns, "-o", f"jsonpath={{.data.{key}}}")
+    return base64.b64decode(out).decode()
+
+
+def newest_backup(ctx, ns, pod, store, creds):
+    """Ask barman for the catalogue, from a pod that could actually restore it."""
+    env = [
+        "env",
+        f"AWS_ACCESS_KEY_ID={creds[0]}",
+        f"AWS_SECRET_ACCESS_KEY={creds[1]}",
+    ]
+    cmd = [
+        "barman-cloud-backup-list",
+        "--cloud-provider", "aws-s3",
+        "--endpoint-url", store["endpointURL"],
+        store["destinationPath"], store["serverName"],
+    ]
+    out = kubectl(ctx, "exec", "-n", ns, pod, "-c", "postgres", "--",
+                  *env, *cmd, check=False)
+    stamps = []
+    for line in out.splitlines():
+        # "20260808T033001  2026-08-08 03:30:44  000000030000..."
+        m = re.match(r"\s*\d{8}T\d{6}\s+(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", line)
+        if m:
+            stamps.append(datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S")
+                          .replace(tzinfo=timezone.utc))
+    if stamps:
+        return max(stamps), None
+    return None, " ".join(out.split())[:120] or "no output"
+
+
+def object_store(ctx, ns, name):
+    """Resolve a Barman Cloud Plugin ObjectStore into the same shape as an
+    in-tree barmanObjectStore, so both paths compare identically. Without this
+    the check quietly stops comparing anything as #377 migrates clusters."""
+    out = kubectl(ctx, "get", "objectstores.barmancloud.cnpg.io", name, "-n", ns,
+                  "-o", "json", check=False)
+    try:
+        return json.loads(out)["spec"]["configuration"]
+    except Exception:
+        return None
+
+
+def clusters(ctx):
+    d = json.loads(kubectl(ctx, "get", "clusters.postgresql.cnpg.io", "-A", "-o", "json"))
+    return d["items"]
+
+
+def running_pod(ctx, ns, cluster):
+    out = kubectl(ctx, "get", "pods", "-n", ns,
+                  "-l", f"cnpg.io/cluster={cluster}",
+                  "--field-selector=status.phase=Running",
+                  "-o", "jsonpath={.items[0].metadata.name}", check=False)
+    return out.strip() or None
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--context")
+    args = ap.parse_args()
+    ctx = args.context
+    failed = False
+
+    print(f"== every recovery source in {ctx or 'this cluster'} holds a recent backup ==")
+    checked = 0
+    for c in clusters(ctx):
+        ns, name = c["metadata"]["namespace"], c["metadata"]["name"]
+        spec = c["spec"]
+        source = (spec.get("bootstrap") or {}).get("recovery", {}).get("source")
+        if not source:
+            continue
+
+        ext = next((e for e in spec.get("externalClusters", []) if e["name"] == source), None)
+        store = (ext or {}).get("barmanObjectStore")
+        if not store:
+            # A plugin-based recovery source is configured elsewhere; this check
+            # does not know how to read it yet, and saying nothing is better
+            # than saying "ok".
+            print(f"  SKIP {name:<20} recovery source '{source}' is not a barmanObjectStore")
+            continue
+
+        store = dict(store)
+        store.setdefault("serverName", name)
+        pod = running_pod(ctx, ns, name)
+        if not pod:
+            failed = True
+            print(f"  FAIL {name:<20} no running pod to read the catalogue from")
+            continue
+
+        cred = store["s3Credentials"]
+        creds = (secret_value(ctx, ns, cred["accessKeyId"]["name"], cred["accessKeyId"]["key"]),
+                 secret_value(ctx, ns, cred["secretAccessKey"]["name"], cred["secretAccessKey"]["key"]))
+
+        newest, err = newest_backup(ctx, ns, pod, store, creds)
+        prefix = store["destinationPath"].rstrip("/").split("/")[-1]
+        checked += 1
+
+        if newest is None:
+            failed = True
+            print(f"  FAIL {name:<20} {prefix}: no base backup found — a rebuild would "
+                  f"have nothing to restore ({err})")
+            continue
+
+        stamp = newest.strftime("%Y-%m-%d %H:%M")
+
+        # Where the cluster actually writes. Same object in the common case, in
+        # which case the comparison is trivially satisfied.
+        archive = (spec.get("backup") or {}).get("barmanObjectStore")
+        if not archive:
+            plugin = next((p for p in spec.get("plugins", [])
+                           if p.get("parameters", {}).get("barmanObjectName")), None)
+            if plugin:
+                archive = object_store(
+                    ctx, ns, plugin["parameters"]["barmanObjectName"])
+        if not archive:
+            failed = True
+            print(f"  FAIL {name:<20} {prefix}: cannot resolve where this cluster "
+                  f"archives to, so the pointer cannot be compared")
+            continue
+
+        archive = dict(archive)
+        archive.setdefault("serverName", name)
+        if archive["destinationPath"] == store["destinationPath"]:
+            print(f"  ok   {name:<20} {prefix}: newest base backup {stamp} "
+                  f"(recovery reads the prefix it archives to)")
+            continue
+
+        a_newest, a_err = newest_backup(ctx, ns, pod, archive, creds)
+        a_prefix = archive["destinationPath"].rstrip("/").split("/")[-1]
+        if a_newest is None:
+            print(f"  ok   {name:<20} {prefix}: newest base backup {stamp} "
+                  f"(archive target {a_prefix} unreadable: {a_err})")
+            continue
+
+        lag = a_newest - newest
+        if lag > MAX_LAG:
+            failed = True
+            print(f"  FAIL {name:<20} recovery reads {prefix} (newest {stamp}) but the "
+                  f"cluster archives to {a_prefix} (newest "
+                  f"{a_newest.strftime('%Y-%m-%d %H:%M')}) — {lag.days}d behind, and "
+                  f"a rebuild would restore the older one")
+        else:
+            print(f"  ok   {name:<20} {prefix}: newest base backup {stamp} "
+                  f"(archive {a_prefix} within {MAX_LAG.days}d)")
+
+    if not checked:
+        print("  no cluster uses bootstrap.recovery — nothing to check")
+
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
