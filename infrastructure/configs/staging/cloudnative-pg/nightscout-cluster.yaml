@@ -79,21 +79,22 @@ spec:
     recovery:
       source: clusterBackup
 
+  # Reads the same object store the cluster archives to, named rather than
+  # respecified — #386 moved backups to the plugin but left this pointer on the
+  # in-tree barmanObjectStore, which CloudNativePG removes in 1.31 along with
+  # the backup path (#377). A recovery source is only exercised on a rebuild,
+  # so this would have been found the one time it could not be fixed calmly.
+  #
+  # serverName is explicit even though it equals the cluster name: it is what
+  # the in-tree configuration recorded, and on the plugin it belongs here
+  # rather than on the ObjectStore, whose own serverName must stay empty.
   externalClusters:
     - name: clusterBackup
-      barmanObjectStore:
-        destinationPath: "s3://homelab-postgres-backups/staging-2026-08-nightscout/"
-        serverName: nightscout-cluster
-        endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-        s3Credentials:
-          accessKeyId:
-            name: b2-credentials
-            key: ACCESS_KEY_ID
-          secretAccessKey:
-            name: b2-credentials
-            key: ACCESS_SECRET_KEY
-        wal:
-          maxParallel: 8
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: nightscout-store
+          serverName: nightscout-cluster
 
   storage:
     size: 5Gi
