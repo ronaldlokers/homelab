@@ -1,0 +1,64 @@
+# The per-database isolation (#219) revoked CONNECT from PUBLIC, and
+# cnpg_metrics_exporter reached the databases through PUBLIC. It was never
+# granted back the way streaming_replica was, so on this cluster the exporter
+# can connect to nothing but template1 and every collection fails:
+#
+#   FATAL: permission denied for database "postgres" (SQLSTATE 42501)
+#
+# With no collection, cnpg_collector_last_available_backup_timestamp reports 0,
+# which fires PostgreSQLBackupNeverTaken on a cluster whose backups are fine,
+# plus CNPGMetricsCollectorFailing on all three pods (#391).
+#
+# Granting a read-only system role CONNECT does not undo the isolation: #219
+# was about app roles reaching each other's databases, and this is not one.
+# Only postgres and app are granted — not the per-app databases.
+#
+# A Job because the cluster bootstraps from recovery and CNPG only runs
+# post-init SQL for initdb. A rebuilt cluster needs this to run again.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-metrics-exporter-grants
+  namespace: database
+spec:
+  backoffLimit: 4
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: grant
+          image: ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0
+          command:
+            - psql
+            - -v
+            - ON_ERROR_STOP=1
+            - -c
+            # Idempotent: re-granting an existing privilege is a no-op.
+            - |
+              GRANT CONNECT ON DATABASE postgres TO cnpg_metrics_exporter;
+              GRANT CONNECT ON DATABASE app TO cnpg_metrics_exporter;
+          env:
+            - name: PGHOST
+              value: postgres-cluster-rw
+            - name: PGDATABASE
+              value: postgres
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-cluster-superuser
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-cluster-superuser
+                  key: password
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
