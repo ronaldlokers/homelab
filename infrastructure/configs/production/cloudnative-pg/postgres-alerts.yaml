@@ -87,10 +87,17 @@ spec:
           annotations:
             summary: "Last base backup of {{ $labels.cnpg_io_cluster }} is older than 26 hours"
             description: "Cluster {{ $labels.cnpg_io_cluster }} has a daily ScheduledBackup but its newest base backup is older than 26h. Check the ScheduledBackup and recent Backup objects in the database namespace."
+          # Matches both metric names. The Barman Cloud Plugin publishes
+          # barman_cloud_cloudnative_pg_io_* and leaves the cnpg_collector_*
+          # ones frozen at the last in-tree backup — marked Deprecated but
+          # still exported — so a migrated cluster looks permanently stale on
+          # the old name alone. max across both is right in every state: only
+          # the old name exists before migration, only the new one advances
+          # after, and if backups genuinely stop, neither advances (#377).
           expr: |
-            (time() - max by (cnpg_io_cluster) (cnpg_collector_last_available_backup_timestamp) > 26 * 3600)
+            (time() - max by (cnpg_io_cluster) ({__name__=~"cnpg_collector_last_available_backup_timestamp|barman_cloud_cloudnative_pg_io_last_available_backup_timestamp"}) > 26 * 3600)
             and
-            (max by (cnpg_io_cluster) (cnpg_collector_last_available_backup_timestamp) > 0)
+            (max by (cnpg_io_cluster) ({__name__=~"cnpg_collector_last_available_backup_timestamp|barman_cloud_cloudnative_pg_io_last_available_backup_timestamp"}) > 0)
           for: 30m
           labels:
             severity: critical
@@ -101,7 +108,7 @@ spec:
             summary: "Cluster {{ $labels.cnpg_io_cluster }} has no base backup at all"
             description: "No base backup has ever completed for {{ $labels.cnpg_io_cluster }} — it is not recoverable from object storage regardless of WAL archiving. Create a ScheduledBackup (with immediate: true) for it."
           expr: |
-            max by (cnpg_io_cluster) (cnpg_collector_last_available_backup_timestamp) == 0
+            max by (cnpg_io_cluster) ({__name__=~"cnpg_collector_last_available_backup_timestamp|barman_cloud_cloudnative_pg_io_last_available_backup_timestamp"}) == 0
           for: 6h
           labels:
             severity: critical
