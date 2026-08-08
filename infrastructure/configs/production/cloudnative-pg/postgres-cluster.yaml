@@ -123,8 +123,10 @@ spec:
     recovery:
       source: clusterBackup
 
-  # Equals backup.barmanObjectStore.destinationPath below, so a recovered
-  # cluster continues the same timeline. immich-cluster keeps them separate.
+  # Names the same object store the cluster archives to, rather than repeating
+  # its destination, so a recovered cluster continues the same timeline and the
+  # two cannot be advanced independently — which is what #394 had to correct by
+  # hand. immich-cluster keeps them separate.
   #
   # Moved off production-2026-03/ only after #392 put a base backup on the new
   # prefix — pointing recovery at an empty prefix would make a rebuild fail,
@@ -132,52 +134,35 @@ spec:
   # holds history from March to 2026-08-08 and is retained as a manual restore
   # source until it ages past the 7d retention promise, then deleted per step 4
   # of the disaster-recovery runbook.
+  #
+  # serverName is explicit even though it equals the cluster name: it is what
+  # the in-tree configuration recorded, and on the plugin it belongs here
+  # rather than on the ObjectStore, whose own serverName must stay empty.
   externalClusters:
     - name: clusterBackup
-      barmanObjectStore:
-        destinationPath: "s3://homelab-postgres-backups/production-2026-08-postgres/"
-        serverName: postgres-cluster
-        endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-        s3Credentials:
-          accessKeyId:
-            name: b2-credentials
-            key: ACCESS_KEY_ID
-          secretAccessKey:
-            name: b2-credentials
-            key: ACCESS_SECRET_KEY
-        wal:
-          maxParallel: 8
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: postgres-store
+          serverName: postgres-cluster
 
   storage:
     size: 30Gi
     storageClass: longhorn
     resizeInUseVolumes: true
 
-  backup:
-    retentionPolicy: "7d"
-    barmanObjectStore:
-      # Own prefix, as every other cluster already has. production-2026-03/ had
-      # accumulated 3,312 live objects behind 12,276 versions and 9,008 delete
-      # markers — the bucket is versioned, so each retention delete leaves both
-      # — and listing it took 71s against 3.6s for a per-cluster prefix. The
-      # metrics collector reads that catalogue, could not finish, and reported
-      # last_available_backup_timestamp as 0, firing PostgreSQLBackupNeverTaken
-      # on a cluster whose backups were fine (#391).
-      #
-      # externalClusters below still points at the old prefix on purpose: it is
-      # where every existing base backup lives, and it stays the recovery
-      # source until a base backup exists here. Moving it is a separate change.
-      destinationPath: "s3://homelab-postgres-backups/production-2026-08-postgres/"
-      endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-      s3Credentials:
-        accessKeyId:
-          name: b2-credentials
-          key: ACCESS_KEY_ID
-        secretAccessKey:
-          name: b2-credentials
-          key: ACCESS_SECRET_KEY
-      wal:
-        compression: gzip
-      data:
-        compression: gzip
-        jobs: 2
+  # Backups go through the Barman Cloud Plugin rather than the in-tree
+  # barmanObjectStore, which CloudNativePG removes in 1.31 (#377). The
+  # destination, prefix, credentials and retention move to
+  # postgres-objectstore.yaml unchanged, so the existing catalogue — including
+  # the base backups #392 and #394 put on this prefix — continues rather than
+  # restarting.
+  #
+  # isWALArchiver: true hands WAL archiving to the plugin. Only one component
+  # may archive, so this is a cutover, not a parallel run — the two cannot be
+  # configured at once.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: postgres-store
