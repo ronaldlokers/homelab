@@ -124,24 +124,17 @@ spec:
     size: 10Gi
     storageClass: local-path
 
-  backup:
-    retentionPolicy: "14d"
-    barmanObjectStore:
-      # Fresh timeline. The old "staging/" prefix accumulates WALs and trips
-      # barman "Expected empty archive" on restart/failover/rebuild (a fresh
-      # initdb cluster must archive into an empty prefix). Bump this date on
-      # each staging rebuild, or purge the path.
-      destinationPath: "s3://homelab-postgres-backups/staging-2026-07/"
-      endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-      s3Credentials:
-        accessKeyId:
-          name: b2-credentials
-          key: ACCESS_KEY_ID
-        secretAccessKey:
-          name: b2-credentials
-          key: ACCESS_SECRET_KEY
-      wal:
-        compression: gzip
-      data:
-        compression: gzip
-        jobs: 2
+  # Backups go through the Barman Cloud Plugin rather than the in-tree
+  # barmanObjectStore, which CloudNativePG removes in 1.31 (#377). The
+  # destination, prefix, credentials and retention move to
+  # postgres-objectstore.yaml unchanged, so the existing catalogue continues
+  # rather than restarting.
+  #
+  # isWALArchiver: true hands WAL archiving to the plugin. Only one component
+  # may archive, so this is a cutover, not a parallel run — the two cannot be
+  # configured at once.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: postgres-store
