@@ -13,18 +13,13 @@ spec:
   cluster:
     name: postgres-cluster
   immediate: true # Take first backup immediately
----
-apiVersion: postgresql.cnpg.io/v1
-kind: ScheduledBackup
-metadata:
-  name: immich-cluster-daily-backup
-  namespace: database
-spec:
-  schedule: "0 30 2 * * *" # Daily at 2:30 AM (staggered after postgres-cluster)
-  backupOwnerReference: self
-  cluster:
-    name: immich-cluster
-  immediate: true # Take first backup immediately
+  # This cluster's backups go through the plugin (#377). Left unset, the
+  # webhook defaults method to barmanObjectStore, which this cluster no longer
+  # has — every nightly run then fails with "no barmanObjectStore section
+  # defined on the target cluster", overnight and unwatched (#388).
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
