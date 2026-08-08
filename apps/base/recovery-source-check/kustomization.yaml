@@ -1,15 +1,20 @@
+# No `namespace:` here on purpose. That field rewrites EVERY namespaced
+# resource, which moved rbac-database.yaml's Role out of the database namespace
+# and left the job unable to read the object-store credentials. Each resource
+# declares its own namespace instead.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: recovery-source-check
 resources:
   - namespace.yaml
   - rbac.yaml
+  - rbac-database.yaml
   - cronjob.yaml
 
 # A copy of scripts/recovery-source-check.py: kustomize refuses to read files
 # outside its own directory. validate.sh fails if the two diverge.
 configMapGenerator:
   - name: recovery-source-check-script
+    namespace: recovery-source-check
     files:
       - recovery-source-check.py
 
