@@ -124,12 +124,18 @@ spec:
       source: clusterBackup
 
   # Equals backup.barmanObjectStore.destinationPath below, so a recovered
-  # cluster continues the same timeline. immich-cluster keeps them separate;
-  # doing that here needs a new prefix and a base backup first.
+  # cluster continues the same timeline. immich-cluster keeps them separate.
+  #
+  # Moved off production-2026-03/ only after #392 put a base backup on the new
+  # prefix — pointing recovery at an empty prefix would make a rebuild fail,
+  # and a rebuild is exactly when nobody is watching. The old prefix still
+  # holds history from March to 2026-08-08 and is retained as a manual restore
+  # source until it ages past the 7d retention promise, then deleted per step 4
+  # of the disaster-recovery runbook.
   externalClusters:
     - name: clusterBackup
       barmanObjectStore:
-        destinationPath: "s3://homelab-postgres-backups/production-2026-03/"
+        destinationPath: "s3://homelab-postgres-backups/production-2026-08-postgres/"
         serverName: postgres-cluster
         endpointURL: "https://s3.eu-central-003.backblazeb2.com"
         s3Credentials:
