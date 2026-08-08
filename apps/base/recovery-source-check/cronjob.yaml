@@ -1,0 +1,56 @@
+# bootstrap.recovery only runs when a Cluster is CREATED, so a wrong
+# externalClusters pointer is invisible until a rebuild — the one moment nobody
+# is in a position to notice. It has been wrong three times (#238, #257, #260),
+# each of which passed review because the manifest looked reasonable.
+#
+# Daily rather than hourly: the pointer changes only when someone edits it, and
+# the comparison costs two catalogue listings per cluster.
+#
+# How a failure is reported differs per cluster, so the overlays supply the
+# container args.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: recovery-source-check
+  namespace: recovery-source-check
+spec:
+  schedule: "23 7 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          serviceAccountName: recovery-source-check
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: check
+              image: alpine/k8s:1.36.2
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  python3 /opt/check/recovery-source-check.py
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  memory: 512Mi
+              volumeMounts:
+                - name: script
+                  mountPath: /opt/check
+          volumes:
+            - name: script
+              configMap:
+                name: recovery-source-check-script

@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: recovery-source-check
+resources:
+  - namespace.yaml
+  - rbac.yaml
+  - cronjob.yaml
+
+# A copy of scripts/recovery-source-check.py: kustomize refuses to read files
+# outside its own directory. validate.sh fails if the two diverge.
+configMapGenerator:
+  - name: recovery-source-check-script
+    files:
+      - recovery-source-check.py
+
+generatorOptions:
+  disableNameSuffixHash: true
