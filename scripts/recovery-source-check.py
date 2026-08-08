@@ -134,15 +134,27 @@ def main():
 
         ext = next((e for e in spec.get("externalClusters", []) if e["name"] == source), None)
         store = (ext or {}).get("barmanObjectStore")
+        server = None
         if not store:
-            # A plugin-based recovery source is configured elsewhere; this check
-            # does not know how to read it yet, and saying nothing is better
-            # than saying "ok".
-            print(f"  SKIP {name:<20} recovery source '{source}' is not a barmanObjectStore")
+            # The plugin spells the same pointer differently: the destination
+            # lives on an ObjectStore, and the external cluster names it. Both
+            # forms have to resolve, or #377 would turn this check off one
+            # cluster at a time while every one of them still reported ok.
+            params = ((ext or {}).get("plugin") or {}).get("parameters") or {}
+            if params.get("barmanObjectName"):
+                store = object_store(ctx, ns, params["barmanObjectName"])
+                # Unlike the in-tree form, serverName is a plugin parameter
+                # rather than a field on the store — the ObjectStore's own
+                # serverName is required to stay empty.
+                server = params.get("serverName")
+        if not store:
+            failed = True
+            print(f"  FAIL {name:<20} recovery source '{source}' resolves to no object "
+                  f"store, so a rebuild would have nothing to restore from")
             continue
 
         store = dict(store)
-        store.setdefault("serverName", name)
+        store.setdefault("serverName", server or name)
         pod = running_pod(ctx, ns, name)
         if not pod:
             failed = True
@@ -168,12 +180,14 @@ def main():
         # Where the cluster actually writes. Same object in the common case, in
         # which case the comparison is trivially satisfied.
         archive = (spec.get("backup") or {}).get("barmanObjectStore")
+        a_server = None
         if not archive:
             plugin = next((p for p in spec.get("plugins", [])
                            if p.get("parameters", {}).get("barmanObjectName")), None)
             if plugin:
                 archive = object_store(
                     ctx, ns, plugin["parameters"]["barmanObjectName"])
+                a_server = plugin["parameters"].get("serverName")
         if not archive:
             failed = True
             print(f"  FAIL {name:<20} {prefix}: cannot resolve where this cluster "
@@ -181,7 +195,7 @@ def main():
             continue
 
         archive = dict(archive)
-        archive.setdefault("serverName", name)
+        archive.setdefault("serverName", a_server or name)
         if archive["destinationPath"] == store["destinationPath"]:
             print(f"  ok   {name:<20} {prefix}: newest base backup {stamp} "
                   f"(recovery reads the prefix it archives to)")
