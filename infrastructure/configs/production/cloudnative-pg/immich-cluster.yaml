@@ -60,18 +60,27 @@ spec:
   # Restore from backup on (re)creation, so an accidental rebuild does not lose
   # the database.
   #
-  # recover-from and archive-to are deliberately different prefixes, so a
-  # recovered cluster starts a clean WAL timeline rather than continuing one it
-  # is also reading from.
+  # Keeping recover-from one generation behind archive-to guarantees the
+  # recovery source is the prefix that STOPPED receiving backups. #260 advanced
+  # both by one and left this pointing at 2026-08-immich, whose newest base
+  # backup is 2026-08-04 while 2026-09-immich had one from every night since —
+  # a rebuild would have restored a four-day-old photo library and reported
+  # Ready. That is #257 again, and #238 before it.
+  #
+  # So this points at the prefix currently receiving backups, as postgres-cluster
+  # does. The clean-timeline requirement is satisfied at recovery time instead:
+  # step 2 of the disaster-recovery runbook bumps archive-to to a NEW prefix as
+  # part of performing the restore, which is the only moment the distinction
+  # matters. A pointer that is correct only until the next rotation is not a
+  # design, it is a countdown.
   bootstrap:
     recovery:
       source: clusterBackup
 
-  # Recovery source: the generation currently receiving backups.
   externalClusters:
     - name: clusterBackup
       barmanObjectStore:
-        destinationPath: "s3://homelab-postgres-backups/production-2026-08-immich/"
+        destinationPath: "s3://homelab-postgres-backups/production-2026-09-immich/"
         serverName: immich-cluster
         endpointURL: "https://s3.eu-central-003.backblazeb2.com"
         s3Credentials:
