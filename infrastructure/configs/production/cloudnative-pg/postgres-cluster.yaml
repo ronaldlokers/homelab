@@ -150,7 +150,18 @@ spec:
   backup:
     retentionPolicy: "7d"
     barmanObjectStore:
-      destinationPath: "s3://homelab-postgres-backups/production-2026-03/"
+      # Own prefix, as every other cluster already has. production-2026-03/ had
+      # accumulated 3,312 live objects behind 12,276 versions and 9,008 delete
+      # markers — the bucket is versioned, so each retention delete leaves both
+      # — and listing it took 71s against 3.6s for a per-cluster prefix. The
+      # metrics collector reads that catalogue, could not finish, and reported
+      # last_available_backup_timestamp as 0, firing PostgreSQLBackupNeverTaken
+      # on a cluster whose backups were fine (#391).
+      #
+      # externalClusters below still points at the old prefix on purpose: it is
+      # where every existing base backup lives, and it stays the recovery
+      # source until a base backup exists here. Moving it is a separate change.
+      destinationPath: "s3://homelab-postgres-backups/production-2026-08-postgres/"
       endpointURL: "https://s3.eu-central-003.backblazeb2.com"
       s3Credentials:
         accessKeyId:
