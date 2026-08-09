@@ -44,15 +44,23 @@ spec:
 
         # Zero connections is the condition that matters; comparing against
         # the `expected` label needs a label_replace dance for no gain.
+        #
+        # Summed across pods and worker processes, not compared per series. An
+        # outpost holds ONE websocket, to one gunicorn worker of one replica, so
+        # every other series is legitimately 0 — with two replicas this alert
+        # fired continuously from 2026-08-07 while the outpost was connected the
+        # whole time (7 connections across the series, expecting 1). An alert
+        # that is always firing is an alert nobody reads.
         - alert: AuthentikOutpostDisconnected
           annotations:
             summary: "authentik outpost {{ $labels.outpost }} is disconnected"
             description: >-
-              Outpost {{ $labels.outpost }} reports zero connections while
-              expecting {{ $labels.expected }}. Flows served by this outpost
-              will fail even though authentik itself answers.
+              Outpost {{ $labels.outpost }} reports zero connections across
+              every authentik replica while expecting {{ $labels.expected }}.
+              Flows served by this outpost will fail even though authentik
+              itself answers.
           expr: |
-            authentik_outposts_connected == 0
+            sum by (outpost, expected) (authentik_outposts_connected) == 0
           for: 10m
           labels:
             severity: warning
