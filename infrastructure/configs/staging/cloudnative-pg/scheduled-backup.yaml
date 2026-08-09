@@ -24,18 +24,6 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: immich-cluster-daily-backup
-  namespace: database
-spec:
-  schedule: "0 30 2 * * *" # Daily at 2:30 AM (staggered after postgres-cluster)
-  backupOwnerReference: self
-  cluster:
-    name: immich-cluster
-  immediate: true # Take first backup immediately
----
-apiVersion: postgresql.cnpg.io/v1
-kind: ScheduledBackup
-metadata:
   name: nightscout-cluster-daily-backup
   namespace: database
 spec:

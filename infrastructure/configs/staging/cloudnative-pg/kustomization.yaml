@@ -11,9 +11,6 @@ resources:
   - nightscout-cluster.yaml
   - nightscout-objectstore.yaml
   - nightscout-documentdb-grants.yaml
-  # Immich is not deployed to staging (see apps/staging/kustomization.yaml),
-  # so its dedicated PostgreSQL cluster is not created either. The file is kept
-  # for when it is re-enabled.
   - scheduled-backup.yaml
   - authentik-database.yaml
   - commafeed-database.yaml

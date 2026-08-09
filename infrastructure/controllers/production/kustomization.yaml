@@ -2,6 +2,11 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../base/priority-classes
+  # Both images are published for linux/arm64 as well as amd64, checked against
+  # the registry rather than inferred from staging's amd64 install — the sidecar
+  # runs beside every PostgreSQL instance, so a missing architecture would take
+  # the databases down rather than just the backups.
+  - ../base/barman-cloud-plugin
   - cert-manager
   - cloudnative-pg
   - longhorn
