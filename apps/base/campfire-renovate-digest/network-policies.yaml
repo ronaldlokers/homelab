@@ -1,0 +1,44 @@
+---
+# Egress to api.github.com is already covered: the campfire namespace's
+# allow-internet-egress selects every pod and permits 443. Only the in-namespace
+# hop needs saying, because default-deny-egress applies to pods talking to each
+# other in the same namespace too — the same pair campfire-alert-bridge needs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-renovate-digest-egress-to-campfire
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-renovate-digest
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: campfire
+      ports:
+        - protocol: TCP
+          port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-renovate-digest-ingress-to-campfire
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: campfire-renovate-digest
+      ports:
+        - protocol: TCP
+          port: 80

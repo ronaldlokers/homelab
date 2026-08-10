@@ -1,0 +1,65 @@
+# Monday morning: the digest is something to read before deciding what to merge
+# that week, not an alert. Renovate itself runs hourly, so the backlog this
+# summarises is already up to date whenever this fires.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: campfire-renovate-digest
+  namespace: campfire
+spec:
+  schedule: "0 8 * * 1"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: campfire-renovate-digest
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: digest
+              image: python:3.13-alpine
+              command: ["python3", "/opt/digest/renovate-digest.py"]
+              env:
+                # GITHUB_TOKEN is Renovate's own token. It can write, which a
+                # digest has no use for — worth replacing with a read-only
+                # fine-grained token if this outlives the experiment.
+                - name: GITHUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: campfire-renovate-digest
+                      key: GITHUB_TOKEN
+                - name: CAMPFIRE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: campfire-renovate-digest
+                      key: CAMPFIRE_URL
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+              volumeMounts:
+                - name: script
+                  mountPath: /opt/digest
+          volumes:
+            - name: script
+              configMap:
+                name: campfire-renovate-digest-script
