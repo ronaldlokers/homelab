@@ -128,6 +128,11 @@ for formatting.
 Bodies are rich text, **not** plain text and not markdown:
 
 - Raw newlines are ignored — a plain-text message arrives as one run-on line.
+- Because of that, two adjacent **inline** elements run together with nothing
+  between them: `<strong>A</strong><strong>B</strong>` renders as `AB`, not as
+  two lines. Section headings need a block wrapper (`<div>`, `<p>`) — a
+  newline in the source will not do it. This shipped as "all greenbackups" in
+  the status bot's first reply.
 - Markdown renders literally: `**bold**` stays `**bold**`.
 - Bare URLs are auto-linked, but unfurl cards are a client-side paste
   operation, so a bot posting a URL gets a link and no preview.

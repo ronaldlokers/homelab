@@ -69,8 +69,20 @@ MAX_ITEMS = 15
 # answer means the same thing whenever it is asked.
 BACKUP_MAX_AGE_HOURS = 26
 
-HELP = (
-    "<strong>commands</strong>"
+
+def heading(text):
+    """A headline on its own line.
+
+    <strong> is inline, so two in a row render as one unbroken run of bold
+    text: "✅ all green" followed by "backups" arrived in the room as
+    "all greenbackups". A block wrapper is the only thing that separates them,
+    because Campfire ignores newline characters entirely. <div> is on
+    ContentFilters::SanitizeTags' allow list; a bare newline is not a tag.
+    """
+    return f"<div><strong>{text}</strong></div>"
+
+
+HELP = heading("commands") + (
     "<ul>"
     "<li><code>status</code> — Flux, pods and backup freshness</li>"
     "<li><code>help</code> — this</li>"
@@ -218,19 +230,19 @@ def render_status():
 
     if problems:
         plural = "" if len(problems) == 1 else "s"
-        parts = [f"<strong>⚠️ {len(problems)} problem{plural}</strong>", bullets(problems)]
+        parts = [heading(f"⚠️ {len(problems)} problem{plural}"), bullets(problems)]
     elif skipped:
         # Never claim green over a section that was never fetched. A check that
         # could not run is an unknown, and an unknown reported as healthy is
         # the one failure mode that makes this worse than having no bot.
-        parts = ["<strong>❓ nothing failing in what could be read</strong>"]
+        parts = [heading("❓ nothing failing in what could be read")]
     else:
-        parts = ["<strong>✅ all green</strong>"]
+        parts = [heading("✅ all green")]
 
     if fresh:
-        parts.append("<strong>backups</strong>" + bullets(fresh))
+        parts.append(heading("backups") + bullets(fresh))
     if skipped:
-        parts.append("<strong>not checked</strong>" + bullets(skipped))
+        parts.append(heading("not checked") + bullets(skipped))
     return "".join(parts)
 
 
@@ -271,8 +283,7 @@ class Handler(BaseHTTPRequestHandler):
                 # Nothing may escape: an unhandled exception here would send a
                 # 500 that Campfire turns into an attachment.
                 log(f"status failed: {error}")
-                body = (
-                    "<strong>⚠️ could not read the cluster</strong>"
+                body = heading("⚠️ could not read the cluster") + (
                     f"<pre>{html.escape(str(error))}</pre>"
                 )
         else:
