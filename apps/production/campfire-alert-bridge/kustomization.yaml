@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base/campfire-alert-bridge/
+  - campfire-alert-bridge-secret.yaml
+
+patches:
+  # Opt in to Reloader so rotating the bot key rolls the pod. CAMPFIRE_URL is
+  # injected as an env var, which is read only at pod creation.
+  - target:
+      kind: Deployment
+      name: campfire-alert-bridge
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: campfire-alert-bridge
+        annotations:
+          reloader.stakater.com/auto: "true"

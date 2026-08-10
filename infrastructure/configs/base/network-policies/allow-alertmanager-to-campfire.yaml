@@ -1,0 +1,24 @@
+---
+# Allow Alertmanager to deliver alerts to the Campfire bridge, which renders
+# them as HTML and posts them as a bot. Complements allow-alertmanager-to-bridge
+# on the campfire side; without this, monitoring's default-deny-egress rejects
+# the connection.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alertmanager-to-campfire
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: campfire
+      ports:
+        - protocol: TCP
+          port: 8080
