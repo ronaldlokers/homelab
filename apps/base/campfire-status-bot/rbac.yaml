@@ -6,9 +6,10 @@ metadata:
 ---
 # Cluster-scoped because the answer is cluster-wide, but read-only and limited
 # to the four kinds the script reads. Deliberately no secrets, no configmaps,
-# no pods/log and no write verb anywhere: the worst this identity can do if the
-# bot is reached by something other than Campfire is disclose which workloads
-# are unhealthy.
+# no write verb anywhere. `why` adds pods/log and events, which is a real
+# widening: an injected instruction inside a pod log could try to have other
+# logs read back into the room. RBAC is what bounds that — no secrets, no exec,
+# nothing writable — and redact() strips credential-shaped text on the way out.
 #
 # Adding a check to campfire-status-bot.py means adding its kind here. The
 # script degrades to "not checked" on a 403 rather than failing, so a missing
@@ -20,6 +21,15 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: [pods]
+    verbs: [get, list]
+  # `why` only. Pod logs are the most likely place for a credential to appear
+  # in plain text, which is why every tool result is run through redact()
+  # before the model or the room ever sees it.
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [events]
     verbs: [list]
   - apiGroups: ["kustomize.toolkit.fluxcd.io"]
     resources: [kustomizations]

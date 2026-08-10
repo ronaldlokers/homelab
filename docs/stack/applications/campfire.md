@@ -203,7 +203,39 @@ PostgreSQL cluster — via a read-only cluster-scoped ClusterRole limited to
 those four kinds, `list` only. A check that cannot run is reported as **not
 checked** rather than folded into a green result.
 
-Commands: `status`, `certs`, `backups`, `longhorn`, `help`. `status` reports
+### `why` — the one verb that costs money
+
+Every other verb is deterministic: read the API, format what is there. `why`
+puts a model behind the same webhook with three read-only tools —
+`get_pod_logs`, `get_warning_events`, `describe_pod` — and asks it to explain a
+failure rather than restate it.
+
+Three things constrain it:
+
+- **One caller.** It is gated on the Campfire `user.id` in the webhook payload,
+  not on the room. Every other verb is open to anyone in the room; this one
+  spends money and reads pod logs.
+- **RBAC is the boundary, not the prompt.** The ServiceAccount cannot read
+  Secrets, cannot exec and cannot write anything. An injected instruction in a
+  pod log can at worst have another log read back into the room — it cannot
+  reach a credential the identity was never granted.
+- **Everything is redacted twice.** Tool output is passed through `redact()`
+  before the model sees it, and the finished answer again before it is posted.
+  API keys, GitHub tokens, JWTs, credentials embedded in URLs, age keys and
+  Campfire bot keys all have patterns. This is defence in depth behind RBAC,
+  not a substitute for it.
+
+It replies twice: an immediate "thinking…" acknowledgement, because a silent
+7 seconds would make Campfire post its own failure notice over the top, and
+then the real answer posted asynchronously. That async reply needs **no extra
+credential** — `room.path` in the webhook payload already embeds the bot key,
+and it only ever points at the room the question was asked in.
+
+The API key is the one credential this workload holds. A Claude subscription
+does not grant API access; it is separately billed per token, and a `why` with
+a couple of tool calls is a few cents.
+
+Commands: `status`, `certs`, `backups`, `longhorn`, `why`, `help`. `status` reports
 only what is **wrong** across every check; the other verbs give the full
 listing for one area on demand. So a failing certificate renewal reaches you
 without having to think to ask, while 26 volume ages stay out of the way until
