@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: campfire
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - campfire.ronaldlokers.nl
+  rules:
+    - host: campfire.ronaldlokers.nl
+      http:
+        paths:
+          - backend:
+              service:
+                name: campfire
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix
