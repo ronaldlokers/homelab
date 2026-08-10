@@ -1,0 +1,6 @@
+# Production only: staging has no Campfire, so there are no notifications to
+# assert anything about.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base/campfire-notify-check/

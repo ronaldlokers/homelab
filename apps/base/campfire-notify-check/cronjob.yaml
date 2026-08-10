@@ -1,0 +1,53 @@
+# Daily. The settings this asserts change only when someone edits them in the
+# UI or recreates a room, so hourly would be noise; but the window between a
+# reversion and the next alert is exactly the window in which alerts go
+# unnoticed, so weekly is too slow.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: campfire-notify-check
+  namespace: campfire
+spec:
+  schedule: "17 6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # No retry: a violation is a setting that will still be wrong in five
+      # minutes, so retrying only delays KubeJobFailed.
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app: campfire-notify-check
+        spec:
+          serviceAccountName: campfire-notify-check
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: check
+              image: alpine/k8s:1.36.2
+              command: ["python3", "/opt/check/campfire-notify-check.py"]
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+              volumeMounts:
+                - name: script
+                  mountPath: /opt/check
+          volumes:
+            - name: script
+              configMap:
+                name: campfire-notify-check-script
