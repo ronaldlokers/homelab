@@ -48,6 +48,23 @@ spec:
             # publicly resolvable host, so it is stated rather than assumed.
             - name: MULTI_TENANT
               value: "false"
+            # Proton's submission relay. Non-secret settings live here so they
+            # are readable in Git; SMTP_USERNAME and SMTP_PASSWORD are in the
+            # SOPS secret, paired so they cannot drift apart.
+            #
+            # SMTP_TLS is deliberately UNSET. Upstream maps it to Mail's `tls:`,
+            # which means implicit TLS on 465 — setting it here would try SMTPS
+            # against a STARTTLS port and fail. Unset leaves Mail's
+            # enable_starttls_auto default, which is what 587 wants.
+            - name: SMTP_ADDRESS
+              value: smtp.protonmail.ch
+            - name: SMTP_PORT
+              value: "587"
+            # Must be the authenticated address: Proton rejects a From it did
+            # not issue the token for. Upstream defaults this to
+            # support@fizzy.do, which would bounce.
+            - name: MAILER_FROM_ADDRESS
+              value: fizzy@lokilabs.nl
           envFrom:
             - secretRef:
                 name: fizzy-secrets
