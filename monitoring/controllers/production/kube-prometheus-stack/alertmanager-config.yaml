@@ -36,3 +36,12 @@ spec:
               password:
                 name: ntfy-publisher
                 key: password
+        # Same alerts, second destination. A receiver may hold several webhooks,
+        # so this needs no routing change and ntfy keeps working exactly as it
+        # did — which matters because ntfy has the native iOS app and Campfire
+        # only has Web Push from an installed PWA.
+        #
+        # No auth here: the credential is the bot key, and it lives in the
+        # bridge's own Secret rather than being handed to Alertmanager.
+        - url: 'http://campfire-alert-bridge.campfire.svc.cluster.local:8080/alerts'
+          sendResolved: true

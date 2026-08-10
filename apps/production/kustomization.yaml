@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - authentik
   - campfire
+  - campfire-alert-bridge
   - cloudflared
   - commafeed
   - gatus

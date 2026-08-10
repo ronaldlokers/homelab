@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: campfire-alert-bridge
+  namespace: campfire
+spec:
+  # Stateless: it holds nothing between requests. One replica is enough for a
+  # webhook that fires at most every groupInterval (5m), and a second would only
+  # matter if Alertmanager could not retry — which it can, which is why publish
+  # failures return 5xx.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: campfire-alert-bridge
+  template:
+    metadata:
+      labels:
+        app: campfire-alert-bridge
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      containers:
+        - name: bridge
+          image: python:3.13-alpine
+          command: ["python3", "/opt/bridge/campfire-alert-bridge.py"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # Holds the room and bot key, so it is the whole credential.
+            - name: CAMPFIRE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: campfire-alert-bridge
+                  key: CAMPFIRE_URL
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          # /healthz reports 503 while CAMPFIRE_URL is unset, so a missing or
+          # mis-keyed secret fails the readiness gate instead of quietly
+          # accepting alerts and dropping them.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: script
+              mountPath: /opt/bridge
+      volumes:
+        - name: script
+          configMap:
+            name: campfire-alert-bridge-script
