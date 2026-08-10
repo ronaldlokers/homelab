@@ -7,7 +7,17 @@ spec:
   route:
     groupBy: ['alertname', 'cluster', 'service']
     groupWait: 10s
-    groupInterval: 10s
+    # Upstream default. Was 10s, which is how long Alertmanager waits before
+    # notifying again about a group that has CHANGED — so one alert joining or
+    # leaving a group produced another push ten seconds later. That is most of
+    # why the ntfy topic reads as a stream rather than a set of events: a single
+    # flapping alert can notify every ten seconds indefinitely.
+    #
+    # ntfy cannot replace a delivered notification from Alertmanager (the update
+    # needs a per-message ID header, and webhook_config sends a static URL), so
+    # notifications only ever accumulate. Sending fewer of them is the part that
+    # is fixable here.
+    groupInterval: 5m
     repeatInterval: 12h
     receiver: 'ntfy'
   receivers:
