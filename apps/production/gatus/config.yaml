@@ -238,7 +238,10 @@ endpoints:
   # so the demo takes ~30s instead of ~3m.
   - name: campfire-alert-demo
     group: test
-    url: "http://127.0.0.1:1/"
+    # Flipped from 127.0.0.1:1 to a service that answers, so the RECOVERED
+    # message fires. ntfy is used because it is known-reachable from this pod
+    # (verified 200 from inside its network namespace).
+    url: "http://ntfy.ntfy.svc.cluster.local/"
     interval: 30s
     conditions:
       - "[STATUS] == 200"
