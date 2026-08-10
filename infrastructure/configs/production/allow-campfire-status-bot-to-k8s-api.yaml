@@ -1,9 +1,15 @@
-# campfire-status-bot reads Kustomizations, HelmReleases, pods and CNPG
-# Clusters to answer `@Claude status` in the room.
+# Two workloads in this namespace read the Kubernetes API:
 #
-# Scoped to the bot's pod, not the whole namespace: Campfire itself has no
-# business talking to the API server, and it is the pod that renders
-# attacker-supplied links.
+#   campfire-status-bot   Kustomizations, HelmReleases, pods, CNPG Clusters,
+#                         Certificates and Longhorn Volumes, to answer
+#                         `@Kubernetes status` in the room.
+#   campfire-notify-check exec into the Campfire pod, because Campfire has no
+#                         API and its involvement settings are readable only
+#                         from Rails.
+#
+# Selected by name rather than by namespace: Campfire itself has no business
+# talking to the API server, and it is the pod that renders attacker-supplied
+# links.
 #
 # Egress policy is evaluated after DNAT, so the destination that matters is a
 # control plane node on 6443. The ClusterIP is named as well because the
@@ -25,8 +31,10 @@ metadata:
   namespace: campfire
 spec:
   podSelector:
-    matchLabels:
-      app: campfire-status-bot
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [campfire-status-bot, campfire-notify-check]
   policyTypes:
     - Egress
   egress:

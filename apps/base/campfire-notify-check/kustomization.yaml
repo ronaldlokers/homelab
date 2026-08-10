@@ -1,0 +1,15 @@
+# No `namespace:` here on purpose — each resource declares its own, matching the
+# other campfire-* workloads.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - rbac.yaml
+  - cronjob.yaml
+
+# Hash suffix left ON: the suffix changes when the script changes, which
+# rewrites the CronJob's volume reference so the next run picks up new code.
+configMapGenerator:
+  - name: campfire-notify-check-script
+    namespace: campfire
+    files:
+      - campfire-notify-check.py
