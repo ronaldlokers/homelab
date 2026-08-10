@@ -10,6 +10,14 @@
 # pre-DNAT rule is what some CNIs match on — same pair as the database,
 # monitoring and homepage namespaces, and the same reason gatus could not reach
 # Traefik until its ports were corrected.
+#
+# In the production overlay, not base/network-policies, because campfire is a
+# production-only app. The neighbouring allow-*-to-k8s-api files DO live in
+# base, and copying them was the mistake: their namespaces (database,
+# monitoring, homepage) exist in both clusters, so "production only in effect"
+# there means the staging node IPs simply never match. A NetworkPolicy for a
+# namespace that does not exist is not inert — the apply fails outright, which
+# wedged staging's infrastructure-configs and, via dependsOn, its apps (#425).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
