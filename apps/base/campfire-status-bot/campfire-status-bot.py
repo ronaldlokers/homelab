@@ -69,6 +69,17 @@ MAX_ITEMS = 15
 # answer means the same thing whenever it is asked.
 BACKUP_MAX_AGE_HOURS = 26
 
+# Flux flips Ready to Unknown while it reconciles, so at any moment something
+# in a 40-object cluster is mid-apply. Reporting that as a fault teaches you to
+# discount the bot, which is worse than not having it — the first reply after a
+# merge said "⚠️ 1 problem" about a Kustomization that was simply busy.
+#
+# A wedged apply and a working one look identical in the condition, so the only
+# thing separating them is how long it has been that way. Generous, because a
+# HelmRelease with wait:true legitimately sits Progressing through a rollout
+# and every Kustomization here waits on its dependencies being healthy.
+PROGRESSING_GRACE_MINUTES = 10
+
 
 def heading(text):
     """A headline on its own line.
@@ -132,23 +143,46 @@ def ready_condition(obj):
     return None
 
 
-def check_flux(deadline):
-    """Kustomizations and HelmReleases whose Ready condition is not True."""
+def parse_time(stamp):
+    return datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+
+
+def check_flux(deadline, now=None):
+    """Kustomizations and HelmReleases that are failing, or stuck not settling.
+
+    Ready=False is a definite failure and is reported however fresh it is.
+    Ready=Unknown (Flux's Progressing) and a missing condition both mean "not
+    settled yet", which is only worth saying once it has gone on longer than a
+    reconcile plausibly takes — see PROGRESSING_GRACE_MINUTES.
+    """
     problems = []
+    now = now or datetime.now(timezone.utc)
     for path, kind in FLUX_KINDS:
         for item in kube_get(path, deadline).get("items", []):
-            condition = ready_condition(item)
-            if condition and condition.get("status") == "True":
-                continue
             meta = item["metadata"]
-            # No Ready condition at all means it has never reconciled, which is
-            # a problem in the same way a failing one is.
+            condition = ready_condition(item)
+            status = (condition or {}).get("status")
+            if status == "True":
+                continue
+
+            detail = ""
+            if status != "False":
+                since = (condition or {}).get("lastTransitionTime") or meta.get("creationTimestamp")
+                if not since:
+                    continue
+                minutes = (now - parse_time(since)).total_seconds() / 60
+                if minutes <= PROGRESSING_GRACE_MINUTES:
+                    continue  # busy, not broken
+                # Say how long. "Reconciliation in progress" on its own reads
+                # as routine; the duration is the whole point of reporting it.
+                detail = f" (unchanged for {minutes:.0f}m)"
+
             reason = (
                 (condition or {}).get("message")
                 or (condition or {}).get("reason")
-                or "not reconciled yet"
+                or "no Ready condition"
             )
-            problems.append(f"{kind} {meta['namespace']}/{meta['name']}: {reason}")
+            problems.append(f"{kind} {meta['namespace']}/{meta['name']}: {reason}{detail}")
     return problems
 
 
@@ -193,8 +227,7 @@ def check_backups(deadline):
         if not stamp:
             problems.append(f"Backup {name}: none recorded")
             continue
-        taken = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
-        age = (now - taken).total_seconds() / 3600
+        age = (now - parse_time(stamp)).total_seconds() / 3600
         if age > BACKUP_MAX_AGE_HOURS:
             problems.append(
                 f"Backup {name}: {age:.1f}h old, past the {BACKUP_MAX_AGE_HOURS}h window"

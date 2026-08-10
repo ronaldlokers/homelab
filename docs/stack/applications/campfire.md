@@ -203,6 +203,14 @@ PostgreSQL cluster — via a read-only cluster-scoped ClusterRole limited to
 those four kinds, `list` only. A check that cannot run is reported as **not
 checked** rather than folded into a green result.
 
+Flux objects get a grace period. `Ready=False` is reported immediately, but
+`Ready=Unknown` — what Flux sets while reconciling — is only reported once it
+has held for longer than `PROGRESSING_GRACE_MINUTES` (10), and then with the
+duration attached. A wedged apply and a working one are indistinguishable in
+the condition itself; only elapsed time separates them. Without this the bot
+called a healthy cluster degraded every time something happened to be
+mid-reconcile, which is most minutes.
+
 There is deliberately no LLM. This version proves the loop — reachability,
 RBAC, both NetworkPolicy hops, the reply landing — at zero cost and with no
 prompt-injection surface, which matters because alert text is
