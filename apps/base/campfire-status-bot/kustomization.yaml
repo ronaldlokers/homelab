@@ -1,0 +1,24 @@
+# No `namespace:` here on purpose — each resource declares its own, matching
+# campfire-alert-bridge. Both live in the campfire namespace so the hop from
+# Campfire stays in-cluster and in-namespace.
+#
+# Egress to the Kubernetes API is NOT here. It lives with the other
+# allow-*-to-k8s-api policies in infrastructure/configs/base/network-policies/,
+# which is where a reader looks for them and where the control plane node
+# addresses are already written down.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - rbac.yaml
+  - deployment.yaml
+  - service.yaml
+  - network-policies.yaml
+
+# Hash suffix left ON: the suffix changes when the script changes, which
+# rewrites the Deployment's volume reference and rolls the pod. Without it an
+# edited script applies cleanly and the running process keeps serving old code.
+configMapGenerator:
+  - name: campfire-status-bot-script
+    namespace: campfire
+    files:
+      - campfire-status-bot.py

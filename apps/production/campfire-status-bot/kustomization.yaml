@@ -1,0 +1,6 @@
+# Production only, like Campfire itself. No patches: the bot carries no secret
+# and no environment-specific address, so the base is the whole thing.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base/campfire-status-bot/

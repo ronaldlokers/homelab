@@ -151,9 +151,9 @@ posts them as the bot. It exists because Alertmanager posts its own JSON to a
 static URL and Campfire treats the request body as the message — pointed
 directly at each other, the room fills with raw JSON.
 
-- Added as a **second** `webhookConfig` on the existing receiver, so ntfy keeps
-  receiving everything unchanged. ntfy has the native iOS app; Campfire has Web
-  Push from an installed PWA only.
+- The single Alertmanager receiver. ntfy was dropped from the alerting path
+  once the room proved it notified reliably; ntfy itself still runs for other
+  senders.
 - One message per webhook payload, not per alert, so Alertmanager's grouping
   survives (`groupInterval: 5m`).
 - Publish failures return 5xx so Alertmanager retries: a chat message nobody
@@ -164,6 +164,61 @@ directly at each other, the room fills with raw JSON.
 The script is mounted from a hash-suffixed ConfigMap on a stock
 `python:3.13-alpine`, so editing it rolls the pod and there is no image to
 build.
+
+## Status bot
+
+`campfire-status-bot` (same namespace) answers `@Claude status` in the room
+with anything failing in the cluster. It is the read direction of the same
+plumbing the alert bridge covers in the write direction.
+
+The mechanism is worth understanding because it is not obvious from the UI. A
+bot carries a **callback URL**; when someone mentions the bot, Campfire POSTs
+the message JSON there, and `Webhook#deliver` treats a `200` response whose
+Content-Type is `text/html` or `text/plain` as the bot's reply and posts it
+into the room. **The answer is the HTTP response body.** Consequences:
+
+- The bot needs **no bot key** and holds no credential. Only the async variant
+  — replying later, or into a different room — needs one, via the
+  `room.path` in the payload (`/rooms/:id/<bot_key>/messages`).
+- A response that is not a 200 text reply *but still carries a Content-Type*
+  becomes an **attachment** via `Mime::Type.lookup`. A 500 with a
+  `Content-Type` header uploads an error page into the room. So the bot answers
+  `200 text/html` for failures too, and the only silent path (malformed
+  payload) sends no `Content-Type` header at all.
+- `ENDPOINT_TIMEOUT` is **7 seconds**, after which Campfire posts "Failed to
+  respond within 7 seconds" itself. The bot gathers against a 5s budget and
+  reports what it has.
+- Webhooks are **unsigned** — no secret, no HMAC. The callback URL is the whole
+  authentication story, which is why the Service is ClusterIP with no Ingress
+  and a NetworkPolicy admits only the Campfire pod.
+
+It reads Flux Kustomizations and HelmReleases, pods that are neither
+running-and-ready nor finished, and `Cluster.status.lastSuccessfulBackup` per
+PostgreSQL cluster — via a read-only cluster-scoped ClusterRole limited to
+those four kinds, `list` only. A check that cannot run is reported as **not
+checked** rather than folded into a green result.
+
+There is deliberately no LLM. This version proves the loop — reachability,
+RBAC, both NetworkPolicy hops, the reply landing — at zero cost and with no
+prompt-injection surface, which matters because alert text is
+attacker-influenced. A model can go behind the same webhook later; that would
+need an Anthropic API key (a Claude subscription does not grant API access).
+
+**Setup is manual and one-off**: in Campfire, edit the bot user and set its
+webhook URL to
+`http://campfire-status-bot.campfire.svc.cluster.local:8080/`. Nothing in Git
+sets that field.
+
+Verify without Campfire:
+
+```bash
+kubectl exec -n campfire --context=production deploy/campfire -- \
+  curl -s -X POST http://campfire-status-bot:8080/ \
+  -d '{"message":{"body":{"plain":"status"}}}'
+```
+
+Run from the Campfire pod on purpose: from anywhere else the NetworkPolicy
+refuses the connection, which is the behaviour being checked.
 
 ## Troubleshooting
 

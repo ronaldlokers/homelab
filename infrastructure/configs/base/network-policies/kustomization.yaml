@@ -15,4 +15,5 @@ resources:
   - allow-alertmanager-to-campfire.yaml
   - allow-flux-to-campfire.yaml
   - allow-gatus-to-campfire.yaml
+  - allow-campfire-status-bot-to-k8s-api.yaml
   - allow-loki-to-s3.yaml

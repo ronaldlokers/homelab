@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: campfire-status-bot
+  namespace: campfire
+spec:
+  # Stateless and idle between mentions. One replica: Campfire delivers each
+  # webhook once with no retry, so a second would add nothing but a second
+  # ServiceAccount token in flight.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: campfire-status-bot
+  template:
+    metadata:
+      labels:
+        app: campfire-status-bot
+    spec:
+      serviceAccountName: campfire-status-bot
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      containers:
+        - name: bot
+          image: python:3.13-alpine
+          command: ["python3", "/opt/bot/campfire-status-bot.py"]
+          ports:
+            - name: http
+              containerPort: 8080
+          # No env and no secret. The reply travels back in the HTTP response
+          # body, so unlike campfire-alert-bridge this holds no bot key — the
+          # only credential in play is the projected ServiceAccount token,
+          # which the kubelet rotates.
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          # /healthz is liveness only and does not touch the API. A check that
+          # proved RBAC would mean an API read every 10s — more traffic than
+          # the bot itself makes — and broken RBAC already shows up in the
+          # answer, under "not checked".
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: script
+              mountPath: /opt/bot
+      volumes:
+        - name: script
+          configMap:
+            name: campfire-status-bot-script

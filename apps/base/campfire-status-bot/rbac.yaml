@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: campfire-status-bot
+  namespace: campfire
+---
+# Cluster-scoped because the answer is cluster-wide, but read-only and limited
+# to the four kinds the script reads. Deliberately no secrets, no configmaps,
+# no pods/log and no write verb anywhere: the worst this identity can do if the
+# bot is reached by something other than Campfire is disclose which workloads
+# are unhealthy.
+#
+# Adding a check to campfire-status-bot.py means adding its kind here. The
+# script degrades to "not checked" on a 403 rather than failing, so a missing
+# rule shows up in the room instead of in a crash loop.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: campfire-status-bot
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [list]
+  - apiGroups: ["kustomize.toolkit.fluxcd.io"]
+    resources: [kustomizations]
+    verbs: [list]
+  - apiGroups: ["helm.toolkit.fluxcd.io"]
+    resources: [helmreleases]
+    verbs: [list]
+  # Cluster.status.lastSuccessfulBackup, not the Backup objects: one small
+  # list rather than every backup ever taken.
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: [clusters]
+    verbs: [list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: campfire-status-bot
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: campfire-status-bot
+subjects:
+  - kind: ServiceAccount
+    name: campfire-status-bot
+    namespace: campfire
