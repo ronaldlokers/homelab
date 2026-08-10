@@ -11,6 +11,7 @@ This document provides detailed information about all components running in the 
   - [MetalLB](./infrastructure/metallb.md)
   - [Traefik](./infrastructure/traefik.md)
 - Applications
+  - [Campfire](./applications/campfire.md)
   - [Commafeed](./applications/commafeed.md)
   - [Homepage](./applications/homepage.md)
   - [Immich](./applications/immich.md)
@@ -41,6 +42,7 @@ This document provides detailed information about all components running in the 
 | Commafeed | ✅ | ✅ | RSS feed reader |
 | Immich | ✅ | ✅ | Photo and video management |
 | ntfy | ❌ | ✅ | Notification service |
+| Campfire | ❌ | ✅ | Group chat, bots, and a mirror of alerts |
 | pgAdmin | ❌ | ✅ | PostgreSQL administration |
 | Speedtest | ❌ | ✅ | Network speed test |
 | kube-prometheus-stack | ✅ | ✅ | Monitoring and observability |
