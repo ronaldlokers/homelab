@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Answer `@Claude status` in Campfire with what the cluster is actually doing.
+"""Answer `@Kubernetes status` in Campfire with what the cluster is actually doing.
 
 A Campfire bot carries a callback URL. When someone mentions the bot, Campfire
 POSTs the message there and — this is the part that shapes everything below —
@@ -302,7 +302,7 @@ class Handler(BaseHTTPRequestHandler):
 
         message = (payload.get("message") or {}).get("body") or {}
         # `plain` arrives with the bot mention already stripped by
-        # Webhook#without_recipient_mentions, so "@Claude status" is "status".
+        # Webhook#without_recipient_mentions, so "@Kubernetes status" is "status".
         words = (message.get("plain") or "").strip().lower().split()
         verb = words[0] if words else ""
         who = (payload.get("user") or {}).get("name", "?")
