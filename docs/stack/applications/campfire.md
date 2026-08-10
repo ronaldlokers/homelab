@@ -233,6 +233,39 @@ kubectl exec -n campfire --context=production deploy/campfire -- \
 Run from the Campfire pod on purpose: from anywhere else the NetworkPolicy
 refuses the connection, which is the behaviour being checked.
 
+## Renovate digest
+
+`campfire-renovate-digest` is a weekly CronJob (Monday 08:00) that posts open
+Renovate PRs into the `#Renovate` room. It posts directly, like Gatus — it
+builds its own HTML, so there is nothing for the bridge to format.
+
+The point is not the list. It flags two things and lists the rest as routine:
+
+- a **major** bump, breaking by definition
+- a **minor** bump that skips more than one minor at once
+
+The second is the one worth the code, and it is not something Renovate will
+tell you. Its own `Update` column says `minor` whether that is one minor or
+eight, because it describes the *kind* of change rather than its size. A chart
+PR left open across several releases lands as a single jump, and some of those
+are invalid as one step — which is how a ServiceMonitor breaks silently. The
+distance has to be computed from the from/to versions.
+
+Two things about parsing Renovate's PRs that cost time to discover:
+
+- **PRs are authored by `ronaldlokers`, not `renovate[bot]`**, because Renovate
+  runs as a CronJob with a personal token. Filtering by author finds nothing;
+  the `renovate/` branch prefix is the reliable signal.
+- **The update table has no fixed column count.** A Helm release gives
+  `Package | Update | Change`; a GitHub Action inserts a `Type` column. The row
+  is located by its change cell and the kind read from the cell before it — a
+  positional match silently skipped every action update.
+
+`GITHUB_TOKEN` is Renovate's own token, duplicated into the digest's SOPS
+secret rather than shared across namespaces. **Rotating it means updating both
+files.** A read-only fine-grained token would be the better long-term answer;
+this reuses what already exists.
+
 ## Troubleshooting
 
 **No notification arrived.** Check both gates before suspecting VAPID or the

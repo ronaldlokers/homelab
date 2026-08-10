@@ -1,0 +1,16 @@
+# No `namespace:` here on purpose — each resource declares its own, matching
+# campfire-alert-bridge and campfire-status-bot. All three live in the campfire
+# namespace so the hop to Campfire stays in-cluster and in-namespace.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - cronjob.yaml
+  - network-policies.yaml
+
+# Hash suffix left ON: the suffix changes when the script changes, which
+# rewrites the CronJob's volume reference so the next run picks up new code.
+configMapGenerator:
+  - name: campfire-renovate-digest-script
+    namespace: campfire
+    files:
+      - renovate-digest.py

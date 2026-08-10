@@ -1,0 +1,7 @@
+# Production only, like Campfire itself. Staging has no Campfire to post to and
+# Renovate raises PRs against one repository, not one per cluster.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base/campfire-renovate-digest/
+  - campfire-renovate-digest-secret.yaml
