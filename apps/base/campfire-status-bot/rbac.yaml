@@ -32,6 +32,14 @@ rules:
   - apiGroups: ["postgresql.cnpg.io"]
     resources: [clusters]
     verbs: [list]
+  - apiGroups: ["cert-manager.io"]
+    resources: [certificates]
+    verbs: [list]
+  # Volume.status.lastBackupAt for the same reason: 26 volumes rather than the
+  # 555 Backup objects behind them, and it carries the PVC name.
+  - apiGroups: ["longhorn.io"]
+    resources: [volumes]
+    verbs: [list]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

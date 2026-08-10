@@ -66,8 +66,15 @@ PER_REQUEST_TIMEOUT = 1.5
 MAX_ITEMS = 15
 
 # 24h schedule plus room for a slow run. Hours rather than a clock time so the
-# answer means the same thing whenever it is asked.
+# answer means the same thing whenever it is asked. Longhorn's backup-daily
+# runs on the same cadence, so the one window covers both.
 BACKUP_MAX_AGE_HOURS = 26
+
+# A volume younger than one backup window has never had the chance to be backed
+# up, and saying so would flag every new PVC for its first day. campfire-data
+# and fizzy-data both read as "never backed up" hours after creation while
+# nothing at all was wrong.
+NEW_VOLUME_GRACE_HOURS = BACKUP_MAX_AGE_HOURS
 
 # Flux flips Ready to Unknown while it reconciles, so at any moment something
 # in a 40-object cluster is mid-apply. Reporting that as a fault teaches you to
@@ -95,7 +102,10 @@ def heading(text):
 
 HELP = heading("commands") + (
     "<ul>"
-    "<li><code>status</code> — Flux, pods and backup freshness</li>"
+    "<li><code>status</code> — anything currently wrong, across every check</li>"
+    "<li><code>certs</code> — certificate expiry per Ingress</li>"
+    "<li><code>backups</code> — Longhorn backup recency per volume</li>"
+    "<li><code>longhorn</code> — volume health and replica state</li>"
     "<li><code>help</code> — this</li>"
     "</ul>"
 )
@@ -106,6 +116,11 @@ FLUX_KINDS = (
     ("/apis/kustomize.toolkit.fluxcd.io/v1/kustomizations", "Kustomization"),
     ("/apis/helm.toolkit.fluxcd.io/v2/helmreleases", "HelmRelease"),
 )
+CERTIFICATES = "/apis/cert-manager.io/v1/certificates"
+# status.lastBackupAt on the Volume rather than listing Backup objects: one
+# small list instead of 555, and it carries the PVC name, which is what a
+# person recognises. Same shape as CNPG's lastSuccessfulBackup.
+VOLUMES = "/apis/longhorn.io/v1beta2/volumes"
 
 # Anything the API can raise that should degrade one section rather than kill
 # the whole answer. KeyError and ValueError cover a response shaped other than
@@ -237,6 +252,80 @@ def check_backups(deadline):
     return fresh, problems
 
 
+def check_certs(deadline, now=None):
+    """Certificate expiry, and renewals that are overdue.
+
+    Overdue means past status.renewalTime and still not renewed, which is the
+    honest signal: cert-manager renews 30 days out, so a fixed "expires within
+    N days" threshold either fires for a month at a time or is tuned so tight
+    it warns too late. commafeed and speedtest served certificates four months
+    expired — long past renewalTime, and invisible to an expiry threshold that
+    nobody had set.
+    """
+    now = now or datetime.now(timezone.utc)
+    listing, problems = [], []
+    for cert in kube_get(CERTIFICATES, deadline).get("items", []):
+        meta, status = cert["metadata"], cert.get("status") or {}
+        name = f"{meta['namespace']}/{meta['name']}"
+        not_after, renewal = status.get("notAfter"), status.get("renewalTime")
+
+        ready = ready_condition(cert)
+        if not ready or ready.get("status") != "True":
+            reason = (ready or {}).get("message") or "not ready"
+            problems.append(f"Certificate {name}: {reason}")
+        elif renewal and parse_time(renewal) < now:
+            overdue = (now - parse_time(renewal)).total_seconds() / 3600
+            problems.append(f"Certificate {name}: renewal overdue by {overdue:.0f}h")
+
+        if not_after:
+            days = (parse_time(not_after) - now).total_seconds() / 86400
+            listing.append(f"{name}: {days:.0f}d left")
+        else:
+            listing.append(f"{name}: no expiry recorded")
+    return listing, problems
+
+
+def check_volumes(deadline, now=None):
+    """Longhorn volume health and backup recency.
+
+    Returns three listings because the verbs want different cuts of one API
+    call: backup ages, health, and the problems worth putting in status.
+    """
+    now = now or datetime.now(timezone.utc)
+    backups, health, problems = [], [], []
+    for volume in kube_get(VOLUMES, deadline).get("items", []):
+        meta, status = volume["metadata"], volume.get("status") or {}
+        kube = status.get("kubernetesStatus") or {}
+        # Fall back to the Longhorn name for a volume with no PVC bound.
+        name = (
+            f"{kube['namespace']}/{kube['pvcName']}"
+            if kube.get("pvcName")
+            else meta["name"]
+        )
+
+        robustness = status.get("robustness", "unknown")
+        health.append(f"{name}: {robustness}, {status.get('state', 'unknown')}")
+        if robustness not in ("healthy", "unknown"):
+            problems.append(f"Volume {name}: {robustness}")
+
+        last = status.get("lastBackupAt")
+        if last:
+            age = (now - parse_time(last)).total_seconds() / 3600
+            backups.append(f"{name}: {age:.1f}h ago")
+            if age > BACKUP_MAX_AGE_HOURS:
+                problems.append(
+                    f"Volume {name}: backup {age:.0f}h old, past the {BACKUP_MAX_AGE_HOURS}h window"
+                )
+        else:
+            backups.append(f"{name}: never")
+            # Only a fault once the volume has existed long enough to have had
+            # a backup window. Without this every new PVC reports one for a day.
+            created = meta.get("creationTimestamp")
+            if created and (now - parse_time(created)).total_seconds() / 3600 > NEW_VOLUME_GRACE_HOURS:
+                problems.append(f"Volume {name}: never backed up")
+    return backups, health, problems
+
+
 def bullets(items):
     shown = items[:MAX_ITEMS]
     body = "".join(f"<li>{html.escape(item)}</li>" for item in shown)
@@ -259,7 +348,19 @@ def render_status():
         fresh, backup_problems = check_backups(deadline)
         problems += backup_problems
     except API_ERRORS as error:
-        skipped.append(f"backups: {error}")
+        skipped.append(f"postgres backups: {error}")
+
+    # The certificate and volume listings belong to their own verbs; status
+    # takes only what is wrong, so it stays short enough to read at a glance.
+    try:
+        problems += check_certs(deadline)[1]
+    except API_ERRORS as error:
+        skipped.append(f"certs: {error}")
+
+    try:
+        problems += check_volumes(deadline)[2]
+    except API_ERRORS as error:
+        skipped.append(f"volumes: {error}")
 
     if problems:
         plural = "" if len(problems) == 1 else "s"
@@ -273,10 +374,32 @@ def render_status():
         parts = [heading("✅ all green")]
 
     if fresh:
-        parts.append(heading("backups") + bullets(fresh))
+        parts.append(heading("postgres backups") + bullets(fresh))
     if skipped:
         parts.append(heading("not checked") + bullets(skipped))
     return "".join(parts)
+
+
+def render_verb(verb):
+    if verb in ("", "status"):
+        return render_status()
+    if verb == "certs":
+        return render_listing("certificates", lambda d: check_certs(d)[0])
+    if verb == "backups":
+        return render_listing("volume backups", lambda d: check_volumes(d)[0])
+    return render_listing("volumes", lambda d: check_volumes(d)[1])
+
+
+def render_listing(title, produce):
+    """One verb's full listing, or why it could not be produced."""
+    deadline = time.monotonic() + DEADLINE
+    try:
+        items = produce(deadline)
+    except API_ERRORS as error:
+        return heading(f"❓ could not read {title}") + f"<pre>{html.escape(str(error))}</pre>"
+    if not items:
+        return heading(f"{title}: nothing to report")
+    return heading(title) + bullets(items)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -309,13 +432,13 @@ class Handler(BaseHTTPRequestHandler):
         room = (payload.get("room") or {}).get("name", "?")
         log(f"{room}: {who} said {verb!r}")
 
-        if verb in ("", "status"):
+        if verb in ("", "status", "certs", "backups", "longhorn"):
             try:
-                body = render_status()
+                body = render_verb(verb)
             except Exception as error:  # noqa: BLE001
                 # Nothing may escape: an unhandled exception here would send a
                 # 500 that Campfire turns into an attachment.
-                log(f"status failed: {error}")
+                log(f"{verb or 'status'} failed: {error}")
                 body = heading("⚠️ could not read the cluster") + (
                     f"<pre>{html.escape(str(error))}</pre>"
                 )
