@@ -1,6 +1,19 @@
-# Production only, like Campfire itself. No patches: the bot carries no secret
-# and no environment-specific address, so the base is the whole thing.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../../base/campfire-status-bot/
+  - campfire-status-bot-secret.yaml
+
+patches:
+  # Opt in to Reloader so rotating the API key rolls the pod. ANTHROPIC_API_KEY
+  # is injected as an env var, which is read only at pod creation.
+  - target:
+      kind: Deployment
+      name: campfire-status-bot
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: campfire-status-bot
+        annotations:
+          reloader.stakater.com/auto: "true"
