@@ -203,6 +203,27 @@ PostgreSQL cluster — via a read-only cluster-scoped ClusterRole limited to
 those four kinds, `list` only. A check that cannot run is reported as **not
 checked** rather than folded into a green result.
 
+Commands: `status`, `certs`, `backups`, `longhorn`, `help`. `status` reports
+only what is **wrong** across every check; the other verbs give the full
+listing for one area on demand. So a failing certificate renewal reaches you
+without having to think to ask, while 26 volume ages stay out of the way until
+you want them.
+
+Two thresholds are deliberately not "expires soon":
+
+**Certificates** are flagged when the Ready condition is not True, or when
+`status.renewalTime` has passed and the certificate still has not renewed.
+cert-manager renews 30 days out, so a fixed "expires within N days" either
+fires for a month at a time or is tuned so tight it warns too late. commafeed
+and speedtest served certificates four months expired — long past renewalTime.
+
+**Volumes** are flagged when robustness is not `healthy`, when the last backup
+is older than 26h, or when there is no backup *and the volume is older than one
+backup window*. That last clause matters: `campfire-data` and `fizzy-data` both
+read as "never backed up" within hours of being created, when the truth was
+simply that the 02:00 job had not come round yet. Without the grace period every
+new PVC reports a fault for its first day.
+
 Flux objects get a grace period. `Ready=False` is reported immediately, but
 `Ready=Unknown` — what Flux sets while reconciling — is only reported once it
 has held for longer than `PROGRESSING_GRACE_MINUTES` (10), and then with the
