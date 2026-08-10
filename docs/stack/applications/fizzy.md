@@ -47,6 +47,11 @@ Two settings that are easy to get wrong:
   means *implicit* TLS on 465. Setting it would attempt SMTPS against a
   STARTTLS port. Unset leaves Mail's `enable_starttls_auto` default, which is
   what 587 wants.
+
+  Do not copy this to another app. authentik uses the same relay and the same
+  port but names the flags the other way round — `AUTHENTIK_EMAIL__USE_TLS`
+  means STARTTLS and must be `true`, while `USE_SSL` is the implicit-TLS one.
+  Read each app's own mapping.
 - **`MAILER_FROM_ADDRESS` must be the authenticated address.** Proton rejects a
   From it did not issue the token for, and upstream defaults this to
   `Fizzy <support@fizzy.do>`.

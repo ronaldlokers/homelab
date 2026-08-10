@@ -44,6 +44,21 @@ spec:
       #   AUTHENTIK_POSTGRESQL__PORT  5432
       #   AUTHENTIK_POSTGRESQL__NAME  authentik
       #   AUTHENTIK_POSTGRESQL__USER  authentik
+      #   AUTHENTIK_EMAIL__HOST       smtp.protonmail.ch
+      #   AUTHENTIK_EMAIL__PORT       587
+      #   AUTHENTIK_EMAIL__USERNAME   authentik@lokilabs.nl
+      #   AUTHENTIK_EMAIL__FROM       authentik@lokilabs.nl
+      #   AUTHENTIK_EMAIL__USE_TLS    true
+      #   AUTHENTIK_EMAIL__USE_SSL    false
+      #
+      # USE_TLS means STARTTLS in authentik's vocabulary and USE_SSL means
+      # implicit TLS, so 587 wants USE_TLS. That is the opposite of Fizzy,
+      # where SMTP_TLS maps to Mail's `tls:` and means implicit TLS on 465 —
+      # the same relay, the same port, and the flag has to be set in one and
+      # left unset in the other. Read the app's own mapping before copying.
+      #
+      # Egress on 587 was already allowed in network-policies.yaml, ahead of
+      # anything being able to use it.
       #
       # Anything added under `authentik:` here will do nothing while this is
       # set. Add it to the Secret instead.
