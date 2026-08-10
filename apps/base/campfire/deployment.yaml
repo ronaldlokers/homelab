@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: campfire
+spec:
+  # One, and it cannot be more. Campfire stores its data in SQLite on a
+  # ReadWriteOnce volume: a second replica would either fail to attach or, worse,
+  # open the same database file twice.
+  replicas: 1
+  # Required by the ReadWriteOnce campfire-data volume. A RollingUpdate starts
+  # the replacement pod before the old one releases the claim, so if the two land
+  # on different nodes the new pod blocks on a multi-attach error and the rollout
+  # stalls. Every other PVC-backed workload here uses Recreate for the same
+  # reason.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: campfire
+  template:
+    metadata:
+      labels:
+        app: campfire
+    spec:
+      securityContext:
+        # The image creates and runs as the `rails` user, uid/gid 1000, and owns
+        # /rails as that user. fsGroup makes the mounted volume writable by it.
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: campfire
+          image: ghcr.io/basecamp/once-campfire
+          ports:
+            - name: http
+              containerPort: 80
+          env:
+            # Traefik terminates TLS. Left unset, the container tries to get its
+            # own Let's Encrypt certificate and wants ports 80 and 443 published.
+            - name: DISABLE_SSL
+              value: "true"
+            # No Sentry DSN is configured, and this stops it initialising at all.
+            - name: SKIP_TELEMETRY
+              value: "true"
+          envFrom:
+            - secretRef:
+                name: campfire-secrets
+          securityContext:
+            allowPrivilegeEscalation: false
+          # /up is Rails' own health endpoint (config/routes.rb), which boots the
+          # app rather than just answering the port.
+          #
+          # A startupProbe gates liveness until the app is actually up. Without
+          # one, liveness starts after initialDelaySeconds and kills the
+          # container on failureThreshold — which is ample on an idle cluster and
+          # not ample during convergence, when every pod restarts at once and
+          # startup contends for one disk. That mistake cost linkding 47 restarts
+          # in 19 hours (docs/war-stories/liveness-without-startup-probe.md).
+          startupProbe:
+            httpGet:
+              path: /up
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /up
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /up
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Requests but no memory limit: a hard cap turns an image-processing
+          # spike (attachment previews go through libvips) into an OOM kill.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+          volumeMounts:
+            - name: campfire-data
+              mountPath: /rails/storage
+      volumes:
+        - name: campfire-data
+          persistentVolumeClaim:
+            claimName: campfire-data

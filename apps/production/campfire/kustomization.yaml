@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: campfire
+resources:
+  - ../../base/campfire/
+  - campfire-secrets.yaml
+  - ingress.yaml
+
+# Upstream publishes a tag per release, plus floating `1` / `1.4` / `latest`
+# tags. Pinned to the exact version so Renovate proposes upgrades as reviewable
+# PRs, rather than the image changing under a floating tag with no commit.
+images:
+  - name: ghcr.io/basecamp/once-campfire
+    newTag: v1.4.9
+
+patches:
+  # Opt in to Reloader: roll this workload when a mounted ConfigMap or Secret
+  # changes. Without it a SOPS secret rotation applies cleanly and the pod keeps
+  # serving the old value, because env/envFrom are injected only at pod creation.
+  - target:
+      kind: Deployment
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: placeholder
+        annotations:
+          reloader.stakater.com/auto: "true"
+  # The base PVC omits storageClassName, which would fall to the cluster
+  # default. Production annotates two StorageClasses as default, so state it.
+  - patch: |
+      - op: add
+        path: /spec/storageClassName
+        value: longhorn
+    target:
+      kind: PersistentVolumeClaim
+      name: campfire-data
