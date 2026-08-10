@@ -125,8 +125,15 @@ def render_flux(payload):
     reason = payload.get("reason", "")
     message = payload.get("message", "").strip()
 
+    # Both clusters post into the same room, so which one sent this has to be
+    # the first thing visible. Set per cluster via the Alert's eventMetadata,
+    # which notification-controller merges into the event's `metadata`.
+    cluster = (payload.get("metadata") or {}).get("cluster", "")
+
     mark = "🚨" if severity == "error" else "ℹ️"
     head = f"<strong>{mark} {html.escape(kind)}/{html.escape(name)}</strong>"
+    if cluster:
+        head = f"<strong>[{html.escape(cluster)}]</strong> " + head
     if severity:
         head += f" · <em>{html.escape(severity)}</em>"
     parts = [head]

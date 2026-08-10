@@ -27,6 +27,13 @@ patches:
       kind: Alert
       name: flux-errors
     patch: |
+      # Both clusters post into the same #Flux room, so every event says which
+      # one it came from. notification-controller merges eventMetadata into the
+      # event's `metadata`, which the bridge renders as a prefix.
+      - op: add
+        path: /spec/eventMetadata
+        value:
+          cluster: production
       - op: add
         path: /spec/eventSources/-
         value:

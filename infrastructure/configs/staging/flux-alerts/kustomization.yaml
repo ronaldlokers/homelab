@@ -4,10 +4,34 @@ resources:
   - ntfy-publisher-secret.yaml
   - ../../base/flux-alerts
 patches:
+  # Staging posts into PRODUCTION's Campfire, through the bridge's LAN-only
+  # ingress — staging has no Campfire of its own, and running a second one to
+  # read two rooms would be worse than crossing the boundary here.
+  #
+  # This is the only cross-cluster dependency in the repo: if production is
+  # down, staging's Flux alerts go nowhere. That is an acceptable direction to
+  # fail, since production being down is the louder problem.
+  #
+  # The base address (public ntfy) is replaced rather than extended: a Provider
+  # has one address. To send staging back to ntfy, drop this patch.
+  - target:
+      kind: Provider
+      name: ntfy
+    patch: |
+      - op: replace
+        path: /spec/address
+        value: "https://campfire-bridge.ronaldlokers.nl/flux"
   - target:
       kind: Alert
       name: flux-errors
     patch: |
+      # Both clusters share the #Flux room, so every event is labelled with its
+      # origin. Without this a staging failure reads as a production one — the
+      # exact confusion #384 separated the ntfy topics to avoid.
+      - op: add
+        path: /spec/eventMetadata
+        value:
+          cluster: staging
       - op: add
         path: /spec/eventSources/-
         value:

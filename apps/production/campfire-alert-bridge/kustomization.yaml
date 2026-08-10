@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - ../../base/campfire-alert-bridge/
   - campfire-alert-bridge-secret.yaml
+  - ingress.yaml
 
 patches:
   # Opt in to Reloader so rotating the bot key rolls the pod. CAMPFIRE_URL is

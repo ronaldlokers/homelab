@@ -1,0 +1,36 @@
+# Exposed only so the STAGING cluster can post its Flux events into the same
+# Campfire room. Production's own senders reach the bridge on its ClusterIP and
+# never traverse this.
+#
+# local-network-only gates it to 10.0.0.0/16, which is what makes an
+# unauthenticated endpoint acceptable: the bridge has no auth of its own, and
+# the worst a LAN host can do is post a message into the #Flux room. The same
+# middleware guards the Longhorn and pgAdmin UIs, which are considerably more
+# interesting targets.
+#
+# If that ever stops being acceptable, the bridge would need a shared token and
+# staging's Provider would carry it in a header via its secretRef — the
+# machinery is already there, it is just not warranted yet.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: campfire-alert-bridge
+  namespace: campfire
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd,kube-system-local-network-only@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - campfire-bridge.ronaldlokers.nl
+  rules:
+    - host: campfire-bridge.ronaldlokers.nl
+      http:
+        paths:
+          - backend:
+              service:
+                name: campfire-alert-bridge
+                port:
+                  number: 8080
+            path: /
+            pathType: Prefix
