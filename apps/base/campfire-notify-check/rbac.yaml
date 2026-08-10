@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: campfire-notify-check
+  namespace: campfire
+---
+# A Role, not a ClusterRole: everything this reads lives in one namespace, and
+# pods/exec is the most powerful verb in the repo — recovery-source-check needs
+# it cluster-wide because PostgreSQL clusters are spread across namespaces, but
+# there is exactly one Campfire.
+#
+# exec into the Campfire pod is the only way in: Campfire has no API, so the
+# involvement settings and subscription count are readable only from Rails.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: campfire-notify-check
+  namespace: campfire
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list]
+  - apiGroups: [""]
+    resources: [pods/exec]
+    verbs: [create]
+  # kubectl exec deploy/... resolves the Deployment to a pod first.
+  - apiGroups: ["apps"]
+    resources: [deployments]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: campfire-notify-check
+  namespace: campfire
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: campfire-notify-check
+subjects:
+  - kind: ServiceAccount
+    name: campfire-notify-check
+    namespace: campfire
