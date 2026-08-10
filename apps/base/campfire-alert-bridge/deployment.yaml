@@ -29,12 +29,18 @@ spec:
             - name: http
               containerPort: 8080
           env:
-            # Holds the room and bot key, so it is the whole credential.
+            # Each holds a room and a bot key, so each is a whole credential.
+            # One destination per source: /alerts -> #Alertmanager, /flux -> #Flux.
             - name: CAMPFIRE_URL
               valueFrom:
                 secretKeyRef:
                   name: campfire-alert-bridge
                   key: CAMPFIRE_URL
+            - name: CAMPFIRE_FLUX_URL
+              valueFrom:
+                secretKeyRef:
+                  name: campfire-alert-bridge
+                  key: CAMPFIRE_FLUX_URL
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

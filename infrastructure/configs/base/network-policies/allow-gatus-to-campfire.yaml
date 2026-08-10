@@ -1,0 +1,21 @@
+---
+# Allow Gatus to post its own alerts to Campfire. Gatus uses the `custom`
+# alerting provider, which templates the HTML body itself, so it talks to
+# Campfire directly rather than through the bridge.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gatus-to-campfire
+  namespace: gatus
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: campfire
+      ports:
+        - protocol: TCP
+          port: 80

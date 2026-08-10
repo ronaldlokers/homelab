@@ -1,0 +1,27 @@
+---
+# Allow Flux's notification-controller to deliver events to the Campfire bridge,
+# which renders them into the #Flux room. Complements allow-flux-to-bridge on
+# the campfire side; without this, flux-system's default-deny-egress rejects the
+# connection.
+#
+# Staging keeps publishing to ntfy instead — it has no Campfire — so this rule
+# is harmless there.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-flux-to-campfire
+  namespace: flux-system
+spec:
+  podSelector:
+    matchLabels:
+      app: notification-controller
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: campfire
+      ports:
+        - protocol: TCP
+          port: 8080

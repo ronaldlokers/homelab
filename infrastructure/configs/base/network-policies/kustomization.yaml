@@ -13,4 +13,6 @@ resources:
   - allow-prometheus-to-system-namespaces.yaml
   - allow-prometheus-to-app-namespaces.yaml
   - allow-alertmanager-to-campfire.yaml
+  - allow-flux-to-campfire.yaml
+  - allow-gatus-to-campfire.yaml
   - allow-loki-to-s3.yaml

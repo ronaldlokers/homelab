@@ -26,6 +26,56 @@ spec:
         - protocol: TCP
           port: 8080
 ---
+# Flux's notification-controller posts events to /flux. Same hop, different
+# source namespace; the matching egress rule is in
+# infrastructure/configs/base/network-policies/allow-flux-to-campfire.yaml.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-flux-to-bridge
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-alert-bridge
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: flux-system
+          podSelector:
+            matchLabels:
+              app: notification-controller
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Gatus posts to Campfire directly rather than through the bridge: its `custom`
+# alerting provider templates its own body, so there is nothing for the bridge
+# to do. The egress side is in
+# infrastructure/configs/base/network-policies/allow-gatus-to-campfire.yaml.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gatus-ingress-to-campfire
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gatus
+      ports:
+        - protocol: TCP
+          port: 80
+---
 # Same namespace is not the same as allowed: default-deny-egress covers pods in
 # this namespace talking to each other too.
 apiVersion: networking.k8s.io/v1

@@ -16,15 +16,35 @@ ui:
   title: "Homelab Status"
   header: "Homelab Status"
 
-# Alerts publish to the ntfy topic "homelab-gatus" via the INTERNAL ntfy service
-# — the external MetalLB VIP is not reliably reachable pod->VIP from inside the
-# cluster. Token injected as ${NTFY_TOKEN} from the SOPS gatus-alerting secret.
+# Alerts post into the Campfire #Gatus room as the Gatus bot, via the INTERNAL
+# service — the external MetalLB VIP is not reliably reachable pod->VIP from
+# inside the cluster (the same reason the ntfy address it replaced was internal).
+#
+# The `custom` provider rather than a dedicated one: Campfire has no Gatus
+# integration, its bot endpoint takes the request body as the message, and
+# `custom` is the only provider that lets the body be templated. That also means
+# Gatus talks to Campfire directly — unlike Alertmanager and Flux, which have no
+# body templating and go through campfire-alert-bridge to be formatted.
+#
+# ${CAMPFIRE_URL} carries the room and bot key and is injected from the SOPS
+# gatus-alerting secret, the same mechanism ${NTFY_TOKEN} used. It must not be
+# written literally here: config.yaml is a ConfigMap, and validate.sh fails on
+# credentials outside a Secret (#321).
+#
+# The body is HTML because Campfire stores rich text and ignores newline
+# characters — a plain-text body arrives as one run-on line. See
+# docs/stack/applications/campfire.md.
 alerting:
-  ntfy:
-    url: "http://ntfy.ntfy.svc.cluster.local"
-    topic: "homelab-gatus"
-    token: "${NTFY_TOKEN}"
-    priority: 3
+  custom:
+    url: "${CAMPFIRE_URL}"
+    method: "POST"
+    headers:
+      Content-Type: "text/html; charset=utf-8"
+    body: "<strong>[ALERT_TRIGGERED_OR_RESOLVED] [ENDPOINT_NAME]</strong><ul><li>group: <code>[ENDPOINT_GROUP]</code></li><li>url: <code>[ENDPOINT_URL]</code></li></ul><pre>[RESULT_ERRORS]</pre>"
+    placeholders:
+      ALERT_TRIGGERED_OR_RESOLVED:
+        TRIGGERED: "🚨 DOWN:"
+        RESOLVED: "✅ RECOVERED:"
     default-alert:
       failure-threshold: 3
       success-threshold: 2
@@ -61,7 +81,7 @@ endpoints:
       - "[STATUS] < 400"
       - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
-      - type: ntfy
+      - type: custom
   - name: homepage
     group: homelab
     url: "https://homepage.ronaldlokers.nl"
@@ -70,7 +90,7 @@ endpoints:
       - "[STATUS] < 400"
       - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
-      - type: ntfy
+      - type: custom
   - name: immich
     group: homelab
     url: "https://immich.ronaldlokers.nl/api/server/ping"
@@ -79,7 +99,7 @@ endpoints:
       - "[STATUS] < 400"
       - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
-      - type: ntfy
+      - type: custom
   - name: linkding
     group: homelab
     url: "https://linkding.ronaldlokers.nl"
@@ -88,7 +108,7 @@ endpoints:
       - "[STATUS] < 400"
       - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
-      - type: ntfy
+      - type: custom
   - name: mealie
     group: homelab
     url: "https://mealie.ronaldlokers.nl"
@@ -97,7 +117,7 @@ endpoints:
       - "[STATUS] < 400"
       - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
-      - type: ntfy
+      - type: custom
   - name: tandoor
     group: homelab
     url: "https://tandoor.ronaldlokers.nl"
@@ -106,7 +126,7 @@ endpoints:
       - "[STATUS] < 400"
       - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
-      - type: ntfy
+      - type: custom
   - name: nightscout
     group: homelab
     url: "https://nightscout.ronaldlokers.nl"
@@ -115,7 +135,7 @@ endpoints:
       - "[STATUS] < 400"
       - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
-      - type: ntfy
+      - type: custom
   - name: ntfy
     group: homelab
     url: "https://ntfy.ronaldlokers.nl"
@@ -124,7 +144,7 @@ endpoints:
       - "[STATUS] < 400"
       - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
-      - type: ntfy
+      - type: custom
   - name: speedtest
     group: homelab
     url: "https://speedtest.ronaldlokers.nl"
@@ -133,7 +153,7 @@ endpoints:
       - "[STATUS] < 400"
       - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
-      - type: ntfy
+      - type: custom
   # Checked on its Service, not through the ingress. Grafana's router carries
   # the local-network-only middleware, which sees a pod address for an
   # in-cluster prober and answers 403 — so this row was red continuously while
@@ -147,7 +167,7 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
     alerts:
-      - type: ntfy
+      - type: custom
   - name: gatus
     group: homelab
     url: "https://gatus.ronaldlokers.nl"
@@ -156,7 +176,7 @@ endpoints:
       - "[STATUS] < 400"
       - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
-      - type: ntfy
+      - type: custom
   # These carry the local-network-only middleware, so a request from a pod is
   # correctly refused with 403 — pod IPs are not inside the 10.0.0.0/16
   # allowlist. Asserting 403 still exercises DNS, TCP, TLS and Traefik routing,
@@ -170,7 +190,7 @@ endpoints:
       - "[STATUS] == 403"
       - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
-      - type: ntfy
+      - type: custom
   - name: pgadmin
     group: homelab-lan-only
     url: "https://pgadmin.ronaldlokers.nl"
@@ -179,7 +199,7 @@ endpoints:
       - "[STATUS] == 403"
       - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
-      - type: ntfy
+      - type: custom
   - name: prometheus
     group: homelab-lan-only
     url: "https://prometheus.ronaldlokers.nl"
@@ -188,7 +208,7 @@ endpoints:
       - "[STATUS] == 403"
       - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
-      - type: ntfy
+      - type: custom
   - name: lokilabs-healthz
     group: external
     url: "https://lokilabs.nl/api/healthz"
@@ -197,7 +217,7 @@ endpoints:
       - "[STATUS] == 200"
       - "[CERTIFICATE_EXPIRATION] > 240h"
     alerts:
-      - type: ntfy
+      - type: custom
   - name: proxmox
     group: infrastructure
     # Checked at the backend host directly — the ingress VIP isn't reachable from
@@ -209,4 +229,4 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
     alerts:
-      - type: ntfy
+      - type: custom
