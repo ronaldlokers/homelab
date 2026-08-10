@@ -61,13 +61,13 @@ spec:
             matchLabels:
               app.kubernetes.io/name: traefik
 ---
-# Web Push only. Deliveries go to Apple's and Google's push endpoints, which is
-# the entire notification path on iOS.
+# Two things need the internet: Web Push (deliveries go to Apple's and Google's
+# push endpoints, which is the entire notification path on iOS) and SMTP
+# submission to Proton for sign-in codes.
 #
 # Narrower than campfire's equivalent because Fizzy has no link unfurler: there
 # is no feature here that fetches an attacker-chosen URL, so the private ranges
 # are excluded for defence in depth rather than to contain a known behaviour.
-# If SMTP is ever configured, the relay needs its own rule — 587 is not open.
 #
 # IPv6 egress needs no rule: nothing grants an IPv6 allow, so
 # default-deny-egress already blocks it.
@@ -97,3 +97,7 @@ spec:
       ports:
         - protocol: TCP
           port: 443
+        # SMTP submission to smtp.protonmail.ch. STARTTLS on 587, not implicit
+        # TLS on 465 — see the SMTP_TLS note on the Deployment.
+        - protocol: TCP
+          port: 587

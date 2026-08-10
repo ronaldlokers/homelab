@@ -32,11 +32,28 @@ there is no arm64 build. There is: `main` is a multi-arch OCI index containing
 both, and the suffixed tags are build-stage artefacts. Check the index, not the
 tag list.
 
-## Signing in — no SMTP here
+## Signing in
 
-Fizzy authenticates by emailing a **6-character verification code**. This
-homelab has no SMTP relay and no mail credentials anywhere, so that email
-cannot be sent.
+Fizzy authenticates by emailing a **6-character verification code**, delivered
+through Proton's submission relay (`smtp.protonmail.ch:587`).
+
+`SMTP_ADDRESS`, `SMTP_PORT` and `MAILER_FROM_ADDRESS` are on the Deployment so
+they are readable in Git; `SMTP_USERNAME` and `SMTP_PASSWORD` are in the
+`fizzy-secrets` SOPS secret, kept together so the pair cannot drift apart.
+
+Two settings that are easy to get wrong:
+
+- **`SMTP_TLS` must stay unset.** Upstream maps it to Mail's `tls:`, which
+  means *implicit* TLS on 465. Setting it would attempt SMTPS against a
+  STARTTLS port. Unset leaves Mail's `enable_starttls_auto` default, which is
+  what 587 wants.
+- **`MAILER_FROM_ADDRESS` must be the authenticated address.** Proton rejects a
+  From it did not issue the token for, and upstream defaults this to
+  `Fizzy <support@fizzy.do>`.
+
+`allow-internet-egress` opens 443 and 587. Nothing else.
+
+### When mail is not working
 
 Unset, `SMTP_ADDRESS` does not disable mail — it falls back to a local MTA, so
 delivery fails rather than no-op'ing:
@@ -46,11 +63,15 @@ Error performing ActionMailer::MailDeliveryJob …
 Errno::ECONNREFUSED (Connection refused - connect(2) for "localhost" port 25)
 ```
 
-It is not a blocker, because the code is only needed to establish a session.
-**Read it from the database, not the log.** Upstream's Docker guide says the
-code appears in the container output; it does not here. The mail body renders
-and is then handed to the failing delivery job, so the only place the code
-exists is the `MagicLink` row:
+Any delivery failure leaves a failed `ActionMailer::MailDeliveryJob` in
+`production_queue.sqlite3` — a useful signal that the relay, not the app, is
+the problem.
+
+The code can always be read straight out of the database, which is the fallback
+when mail is broken and was the only route before the relay existed. **Not from
+the log** — upstream's Docker guide says the code appears in the container
+output; it does not here. The body renders and is handed to the delivery job,
+so the only place it exists is the `MagicLink` row:
 
 ```bash
 kubectl exec -n fizzy --context=production deploy/fizzy -- bin/rails runner '
@@ -65,20 +86,12 @@ second. `purpose` is `sign_up` for the very first one and `sign_in` afterwards.
 The nil branch matters: without it the command dies on `nil.code` and buries
 the reason in a Ruby backtrace.
 
-Then **register a passkey immediately.** Fizzy supports WebAuthn
-(`ActionPack::Passkey`), and sessions are database-backed rather than
-cookie-expiry-bound, so after this the email path is not needed again on that
-device.
+### Passkeys
 
-Every attempt leaves a failed `ActionMailer::MailDeliveryJob` behind in
-`production_queue.sqlite3`. Harmless at one sign-in per device; worth knowing
-before wondering why SolidQueue has a failed-job backlog.
-
-If that becomes annoying — a new device, a cleared browser — the fix is an SMTP
-relay: `SMTP_ADDRESS`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` and
-`MAILER_FROM_ADDRESS` into the `fizzy-secrets` SOPS secret, plus a
-NetworkPolicy egress rule for the submission port. `allow-internet-egress`
-opens **443 only**; 587 is deliberately not open.
+Worth registering one anyway. Fizzy supports WebAuthn
+(`ActionPack::Passkey`) and sessions are database-backed rather than
+cookie-expiry-bound, so a passkey removes the email round trip entirely — and
+keeps working if the Proton token is ever revoked.
 
 There is no OIDC support, so unlike linkding, mealie and immich this does not
 sit behind authentik.
@@ -93,8 +106,8 @@ publicly resolvable host, so it is stated rather than assumed.
 
 Narrower than Campfire's. Fizzy has **no link unfurler** — no feature that
 fetches an attacker-chosen URL — so the RFC1918 exclusions are defence in depth
-rather than containment of a known behaviour. Port 443 only; Campfire also
-needs 80 for unfurling.
+rather than containment of a known behaviour. Ports 443 and 587 only; Campfire
+also needs 80 for unfurling.
 
 Web Push works the same way: VAPID keys in the SOPS secret, deliveries to
 Apple's and Google's endpoints, and on iOS only from an installed PWA.
