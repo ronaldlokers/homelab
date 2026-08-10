@@ -1,0 +1,17 @@
+# ClusterIP only, and deliberately no Ingress. Campfire is the sole caller and
+# it lives in this namespace, so nothing has to leave the cluster. That matters
+# because Campfire webhooks carry no signature or shared secret: the callback
+# URL is the whole authentication story, and the NetworkPolicy beside this file
+# is what makes that acceptable.
+apiVersion: v1
+kind: Service
+metadata:
+  name: campfire-status-bot
+  namespace: campfire
+spec:
+  ports:
+    - port: 8080
+      targetPort: http
+  selector:
+    app: campfire-status-bot
+  type: ClusterIP

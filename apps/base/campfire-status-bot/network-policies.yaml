@@ -1,0 +1,51 @@
+---
+# Campfire is the only thing allowed to reach the bot, and this rule is the
+# only authentication the webhook has: Campfire signs nothing and sends no
+# shared secret, so "who can open a socket to port 8080" is the whole control.
+#
+# The campfire namespace default-denies both directions, so the same hop has to
+# be said twice — ingress here, egress below. Same-namespace is not the same as
+# allowed.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-campfire-to-status-bot
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-status-bot
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: campfire
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# The egress half. campfire's allow-internet-egress excludes 10.0.0.0/8, which
+# the pod CIDR sits inside, so without this the webhook never leaves Campfire
+# and the room gets "Failed to respond within 7 seconds" with nothing in the
+# bot's log to explain it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-campfire-egress-to-status-bot
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: campfire-status-bot
+      ports:
+        - protocol: TCP
+          port: 8080
