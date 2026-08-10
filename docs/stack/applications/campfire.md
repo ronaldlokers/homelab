@@ -172,7 +172,7 @@ build.
 
 ## Status bot
 
-`campfire-status-bot` (same namespace) answers `@Claude status` in the room
+`campfire-status-bot` (same namespace) answers `@Kubernetes status` in the room
 with anything failing in the cluster. It is the read direction of the same
 plumbing the alert bridge covers in the write direction.
 
