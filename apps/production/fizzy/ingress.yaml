@@ -1,0 +1,26 @@
+# Public like campfire, not LAN-gated like longhorn or pgadmin. Fizzy's own
+# sign-in is the gate, and Web Push on iOS only works from an installed PWA,
+# which needs the host reachable from the phone's network rather than only from
+# the LAN.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fizzy
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - fizzy.ronaldlokers.nl
+  rules:
+    - host: fizzy.ronaldlokers.nl
+      http:
+        paths:
+          - backend:
+              service:
+                name: fizzy
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix

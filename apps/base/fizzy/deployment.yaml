@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fizzy
+spec:
+  # One, and it cannot be more. Fizzy stores its data in SQLite on a
+  # ReadWriteOnce volume: a second replica would either fail to attach or,
+  # worse, open the same database file twice.
+  replicas: 1
+  # Required by the ReadWriteOnce fizzy-data volume. A RollingUpdate starts the
+  # replacement pod before the old one releases the claim, so if the two land on
+  # different nodes the new pod blocks on a multi-attach error and the rollout
+  # stalls. Same reason as campfire and every other PVC-backed workload here.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: fizzy
+  template:
+    metadata:
+      labels:
+        app: fizzy
+    spec:
+      securityContext:
+        # The image creates and runs as the `rails` user, uid/gid 1000, and owns
+        # /rails as that user. fsGroup makes the mounted volume writable by it.
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: fizzy
+          image: ghcr.io/basecamp/fizzy
+          ports:
+            - name: http
+              containerPort: 80
+          env:
+            # Traefik terminates TLS. Left unset, Thruster tries to obtain its
+            # own Let's Encrypt certificate and wants both 80 and 443 published.
+            - name: DISABLE_SSL
+              value: "true"
+            # Used to build absolute links — password-less sign-in links, push
+            # notification targets, attachment URLs. Wrong here means links that
+            # point at the container rather than at the ingress.
+            - name: BASE_URL
+              value: https://fizzy.ronaldlokers.nl
+            # Single account. Upstream defaults to this, but the setting is the
+            # difference between a personal board and an open signup page on a
+            # publicly resolvable host, so it is stated rather than assumed.
+            - name: MULTI_TENANT
+              value: "false"
+          envFrom:
+            - secretRef:
+                name: fizzy-secrets
+          securityContext:
+            allowPrivilegeEscalation: false
+          # /up is Rails' own health endpoint, which boots the app rather than
+          # just answering the port.
+          #
+          # A startupProbe gates liveness until the app is actually up. Without
+          # one, liveness starts after initialDelaySeconds and kills the
+          # container on failureThreshold — ample on an idle cluster, not ample
+          # during convergence when every pod restarts at once and startup
+          # contends for one disk. That mistake cost linkding 47 restarts in 19
+          # hours (docs/war-stories/liveness-without-startup-probe.md).
+          #
+          # The entrypoint runs migrations before the server starts, so first
+          # boot on an empty volume is the slowest one.
+          startupProbe:
+            httpGet:
+              path: /up
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /up
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /up
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Requests but no memory limit: a hard cap turns an image-processing
+          # spike (attachment previews go through libvips) into an OOM kill.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+          volumeMounts:
+            - name: fizzy-data
+              mountPath: /rails/storage
+      volumes:
+        - name: fizzy-data
+          persistentVolumeClaim:
+            claimName: fizzy-data

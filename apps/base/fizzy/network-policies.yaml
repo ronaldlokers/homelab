@@ -1,0 +1,99 @@
+---
+# Default deny all ingress traffic in fizzy namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: fizzy
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# Default deny all egress traffic in fizzy namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: fizzy
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+# Allow DNS queries from fizzy namespace to kube-system
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: fizzy
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Allow ingress from Traefik (kube-system) to fizzy pods
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-from-traefik
+  namespace: fizzy
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+---
+# Web Push only. Deliveries go to Apple's and Google's push endpoints, which is
+# the entire notification path on iOS.
+#
+# Narrower than campfire's equivalent because Fizzy has no link unfurler: there
+# is no feature here that fetches an attacker-chosen URL, so the private ranges
+# are excluded for defence in depth rather than to contain a known behaviour.
+# If SMTP is ever configured, the relay needs its own rule — 587 is not open.
+#
+# IPv6 egress needs no rule: nothing grants an IPv6 allow, so
+# default-deny-egress already blocks it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-internet-egress
+  namespace: fizzy
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8        # RFC1918 private
+              - 172.16.0.0/12     # RFC1918 private
+              - 192.168.0.0/16    # RFC1918 private
+              - 169.254.0.0/16    # link-local / cloud metadata
+              - 127.0.0.0/8       # loopback
+              - 100.64.0.0/10     # CGNAT (RFC6598)
+              - 192.0.0.0/24      # IETF protocol assignments
+              - 198.18.0.0/15     # benchmarking
+              - 224.0.0.0/4       # multicast
+      ports:
+        - protocol: TCP
+          port: 443

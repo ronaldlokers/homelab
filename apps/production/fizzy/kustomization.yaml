@@ -1,0 +1,43 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: fizzy
+resources:
+  - ../../base/fizzy/
+  - fizzy-secrets.yaml
+  - ingress.yaml
+
+# Upstream publishes no semver tags — only a floating `main` and a `sha-<short>`
+# per build. Pinning `main` alone would let the image change under a tag with no
+# commit here to show it, which is the thing campfire's `newTag: v1.4.9` exists
+# to prevent.
+#
+# So the digest is the pin, and the tag is documentation. Renovate bumps the
+# digest as a reviewable PR; the same pattern the renovate CronJob already uses
+# on its own image.
+images:
+  - name: ghcr.io/basecamp/fizzy
+    newTag: main
+    digest: sha256:e2f8c5ac192d2d867915401a1e0270afafd8cc76b8c5d0e46121078afac54a75
+
+patches:
+  # Opt in to Reloader: roll this workload when a mounted Secret changes.
+  # Without it a SOPS secret rotation applies cleanly and the pod keeps serving
+  # the old value, because envFrom is injected only at pod creation.
+  - target:
+      kind: Deployment
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: placeholder
+        annotations:
+          reloader.stakater.com/auto: "true"
+  # The base PVC omits storageClassName, which would fall to the cluster
+  # default. Production annotates two StorageClasses as default, so state it.
+  - patch: |
+      - op: add
+        path: /spec/storageClassName
+        value: longhorn
+    target:
+      kind: PersistentVolumeClaim
+      name: fizzy-data
