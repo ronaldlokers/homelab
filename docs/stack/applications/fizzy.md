@@ -38,19 +38,41 @@ Fizzy authenticates by emailing a **6-character verification code**. This
 homelab has no SMTP relay and no mail credentials anywhere, so that email
 cannot be sent.
 
-It is not a blocker, because the code is only needed to establish a session:
+Unset, `SMTP_ADDRESS` does not disable mail — it falls back to a local MTA, so
+delivery fails rather than no-op'ing:
 
-1. Read the code out of the container's own log:
+```
+Error performing ActionMailer::MailDeliveryJob …
+Errno::ECONNREFUSED (Connection refused - connect(2) for "localhost" port 25)
+```
 
-   ```bash
-   kubectl logs -n fizzy --context=production deploy/fizzy | grep -i -A2 "verification\|code"
-   ```
+It is not a blocker, because the code is only needed to establish a session.
+**Read it from the database, not the log.** Upstream's Docker guide says the
+code appears in the container output; it does not here. The mail body renders
+and is then handed to the failing delivery job, so the only place the code
+exists is the `MagicLink` row:
 
-2. Sign in with it.
-3. **Register a passkey immediately.** Fizzy supports WebAuthn
-   (`ActionPack::Passkey`), and sessions are database-backed rather than
-   cookie-expiry-bound, so after this the email path is not needed again on
-   that device.
+```bash
+kubectl exec -n fizzy --context=production deploy/fizzy -- bin/rails runner '
+  m = MagicLink.order(:created_at).last
+  puts m ? { code: m.code, purpose: m.purpose, expires_at: m.expires_at }.inspect
+         : "no pending code — request one from the sign-in page first"'
+```
+
+Codes expire **15 minutes** after they are requested, and the row is deleted
+the moment one is used, so request from the sign-in page first and run this
+second. `purpose` is `sign_up` for the very first one and `sign_in` afterwards.
+The nil branch matters: without it the command dies on `nil.code` and buries
+the reason in a Ruby backtrace.
+
+Then **register a passkey immediately.** Fizzy supports WebAuthn
+(`ActionPack::Passkey`), and sessions are database-backed rather than
+cookie-expiry-bound, so after this the email path is not needed again on that
+device.
+
+Every attempt leaves a failed `ActionMailer::MailDeliveryJob` behind in
+`production_queue.sqlite3`. Harmless at one sign-in per device; worth knowing
+before wondering why SolidQueue has a failed-job backlog.
 
 If that becomes annoying — a new device, a cleared browser — the fix is an SMTP
 relay: `SMTP_ADDRESS`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` and
