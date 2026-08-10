@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: fizzy
+spec:
+  ports:
+    - port: 80
+  selector:
+    app: fizzy
+  type: ClusterIP

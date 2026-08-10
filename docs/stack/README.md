@@ -13,6 +13,7 @@ This document provides detailed information about all components running in the 
 - Applications
   - [Campfire](./applications/campfire.md)
   - [Commafeed](./applications/commafeed.md)
+  - [Fizzy](./applications/fizzy.md)
   - [Homepage](./applications/homepage.md)
   - [Immich](./applications/immich.md)
   - [Linkding](./applications/linkding.md)
@@ -43,6 +44,7 @@ This document provides detailed information about all components running in the 
 | Immich | ✅ | ✅ | Photo and video management |
 | ntfy | ❌ | ✅ | Notification service |
 | Campfire | ❌ | ✅ | Group chat, bots, and a mirror of alerts |
+| Fizzy | ❌ | ✅ | Kanban board |
 | pgAdmin | ❌ | ✅ | PostgreSQL administration |
 | Speedtest | ❌ | ✅ | Network speed test |
 | kube-prometheus-stack | ✅ | ✅ | Monitoring and observability |
