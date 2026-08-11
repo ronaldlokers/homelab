@@ -1,0 +1,30 @@
+# Ingress for the morning briefing's overnight-alert query.
+#
+# The egress half is in apps/base/campfire-status-bot/network-policies.yaml.
+# Both halves are required: monitoring denies ingress by default, so without
+# this the connection is refused at the far end and the briefing reports
+# "overnight alerts: <error>" under "not checked" rather than going quiet —
+# which is the intended failure, but still a failure.
+#
+# Production only, like the other campfire rules: the namespace does not exist
+# in staging, and a policy naming a missing namespace wedges the whole
+# Kustomization (#426).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-status-bot-to-prometheus
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: campfire
+      ports:
+        - protocol: TCP
+          port: 9090

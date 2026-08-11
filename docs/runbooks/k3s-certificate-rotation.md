@@ -30,9 +30,21 @@ O=system:masters will expire within 120 days at 2026-12-02T17:11:23Z, ...
 
 ### Monitoring Indicators
 
-**There is no alert for this.** The events exist; nothing routes them. It was
-found by accident, when the Campfire status bot's `why` verb read the warning
-event stream while triaging something unrelated. Worth adding a PrometheusRule.
+**The morning briefing watches this**, as of 2026-08-11. It reports any node
+whose certificates are under 30 days out, so this should reach you before the
+event does.
+
+It does not read the events. Kubernetes keeps them about an hour, so a
+once-a-day job would nearly always run when none exist. It reads
+`k3s_certificate_expiration_seconds` from Prometheus, which is scraped
+continuously and covers all three nodes. To ask directly:
+
+```promql
+min by (instance) (k3s_certificate_expiration_seconds) / 86400
+```
+
+The events are still the thing k3s itself emits, and are worth checking when
+the metric and the node disagree:
 
 ```bash
 kubectl get events -A --field-selector reason=CertificateExpirationWarning
@@ -191,9 +203,14 @@ ssh <node> 'systemctl show k3s -p ActiveEnterTimestamp --value'
 
 ## Prevention
 
-Rotation buys one year. The warning fires at 120 days, which is ample, but only
-if someone sees it — and today nothing routes these events anywhere.
+Rotation buys one year, and the warning fires at 120 days — ample, but only if
+someone sees it.
 
-Worth doing: a PrometheusRule on the event, or a `certs`-style assertion in the
-Campfire status bot. The bot already reads cert-manager Certificates; k3s node
-certificates are a different source and are not covered by it.
+**Someone does now.** The Campfire morning briefing reports any node under 30
+days from `k3s_certificate_expiration_seconds`, and says nothing on the other
+335 mornings. 30 rather than 120 because a line repeated every morning for four
+months is one you stop reading. See `docs/stack/applications/campfire.md`.
+
+That still leaves the briefing itself as a single point of failure: if the
+CronJob stops running, nothing notices. Same gap as the Watchdog alert, tracked
+on the Homelab board.
