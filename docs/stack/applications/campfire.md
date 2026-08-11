@@ -177,6 +177,35 @@ directly at each other, the room fills with raw JSON.
 - `/healthz` returns 503 while `CAMPFIRE_URL` is unset, so a missing secret
   fails readiness rather than silently swallowing alerts.
 
+### Resolving amends the message instead of adding one
+
+A firing alert and its resolution used to be two messages, so the room was a log
+of states rather than a view of the current one — exactly what the ntfy topic it
+replaced had been. Since #239 the bridge amends instead.
+
+**The rule is about notification, not tidiness.** `MessagesController#update`
+does not call `room.receive`, so an edit reaches nobody's phone:
+
+| Change | Action | Why |
+|---|---|---|
+| First alert of a group fires | POST | Has to push |
+| A fingerprint not firing before joins | POST | New information; an amend would be silent |
+| Only resolutions since last time | PATCH | Nothing new to announce |
+| Whole group resolves | PATCH, then forget the group | So a re-fire pushes again |
+
+Forgetting on full resolve is what stops a recurrence being silently folded into
+a week-old message.
+
+Alertmanager repeats the **whole group** in every notification, so the rendered
+body is always the group's current state — nothing is reconstructed from deltas,
+and the only thing worth remembering is the message id.
+
+**State is in memory**, keyed by `groupKey` and capped at 200 groups. A restart
+forgets the mapping, and an amend for a forgotten group posts a new message
+instead — today's behaviour, with a stale firing message left behind as the
+cost. A SQLite file on a PVC would fix that; it is not worth the moving parts
+yet. An amend that 404s (message deleted by hand) falls back the same way.
+
 ### Links on an alert
 
 Every alert renders up to three, which is the difference between reading an

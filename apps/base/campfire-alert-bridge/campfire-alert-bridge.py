@@ -10,9 +10,16 @@ text and ignores newline characters, so a plain-text alert arrives as one
 run-on line. Tags are filtered server-side by ContentFilters::SanitizeTags;
 everything used here (strong, em, code, pre, ul, li, a) is on its allow list.
 
-What this deliberately does NOT do: replace a firing message when the alert
-resolves. Campfire exposes exactly one bot route — POST create — so a resolved
-alert can only be a new message. See docs/stack/... and #377-era discussion.
+A resolving alert amends the message that announced it rather than adding a
+second one, so the room shows the current state instead of a log of states.
+That needs basecamp/once-campfire#239 (bots may update their own messages),
+which is why the image is pinned to a main digest — see
+apps/production/campfire/kustomization.yaml.
+
+The rule for amend-versus-post is about notification, not tidiness: an update
+does not call room.receive, so an edit reaches nobody's phone. Anything new
+gets a new message; only resolutions are folded into the existing one. See
+deliver_alerts.
 
 Env:
     CAMPFIRE_URL  full bot endpoint including the room and bot key
@@ -22,7 +29,9 @@ Env:
 import html
 import json
 import os
+import re
 import sys
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -61,6 +70,13 @@ SILENCE_DATASOURCE = os.environ.get("SILENCE_DATASOURCE", "Alertmanager")
 # app that is actually broken. Anything narrower (pod, instance) would be
 # outlived by the next restart, and the matchers are editable on the page.
 SILENCE_MATCHERS = ("alertname", "namespace")
+
+# groupKey -> {"id": message id, "firing": fingerprints firing at that point}.
+# ThreadingHTTPServer means two notifications can land at once, and both read
+# then write this.
+TRACKED = {}
+TRACKED_LOCK = threading.Lock()
+MAX_TRACKED = 200
 
 
 def log(msg):
@@ -196,15 +212,100 @@ def render_flux(payload):
     return "".join(parts)
 
 
-def publish(url, body):
+def publish(url, body, method="POST"):
+    """Create or amend a message. Returns (status, location header)."""
     request = urllib.request.Request(
         url,
         data=body.encode("utf-8"),
         headers={"Content-Type": "text/html; charset=utf-8"},
-        method="POST",
+        method=method,
     )
     with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
-        return response.status
+        return response.status, response.headers.get("location", "")
+
+
+def message_id_from(location):
+    """The id out of the location header create answers with.
+
+    create is `head :created, location: message_url(@message)` — an empty body
+    and a URL — so the id is the last path segment rather than a field in a
+    JSON response.
+    """
+    match = re.search(r"/(\d+)(?:\D*)$", location or "")
+    return match.group(1) if match else None
+
+
+def firing_fingerprints(payload):
+    return frozenset(
+        alert.get("fingerprint")
+        for alert in payload.get("alerts", [])
+        if alert.get("status") != "resolved" and alert.get("fingerprint")
+    )
+
+
+def remember(group_key, message_id, firing):
+    with TRACKED_LOCK:
+        TRACKED[group_key] = {"id": message_id, "firing": firing}
+        # Bounded rather than unbounded: a group that never resolves would
+        # otherwise sit here forever. Oldest first — insertion order is
+        # guaranteed for dict since 3.7.
+        while len(TRACKED) > MAX_TRACKED:
+            TRACKED.pop(next(iter(TRACKED)))
+
+
+def deliver_alerts(destination, payload):
+    """Post a new message, or amend the one this group already has.
+
+    Alertmanager repeats the *whole* group in every notification, so the
+    rendered body is always the group's current state and nothing has to be
+    reconstructed from deltas. Only the message id has to be remembered.
+
+    When to amend and when to post again is decided by push, not by tidiness:
+    MessagesController#update does not call room.receive, so **an edit
+    notifies nobody**. Anything new therefore has to be a new message.
+
+      * a fingerprint that was not firing before  -> POST, so it pushes
+      * only resolutions since last time          -> PATCH, silently
+      * whole group resolved                      -> PATCH, then forget it, so
+                                                     a re-fire pushes again
+
+    State is in memory, so a restart forgets which message belongs to which
+    group. The fallback is to post a new message, which is exactly today's
+    behaviour — the cost is a stale firing message left in the room. A SQLite
+    file on a PVC would fix that and is not worth the moving parts yet.
+    """
+    body = render(payload)
+    if body is None:
+        return None, "nothing to say"
+
+    group_key = payload.get("groupKey")
+    firing = firing_fingerprints(payload)
+    resolved = payload.get("status") == "resolved"
+
+    with TRACKED_LOCK:
+        known = TRACKED.get(group_key)
+    # Not <= : a group that gained an alert has something new to say.
+    escalated = known is not None and not firing.issubset(known["firing"])
+
+    if known and not escalated:
+        try:
+            status, _ = publish(f"{destination}/{known['id']}", body, method="PATCH")
+            if resolved:
+                with TRACKED_LOCK:
+                    TRACKED.pop(group_key, None)
+            else:
+                remember(group_key, known["id"], firing)
+            return status, f"amended message {known['id']}"
+        except urllib.error.HTTPError as error:
+            # 404 is the message having been deleted by hand. Anything else is
+            # unexpected, and in both cases a new message beats no message.
+            log(f"amend of {known['id']} failed ({error.code}), posting instead")
+
+    status, location = publish(destination, body)
+    message_id = message_id_from(location)
+    if group_key and message_id and not resolved:
+        remember(group_key, message_id, firing)
+    return status, f"posted message {message_id or '?'}"
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -235,17 +336,25 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        message = render(payload) if self.path == "/alerts" else render_flux(payload)
-        if message is None:
-            # Nothing to say. 200 so Alertmanager does not retry forever.
-            self.send_response(200)
-            self.end_headers()
-            return
-
         try:
-            status = publish(destination, message)
-            count = len(payload.get("alerts", [])) if self.path == "/alerts" else 1
-            log(f"{self.path}: published {count} event(s), campfire returned {status}")
+            if self.path == "/alerts":
+                # Alerts have a life beyond one message: the same group is
+                # amended as its members resolve. Flux events are one-shot.
+                status, what = deliver_alerts(destination, payload)
+                if status is None:
+                    self.send_response(200)  # nothing to say; do not retry
+                    self.end_headers()
+                    return
+                count = len(payload.get("alerts", []))
+                log(f"/alerts: {count} alert(s), {what}, campfire returned {status}")
+            else:
+                message = render_flux(payload)
+                if message is None:
+                    self.send_response(200)
+                    self.end_headers()
+                    return
+                status, _ = publish(destination, message)
+                log(f"/flux: published 1 event(s), campfire returned {status}")
             self.send_response(200)
         except (urllib.error.URLError, TimeoutError, OSError) as error:
             # 5xx so the sender retries: a chat message nobody sent is
