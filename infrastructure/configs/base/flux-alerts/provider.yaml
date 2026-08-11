@@ -1,30 +1,29 @@
 ---
-# Sends Flux events to ntfy via its generic webhook endpoint.
-# ntfy inline templating (?tpl=yes) formats the title/message from the JSON
-# event body posted by notification-controller; '+' encodes spaces.
-# Base targets the public ntfy URL (used by staging, which has no in-cluster
-# ntfy); production patches this to the in-cluster service URL.
+# Sends Flux events to the Campfire bridge, which renders each event as HTML
+# into the #Flux room. Base targets the in-cluster Service; staging patches it
+# to production's bridge over the LAN-only ingress, having no Campfire of its
+# own.
 #
-# Staging publishes to the flux-staging topic at default priority, production
-# to flux at high priority. They shared one topic until 2026-08-03, when a
-# CPU-saturated staging cluster produced a steady stream of dry-run timeout
-# alerts — the same channel a production alarm would arrive on. Separating them
-# means staging noise cannot bury production, and staging can be muted without
-# muting anything that matters.
+# Named `ntfy` until 2026-08-11, and pointed at ntfy until 2026-08-03. Both
+# clusters had patched the address away long before the rename, so the name
+# described nothing: the generated Alertmanager receiver read
+# `monitoring/ntfy-config/campfire`, which is where this was noticed. ntfy is
+# still deployed and still used — by external services publishing into it, not
+# by anything in the cluster.
 #
-# Publishing is authenticated (#165). Each cluster supplies its own
-# ntfy-publisher Secret in flux-system whose `headers` key carries an
-# Authorization header; notification-controller merges it into every request.
-# The matching grant lives in NTFY_AUTH_ACCESS in
-# apps/production/ntfy/deployment-patch.yaml — without it ntfy 403s the publish
-# and alerts disappear with no error surfaced anywhere.
+# Flux offers no body templating on a `generic` Provider. The old ntfy address
+# carried its formatting in the URL (?tpl=yes) because ntfy templated the JSON
+# itself; Campfire treats the body as the message, so raw Event JSON would land
+# in the room. That is what the bridge is for.
+#
+# No secretRef. It carried an ntfy Authorization header that the bridge never
+# reads — it accepts any POST to /flux — so the only thing it achieved was
+# handing an ntfy credential to a service that is not ntfy.
 apiVersion: notification.toolkit.fluxcd.io/v1beta3
 kind: Provider
 metadata:
-  name: ntfy
+  name: campfire
   namespace: flux-system
 spec:
   type: generic
-  address: "https://ntfy.ronaldlokers.nl/flux-staging?tpl=yes&t=Flux+staging+{{.severity}}:+{{.involvedObject.kind}}/{{.involvedObject.name}}&m={{.message}}&priority=default&tags=warning"
-  secretRef:
-    name: ntfy-publisher
+  address: "http://campfire-alert-bridge.campfire.svc.cluster.local:8080/flux"

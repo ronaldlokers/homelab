@@ -6,7 +6,7 @@ metadata:
   namespace: flux-system
 spec:
   providerRef:
-    name: ntfy
+    name: campfire
   # `info` does not mean "info only" — the CRD is explicit: "If set to 'info'
   # no events will be filtered." So this one Alert carries both successful
   # reconciles and failures, and #Flux becomes a deploy log rather than a
