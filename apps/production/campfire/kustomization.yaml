@@ -6,12 +6,23 @@ resources:
   - campfire-secrets.yaml
   - ingress.yaml
 
-# Upstream publishes a tag per release, plus floating `1` / `1.4` / `latest`
-# tags. Pinned to the exact version so Renovate proposes upgrades as reviewable
-# PRs, rather than the image changing under a floating tag with no commit.
+# On `main` rather than a release, for basecamp/once-campfire#239 — bots can
+# update and destroy their own messages. Merged 2026-08-11; v1.4.9 was cut on
+# 2026-08-04, so no tag carries it yet.
+#
+# That route is the whole reason the alert bridge can replace a firing message
+# when the alert resolves instead of appending a second one, which is what made
+# this room an append-only log exactly like the ntfy topic it replaced.
+#
+# The digest is the pin and the tag is documentation — same shape as fizzy. A
+# floating `main` would move the image with no commit and no review; this way
+# Renovate proposes each move as a PR.
+#
+# Back to a release when one includes #239: set newTag and drop the digest.
 images:
   - name: ghcr.io/basecamp/once-campfire
-    newTag: v1.4.9
+    newTag: main
+    digest: sha256:956fdaaa8e202e9a3c0fb54539203a950179d2d2abae753a5231a4c74276a91f
 
 patches:
   # Opt in to Reloader: roll this workload when a mounted ConfigMap or Secret

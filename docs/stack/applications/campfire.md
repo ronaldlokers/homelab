@@ -3,7 +3,8 @@
 [Campfire](https://github.com/basecamp/once-campfire) is Basecamp's group chat,
 open-sourced under MIT. Production only, at `campfire.ronaldlokers.nl`.
 
-**Image**: `ghcr.io/basecamp/once-campfire` (arm64 published, pinned per release)
+**Image**: `ghcr.io/basecamp/once-campfire` (arm64 published). Currently pinned to
+a **`main` digest**, not a release — see [Why main](#why-main-and-not-a-release).
 
 ## Shape
 
@@ -101,27 +102,37 @@ curl -d 'hello' https://campfire.ronaldlokers.nl/rooms/<room>/<bot_key>/messages
 Returns `201` with an **empty body** and a `location` header naming the new
 message — `head :created`, so silence is success.
 
-**The bot API is create-only.** This is the single most important fact about
-building on it:
+**The bot API was create-only until 2026-08-11.** It is the fact most of this
+page was built around, and it no longer holds:
 
 ```ruby
-# config/routes.rb — one bot verb, no update, no destroy
-post ":bot_key/messages", to: "messages/by_bots#create", as: :bot_messages
-
-# app/controllers/messages/by_bots_controller.rb
-allow_bot_access only: :create
+# config/routes.rb, on main
+scope path: ":bot_key", as: :bot, defaults: { format: :json } do
+  resources :messages, controller: "messages/by_bots",
+            only: %i[ index create update destroy ]
+end
 ```
 
-`allow_bot_access` is `skip_before_action :deny_bots`, and every controller
-carries a blanket `deny_bots`. `MessagesController#update` exists and its
-authorisation would even permit it — `can_administer?` returns true for a
-record's own creator — but no bot-key route reaches it.
+`basecamp/once-campfire#239` added `update` and `destroy` — and `index`, which
+was not in the original proposal, so a bot can now **read** a room as well as
+write to it. `update` and `destroy` are guarded by `ensure_can_administer`, and
+`can_administer?` is true for a record's own creator, so a bot can only touch
+its own messages.
 
-**Consequence:** a resolved alert cannot replace the message that announced it.
-Alerts are an append-only stream here, exactly as in ntfy. Changing that means
-patching upstream (a ~10-line diff: add the routes, widen `allow_bot_access`)
-and carrying a Rails fork through their security cadence, which is not worth it
-for formatting.
+`create` still returns `head :created` with a `location` header and an empty
+body, so a caller that wants the message id reads the header rather than a JSON
+response.
+
+### Why main and not a release
+
+The merge landed on 2026-08-11; `v1.4.9` was cut on 2026-08-04. No published tag
+carries it, so the image is pinned to a **`main` digest** — the digest is the
+pin, the tag is documentation, and Renovate proposes each move as a reviewable
+PR. Same shape as fizzy.
+
+The trade is explicit: production chat and the entire alerting path run an
+unreleased build. Go back to a release as soon as one includes #239 — set
+`newTag` and drop the `digest` in `apps/production/campfire/kustomization.yaml`.
 
 ## Message formatting
 
@@ -398,9 +409,13 @@ than none.
 ### Overnight alerts come from Prometheus, not Campfire
 
 The obvious source is the `#Alertmanager` room — read back what arrived
-overnight. That does not work: **Campfire's bot API is create-only**, so a bot
-cannot read the room it posts into. Alertmanager keeps no usable history
-either.
+overnight. When this was built that was impossible, because the bot API was
+create-only; #239 has since added `index`, so a bot *can* now read a room.
+
+It is still the wrong source. Reading the room asks "what did the bridge manage
+to post", which is a question about the bridge. Prometheus answers what actually
+fired, including anything the bridge dropped or never saw. Alertmanager itself
+keeps no usable history either way.
 
 Prometheus does. `ALERTS` is an ordinary series, so a range query over the
 window answers "what fired" without the briefing holding any state:
