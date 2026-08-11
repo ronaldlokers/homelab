@@ -16,10 +16,12 @@ metadata:
   name: campfire-morning-briefing
   namespace: campfire
 spec:
-  # Europe/Amsterdam. The cluster runs UTC, so this is 07:00 in winter and
-  # 08:00 in summer — close enough for coffee, and not worth a timeZone field
-  # that k3s would have to support on every node.
-  schedule: "0 6 * * *"
+  # 07:00 local all year rather than a UTC time that drifts an hour with DST.
+  # timeZone reached GA in Kubernetes 1.27 and this cluster runs 1.33; on an
+  # older control plane the field is ignored silently, which would put this an
+  # hour early half the year rather than fail visibly.
+  schedule: "0 7 * * *"
+  timeZone: "Europe/Amsterdam"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 3

@@ -308,9 +308,9 @@ refuses the connection, which is the behaviour being checked.
 
 ## Morning briefing
 
-`campfire-morning-briefing` is a daily CronJob (06:00 UTC — 07:00 in winter,
-08:00 in summer) that runs the status bot's own checks once and posts into
-`#All Talk`.
+`campfire-morning-briefing` is a daily CronJob (07:00 Europe/Amsterdam, pinned
+with `timeZone` so it does not drift with DST) that runs the status bot's own
+checks once and posts into `#All Talk`.
 
 It is not a separate app. It is `campfire-status-bot.py --briefing`, mounting
 the same ConfigMap as the Deployment, so there is exactly one definition of
@@ -331,8 +331,28 @@ reading it anyway. So a clean cluster gets no message. What does get a message:
 | Condition | Why it is worth waking up to |
 |---|---|
 | Any check reports a problem | Same checks as `@Kubernetes status` |
+| A k3s node certificate is under 30 days | Nothing else watches these at all |
+| A Longhorn disk is over 80% used | Past this a replica rebuild has nowhere to go |
+| A pod has been unschedulable | The reason and the duration, not just "Pending" |
 | An alert fired in the last 24h | Including one that already resolved |
 | A check could not run | An unknown is never reported as healthy |
+
+The three middle rows are new work rather than a re-run of the status verb:
+
+- **k3s node certificates** come from `k3s_certificate_expiration_seconds`,
+  aggregated per node because all thirteen certificates on a node share one
+  expiry. The `CertificateExpirationWarning` events are the obvious source and
+  are the wrong one: Kubernetes keeps events about an hour, so a once-a-day job
+  would almost always run when none exist and report all clear. The k3s runbook
+  observed that nothing routed these anywhere — this is what routes them.
+  Warning at 30 days rather than k3s's own 120: four months of the same line
+  every morning is exactly how a briefing becomes wallpaper.
+- **Disk headroom** is `longhorn_disk_usage_bytes / longhorn_disk_capacity_bytes`.
+  80% because three replicas on 512GB per node need somewhere to rebuild.
+- **Unschedulable pods** were already caught as `Pending`, which reads like a
+  pod that is starting. Now the `PodScheduled` message and the age come with
+  it, so `Insufficient cpu` for six hours looks different from three minutes
+  old. This one also improves the interactive `status` verb.
 
 The third row is the one that keeps the silence honest. If the briefing were
 quiet when Prometheus was unreachable, quiet would stop meaning "fine" and

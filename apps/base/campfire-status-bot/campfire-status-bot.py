@@ -138,6 +138,18 @@ BRIEFING_ALERT_EXCLUDE = {"Watchdog", "InfoInhibitor"}
 # briefing must not be late because a range query is slow.
 PROMETHEUS_TIMEOUT = 10
 
+# k3s rotates node certificates for one year and warns at 120 days, which is
+# far too early to repeat every morning — four months of the same line is how
+# a briefing becomes wallpaper. Thirty days is still ample: the rotation itself
+# is fifteen minutes, and a line that nags for a month has earned the nagging.
+# See docs/runbooks/k3s-certificate-rotation.md.
+K3S_CERT_WARN_DAYS = int(os.environ.get("K3S_CERT_WARN_DAYS", "30"))
+
+# Longhorn keeps three replicas on 512GB per node and needs free space to
+# rebuild one. At 80% a full node still has room to re-replicate; past that a
+# single disk failure has nowhere to go.
+DISK_WARN_PERCENT = float(os.environ.get("DISK_WARN_PERCENT", "80"))
+
 
 def heading(text):
     """A headline on its own line.
@@ -271,6 +283,29 @@ def check_flux(deadline, now=None):
     return problems
 
 
+def pending_detail(pod, phase, now=None):
+    """Why a Pending pod is Pending, and for how long.
+
+    "Pod x/y: Pending" reads like a pod that is starting. A pod the scheduler
+    has refused for six hours is a different problem with the same word on it,
+    and the reason is what separates them — usually Insufficient cpu/memory,
+    which no other check reports.
+    """
+    if phase != "Pending":
+        return ""
+    now = now or datetime.now(timezone.utc)
+    parts = []
+    for condition in (pod.get("status") or {}).get("conditions") or []:
+        if condition.get("type") == "PodScheduled" and condition.get("status") != "True":
+            parts.append(condition.get("message") or condition.get("reason") or "unschedulable")
+            break
+    created = (pod.get("metadata") or {}).get("creationTimestamp")
+    if created:
+        minutes = (now - parse_time(created)).total_seconds() / 60
+        parts.append(f"{minutes / 60:.0f}h" if minutes >= 90 else f"{minutes:.0f}m")
+    return f" ({', '.join(parts)})" if parts else ""
+
+
 def check_pods(deadline):
     """Pods that are neither running-and-ready nor finished.
 
@@ -286,7 +321,7 @@ def check_pods(deadline):
             continue  # a finished Job pod, not a fault
         name = f"{pod['metadata']['namespace']}/{pod['metadata']['name']}"
         if phase != "Running":
-            problems.append(f"Pod {name}: {phase or 'unknown'}")
+            problems.append(f"Pod {name}: {phase or 'unknown'}{pending_detail(pod, phase)}")
             continue
         for container in status.get("containerStatuses") or []:
             if container.get("ready"):
@@ -808,6 +843,63 @@ def render_status():
     return "".join(parts)
 
 
+def prom_query(path, params):
+    """One Prometheus read. Anything but an explicit success is an error.
+
+    A query that half-worked must not read as "nothing found" — that is the
+    difference between a quiet morning and an unnoticed blind spot, and the
+    briefing reports the two differently.
+    """
+    request = urllib.request.Request(f"{PROMETHEUS_URL}{path}?{urllib.parse.urlencode(params)}")
+    with urllib.request.urlopen(request, timeout=PROMETHEUS_TIMEOUT) as response:
+        payload = json.load(response)
+    if payload.get("status") != "success":
+        raise RuntimeError(payload.get("error") or "prometheus rejected the query")
+    return (payload.get("data") or {}).get("result", [])
+
+
+def check_node_certs():
+    """k3s's own certificates, which cert-manager knows nothing about.
+
+    `k3s_certificate_expiration_seconds` is scraped continuously, which is why
+    it is used instead of the CertificateExpirationWarning events: events are
+    kept about an hour, so a once-a-day job would usually run when none exist
+    and report all clear. The runbook noted nothing routed these anywhere; this
+    is what routes them.
+
+    Aggregated per node because all thirteen certificates on a node share one
+    expiry — without the min() a single stale node fills the whole message.
+    """
+    problems = []
+    for series in prom_query(
+        "/api/v1/query",
+        {"query": f"min by (instance) (k3s_certificate_expiration_seconds) < {K3S_CERT_WARN_DAYS * 86400}"},
+    ):
+        node = (series["metric"].get("instance") or "?").split(":")[0]
+        days = float(series["value"][1]) / 86400
+        problems.append(f"k3s certificates on {node}: {days:.0f}d left")
+    # One node reports on two ports; the certificates behind them are the same.
+    return sorted(set(problems))
+
+
+def check_disk_headroom():
+    """Longhorn disks past the point where a replica rebuild still fits."""
+    problems = []
+    for series in prom_query(
+        "/api/v1/query",
+        {
+            "query": "100 * longhorn_disk_usage_bytes / longhorn_disk_capacity_bytes"
+            f" > {DISK_WARN_PERCENT}"
+        },
+    ):
+        node = series["metric"].get("node", "?")
+        problems.append(
+            f"Longhorn disk on {node}: {float(series['value'][1]):.0f}% used,"
+            f" past {DISK_WARN_PERCENT:.0f}%"
+        )
+    return problems
+
+
 def check_overnight_alerts(now=None):
     """Alert names that were firing at any point in the window.
 
@@ -821,7 +913,8 @@ def check_overnight_alerts(now=None):
     03:00 and resolved itself, which is invisible everywhere else.
     """
     now = now or datetime.now(timezone.utc)
-    query = urllib.parse.urlencode(
+    series_list = prom_query(
+        "/api/v1/query_range",
         {
             "query": 'ALERTS{alertstate="firing"}',
             "start": (now - timedelta(hours=BRIEFING_WINDOW_HOURS)).strftime(
@@ -831,17 +924,11 @@ def check_overnight_alerts(now=None):
             # Coarse on purpose: this asks which alerts existed, not when. A
             # 5m step over 24h is 288 points per series, which is cheap.
             "step": "5m",
-        }
+        },
     )
-    request = urllib.request.Request(f"{PROMETHEUS_URL}/api/v1/query_range?{query}")
-    with urllib.request.urlopen(request, timeout=PROMETHEUS_TIMEOUT) as response:
-        payload = json.load(response)
-
-    if payload.get("status") != "success":
-        raise RuntimeError(payload.get("error") or "prometheus rejected the query")
 
     names = {}
-    for series in (payload.get("data") or {}).get("result", []):
+    for series in series_list:
         metric = series.get("metric") or {}
         name = metric.get("alertname")
         if not name or name in BRIEFING_ALERT_EXCLUDE:
@@ -890,6 +977,18 @@ def render_briefing(now=None):
         problems += check_volumes(deadline)[2]
     except API_ERRORS as error:
         skipped.append(f"volumes: {error}")
+
+    # Everything below this line asks Prometheus rather than the Kubernetes
+    # API: node certificates and disk headroom are not in the API at all, and
+    # an alert that already resolved exists nowhere else.
+    for label, check in (
+        ("node certificates", check_node_certs),
+        ("disk headroom", check_disk_headroom),
+    ):
+        try:
+            problems += check()
+        except API_ERRORS + (RuntimeError,) as error:
+            skipped.append(f"{label}: {error}")
 
     try:
         overnight = check_overnight_alerts(now)
