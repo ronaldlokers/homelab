@@ -6,6 +6,10 @@ resources:
   - release.yaml
   - grafana-admin-secret.yaml
   - grafana-oidc-secret.yaml
+  # Before alertmanager-config.yaml, which references it. Ordering here is
+  # cosmetic — kustomize does not sequence apply — but the dependency is real:
+  # the AlertmanagerConfig is skipped entirely if this secret is missing.
+  - alertmanager-deadman-secret.yaml
   - alertmanager-config.yaml
   - job-alerts.yaml
   - authentik-alerts.yaml
