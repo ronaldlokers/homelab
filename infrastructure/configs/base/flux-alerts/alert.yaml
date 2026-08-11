@@ -23,13 +23,23 @@ spec:
   # on every periodic reconcile, not only when a reconcile changes something,
   # so "info" on its own is a heartbeat rather than a deploy log.
   #
-  # These three are the heartbeat. What survives is the part worth reading: a
+  # These four are the heartbeat. What survives is the part worth reading: a
   # Kustomization that actually applied a revision, a HelmRelease that upgraded
   # or was rolled back, and every error.
+  #
+  # The last two only fire when a reconcile does something, so an idle
+  # measurement cannot see them. They showed up when the room was cleared:
+  # 71 of 82 messages were noise rather than the 58 the first three accounted
+  # for, and a single deploy arrived as four messages instead of one.
+  #
+  # Unanchored on purpose. Kubernetes aggregates repeated events into
+  # "(combined from similar events): <message>", which an anchored pattern
+  # misses — matching on a substring covers both forms.
   exclusionList:
-    - "^Reconciliation finished in"
+    - "Reconciliation finished in"
     - "no changes since last reconciliation"
-    - "^\\(combined from similar events\\): Reconciliation finished in"
+    - "Health check passed in"
+    - "Dependencies do not meet ready condition"
   eventSources:
     - kind: GitRepository
       name: "*"
