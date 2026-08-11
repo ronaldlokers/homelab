@@ -23,7 +23,7 @@ patches:
         value: "https://campfire-bridge.ronaldlokers.nl/flux"
   - target:
       kind: Alert
-      name: flux-errors
+      name: flux-events
     patch: |
       # Both clusters share the #Flux room, so every event is labelled with its
       # origin. Without this a staging failure reads as a production one — the

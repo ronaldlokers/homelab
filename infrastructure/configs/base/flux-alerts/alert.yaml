@@ -2,12 +2,24 @@
 apiVersion: notification.toolkit.fluxcd.io/v1beta3
 kind: Alert
 metadata:
-  name: flux-errors
+  name: flux-events
   namespace: flux-system
 spec:
   providerRef:
     name: ntfy
-  eventSeverity: error
+  # `info` does not mean "info only" — the CRD is explicit: "If set to 'info'
+  # no events will be filtered." So this one Alert carries both successful
+  # reconciles and failures, and #Flux becomes a deploy log rather than a
+  # problem channel. The bridge already distinguishes them, rendering error
+  # with 🚨 and everything else with ℹ️.
+  #
+  # A second Alert at info severity would have been the obvious shape and is
+  # unnecessary: it would duplicate the eventSources list below and need its
+  # own eventMetadata patch in both overlays to stay distinguishable.
+  #
+  # If this turns out too chatty, `exclusionList` takes regexes matched against
+  # the event message — narrower than dropping back to errors only.
+  eventSeverity: info
   eventSources:
     - kind: GitRepository
       name: "*"
