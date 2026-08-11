@@ -95,28 +95,41 @@ spec:
     recovery:
       source: clusterBackup
 
+  # Names the same object store the cluster archives to rather than
+  # respecifying it, which is also what keeps the NOTE above true by
+  # construction: one destination, named twice, cannot drift into two.
+  #
+  # serverName is explicit even though it equals the cluster name: it is what
+  # the in-tree configuration recorded, and on the plugin it belongs here
+  # rather than on the ObjectStore, whose own serverName must stay empty.
   externalClusters:
     - name: clusterBackup
-      barmanObjectStore:
-        destinationPath: "s3://homelab-postgres-backups/production-2026-08-nightscout/"
-        serverName: nightscout-cluster
-        endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-        s3Credentials:
-          accessKeyId:
-            name: b2-credentials
-            key: ACCESS_KEY_ID
-          secretAccessKey:
-            name: b2-credentials
-            key: ACCESS_SECRET_KEY
-        wal:
-          maxParallel: 8
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: nightscout-store
+          serverName: nightscout-cluster
 
   storage:
     size: 10Gi
     storageClass: longhorn
 
+  # Backups go through the Barman Cloud Plugin rather than the in-tree
+  # barmanObjectStore, which CloudNativePG removes in 1.31 (#377). The
+  # destination, prefix, credentials and retention move to
+  # nightscout-objectstore.yaml unchanged, so the existing catalogue continues
+  # rather than restarting.
+  #
+  # isWALArchiver: true hands WAL archiving to the plugin. Only one component
+  # may archive, so this is a cutover, not a parallel run — the two cannot be
+  # configured at once.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: nightscout-store
+
   backup:
-    retentionPolicy: "7d"
     # Not the default prefer-standby. This began as the fix for #376, where a
     # replica could not read WAL archiving status and every backup stalled;
     # #383 has since granted CNPG's roles the access they were missing, so a
@@ -129,21 +142,3 @@ spec:
     # backup I/O on the primary of a 10Gi database, which is worth less than
     # the failure mode.
     target: primary
-    barmanObjectStore:
-      # Own prefix. Sharing one with another cluster trips barman's "Expected
-      # empty archive" check, and makes a restore ambiguous about which cluster
-      # it is restoring.
-      destinationPath: "s3://homelab-postgres-backups/production-2026-08-nightscout/"
-      endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-      s3Credentials:
-        accessKeyId:
-          name: b2-credentials
-          key: ACCESS_KEY_ID
-        secretAccessKey:
-          name: b2-credentials
-          key: ACCESS_SECRET_KEY
-      wal:
-        compression: gzip
-      data:
-        compression: gzip
-        jobs: 2
