@@ -197,24 +197,12 @@ spec:
           url: http://loki-gateway.monitoring.svc.cluster.local:80
           isDefault: false
           editable: false
-        # Registers the *real* Alertmanager so Grafana can silence the alerts
-        # that actually fire. Without this Grafana only knows its own built-in
-        # Alertmanager, and a silence created there would appear to succeed
-        # while silencing nothing — which is worse than having no silence link.
+        # No Alertmanager datasource here on purpose. The chart provisions one
+        # already — name "Alertmanager", uid "alertmanager", with exactly the
+        # jsonData a silence link needs (implementation: prometheus,
+        # handleGrafanaManagedAlerts: false).
         #
-        # The name matters: campfire-alert-bridge puts it in the silence links
-        # it renders (?alertmanager=Alertmanager), so renaming this breaks them.
-        - name: Alertmanager
-          type: alertmanager
-          uid: alertmanager-production
-          access: proxy
-          url: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
-          isDefault: false
-          editable: false
-          jsonData:
-            # This is a Prometheus Alertmanager, not a Grafana-managed one; the
-            # API shapes differ and Grafana needs telling which it is.
-            implementation: prometheus
-            # Grafana-managed alerts keep going to Grafana's own Alertmanager.
-            # This datasource is for reading and silencing what Prometheus sends.
-            handleGrafanaManagedAlerts: false
+        # #450 added a second one under the same name because this file was
+        # read as if it were the whole picture. It is not: it holds overrides,
+        # and the chart's own datasources never appear in it. Check the
+        # rendered kube-prometheus-stack-grafana-datasource ConfigMap instead.
