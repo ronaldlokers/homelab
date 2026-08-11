@@ -17,9 +17,19 @@ spec:
   # unnecessary: it would duplicate the eventSources list below and need its
   # own eventMetadata patch in both overlays to stay distinguishable.
   #
-  # If this turns out too chatty, `exclusionList` takes regexes matched against
-  # the event message — narrower than dropping back to errors only.
   eventSeverity: info
+  # Measured before this list existed: 9 messages in 2 minutes with nobody
+  # touching anything — roughly 6,500 a day. Flux emits ReconciliationSucceeded
+  # on every periodic reconcile, not only when a reconcile changes something,
+  # so "info" on its own is a heartbeat rather than a deploy log.
+  #
+  # These three are the heartbeat. What survives is the part worth reading: a
+  # Kustomization that actually applied a revision, a HelmRelease that upgraded
+  # or was rolled back, and every error.
+  exclusionList:
+    - "^Reconciliation finished in"
+    - "no changes since last reconciliation"
+    - "^\\(combined from similar events\\): Reconciliation finished in"
   eventSources:
     - kind: GitRepository
       name: "*"
