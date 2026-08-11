@@ -225,6 +225,26 @@ Three things constrain it:
   Campfire bot keys all have patterns. This is defence in depth behind RBAC,
   not a substitute for it.
 
+**The answer is a shape, not prose.** The tool loop runs first; a final call
+with no tools and an `output_config.format` schema returns `summary`,
+`evidence[]`, `commands[]` and `confidence`, and the bridge renders that with
+the same `heading()` and `bullets()` helpers every other verb uses.
+
+Asking for text and rendering it was the original behaviour and did not work:
+the model wrote markdown, Campfire ignored the newlines, and the answer arrived
+as one run-on paragraph with literal hyphens and backticks. Nothing the model
+writes is treated as markup now — each field is redacted, escaped and placed.
+
+Two ordering rules that a refactor will want to break:
+
+- **Redact per field, before escaping.** Before escaping, because the patterns
+  should see a credential as written rather than with its quotes turned into
+  `&quot;`. Per field, because redacting the finished HTML lets a greedy value
+  match run straight across a tag — the `key=value` pattern ate an entire
+  `<div>` when it was done last, since tags contain no whitespace to stop at.
+- **Commands go one per `<pre>`.** `<pre>` does not wrap, so the system prompt
+  asks for single-line commands; the explanation belongs in the evidence.
+
 It replies twice: an immediate "thinking…" acknowledgement, because a silent
 7 seconds would make Campfire post its own failure notice over the top, and
 then the real answer posted asynchronously. That async reply needs **no extra
