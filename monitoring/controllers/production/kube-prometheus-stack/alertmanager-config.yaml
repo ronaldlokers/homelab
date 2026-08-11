@@ -20,7 +20,35 @@ spec:
     groupInterval: 5m
     repeatInterval: 12h
     receiver: 'campfire'
+    # InfoInhibitor is not an alert about anything. It fires so the inhibit_rule
+    # further down the generated config can use it as a source to suppress
+    # severity=info alerts, and the chart expects it to notify nobody.
+    #
+    # It reached the room anyway, 13 times. `alertmanagerConfigMatcherStrategy:
+    # type: None` (see release.yaml, and it is needed) leaves this route without
+    # matchers, so it catches every alert and runs with continue: true. The
+    # chart's own `null` route sits *after* it and only matches Watchdog, so
+    # nothing upstream can drop InfoInhibitor and a later null route cannot
+    # unsend what an earlier route already delivered.
+    #
+    # A child route is the fix: children are evaluated before the parent's
+    # receiver and do not continue, so this terminates.
+    #
+    # Watchdog is deliberately not in here. It also reaches the room, which the
+    # chart likewise does not intend — but at one message per repeatInterval it
+    # is the only end-to-end proof the alert path still works, and nothing else
+    # consumes it. Worth replacing with something that alerts on its *absence*,
+    # which is the only thing a deadman switch is actually for.
+    routes:
+      - receiver: 'blackhole'
+        matchers:
+          - name: alertname
+            matchType: '='
+            value: 'InfoInhibitor'
   receivers:
+    # No integrations, so Alertmanager drops anything routed here. Same shape as
+    # the chart's own 'null' receiver, which is not reachable from this route.
+    - name: 'blackhole'
     # Campfire only, as of 2026-08-10. Alerts also went to ntfy until then; the
     # room is readable (HTML, so labels are a list and errors keep their shape),
     # searchable, and can be replied to, which a broadcast topic cannot.
