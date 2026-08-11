@@ -160,7 +160,22 @@ def log(message):
 
 
 def kube_get(path, deadline):
-    """One API read, bounded by whatever is left of the budget."""
+    """One API read, bounded by whatever is left of the budget.
+
+    Served from the API server's watch cache rather than etcd:
+    `resourceVersion=0` is what a controller's informer does on first list, and
+    it is the difference between a quorum read of every pod in the cluster and
+    a copy out of memory.
+
+    Without it, `status` made six unfiltered cluster-wide lists in a five second
+    burst and API Priority and Fairness throttled it — two invocations in three
+    came back with parts of the answer replaced by "not checked: HTTP Error 429".
+    The bot degraded honestly, which is the point of that branch, but a status
+    that is degraded half the time is one you stop reading.
+
+    The cost is that a read may be very slightly stale. For a summary that
+    already reports backup ages in hours, that is not a cost.
+    """
     remaining = deadline - time.monotonic()
     if remaining <= 0:
         raise TimeoutError(f"budget spent before {path}")
@@ -172,7 +187,10 @@ def kube_get(path, deadline):
         with open(TOKEN_FILE) as handle:
             headers["Authorization"] = "Bearer " + handle.read().strip()
 
-    request = urllib.request.Request(KUBE_API + path, headers=headers)
+    separator = "&" if "?" in path else "?"
+    request = urllib.request.Request(
+        KUBE_API + path + separator + "resourceVersion=0", headers=headers
+    )
     timeout = min(PER_REQUEST_TIMEOUT, remaining)
     with urllib.request.urlopen(request, timeout=timeout, context=SSL_CONTEXT) as response:
         return json.load(response)
