@@ -24,6 +24,10 @@ puts a model behind the same loop, with read-only tools, and is the only part
 that costs money or can be prompt-injected. It answers to one Campfire user id
 and posts asynchronously, because inference is far past the 7s timeout above.
 
+Run with --briefing and it does not serve at all: it runs the same checks once,
+posts to CAMPFIRE_URL only if something is worth saying, and exits. That mode
+is deliberately silent on a normal morning — see render_briefing.
+
 Env:
     KUBE_API           API base URL, default https://kubernetes.default.svc
     KUBE_TOKEN_FILE    ServiceAccount token; ignored when absent
@@ -33,6 +37,9 @@ Env:
     ANTHROPIC_MODEL    default claude-opus-5
     TRIAGE_USER_ID     Campfire user allowed to invoke `why`, default 1
     CAMPFIRE_BASE      where async replies are posted
+    CAMPFIRE_URL       --briefing only: full bot URL including room and bot key
+    PROMETHEUS_URL     --briefing only: where to ask what fired overnight
+    BRIEFING_WINDOW_HOURS  --briefing only, default 24
 
 Leaving both file paths pointing at nothing turns off auth and TLS, which is
 how this runs against `kubectl proxy` when testing off-cluster.
@@ -49,7 +56,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 KUBE_API = os.environ.get("KUBE_API", "https://kubernetes.default.svc")
@@ -112,6 +119,36 @@ NEW_VOLUME_GRACE_HOURS = BACKUP_MAX_AGE_HOURS
 # HelmRelease with wait:true legitimately sits Progressing through a rollout
 # and every Kustomization here waits on its dependencies being healthy.
 PROGRESSING_GRACE_MINUTES = 10
+
+# --briefing only.
+CAMPFIRE_URL = os.environ.get("CAMPFIRE_URL", "")
+PROMETHEUS_URL = os.environ.get(
+    "PROMETHEUS_URL",
+    "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090",
+)
+# "Overnight" is whatever has happened since the last briefing. A fixed 24h
+# window means a run that is skipped or fails does not create a blind spot —
+# the next one still covers the gap, at the cost of repeating an alert once.
+BRIEFING_WINDOW_HOURS = int(os.environ.get("BRIEFING_WINDOW_HOURS", "24"))
+# Watchdog fires forever by design and InfoInhibitor exists only to be an
+# inhibit_rule source. Neither is news, and #446 already stops InfoInhibitor
+# reaching a room at all.
+BRIEFING_ALERT_EXCLUDE = {"Watchdog", "InfoInhibitor"}
+# Prometheus is a second network hop with its own failure modes, and the
+# briefing must not be late because a range query is slow.
+PROMETHEUS_TIMEOUT = 10
+
+# k3s rotates node certificates for one year and warns at 120 days, which is
+# far too early to repeat every morning — four months of the same line is how
+# a briefing becomes wallpaper. Thirty days is still ample: the rotation itself
+# is fifteen minutes, and a line that nags for a month has earned the nagging.
+# See docs/runbooks/k3s-certificate-rotation.md.
+K3S_CERT_WARN_DAYS = int(os.environ.get("K3S_CERT_WARN_DAYS", "30"))
+
+# Longhorn keeps three replicas on 512GB per node and needs free space to
+# rebuild one. At 80% a full node still has room to re-replicate; past that a
+# single disk failure has nowhere to go.
+DISK_WARN_PERCENT = float(os.environ.get("DISK_WARN_PERCENT", "80"))
 
 
 def heading(text):
@@ -246,6 +283,29 @@ def check_flux(deadline, now=None):
     return problems
 
 
+def pending_detail(pod, phase, now=None):
+    """Why a Pending pod is Pending, and for how long.
+
+    "Pod x/y: Pending" reads like a pod that is starting. A pod the scheduler
+    has refused for six hours is a different problem with the same word on it,
+    and the reason is what separates them — usually Insufficient cpu/memory,
+    which no other check reports.
+    """
+    if phase != "Pending":
+        return ""
+    now = now or datetime.now(timezone.utc)
+    parts = []
+    for condition in (pod.get("status") or {}).get("conditions") or []:
+        if condition.get("type") == "PodScheduled" and condition.get("status") != "True":
+            parts.append(condition.get("message") or condition.get("reason") or "unschedulable")
+            break
+    created = (pod.get("metadata") or {}).get("creationTimestamp")
+    if created:
+        minutes = (now - parse_time(created)).total_seconds() / 60
+        parts.append(f"{minutes / 60:.0f}h" if minutes >= 90 else f"{minutes:.0f}m")
+    return f" ({', '.join(parts)})" if parts else ""
+
+
 def check_pods(deadline):
     """Pods that are neither running-and-ready nor finished.
 
@@ -261,7 +321,7 @@ def check_pods(deadline):
             continue  # a finished Job pod, not a fault
         name = f"{pod['metadata']['namespace']}/{pod['metadata']['name']}"
         if phase != "Running":
-            problems.append(f"Pod {name}: {phase or 'unknown'}")
+            problems.append(f"Pod {name}: {phase or 'unknown'}{pending_detail(pod, phase)}")
             continue
         for container in status.get("containerStatuses") or []:
             if container.get("ready"):
@@ -783,6 +843,200 @@ def render_status():
     return "".join(parts)
 
 
+def prom_query(path, params):
+    """One Prometheus read. Anything but an explicit success is an error.
+
+    A query that half-worked must not read as "nothing found" — that is the
+    difference between a quiet morning and an unnoticed blind spot, and the
+    briefing reports the two differently.
+    """
+    request = urllib.request.Request(f"{PROMETHEUS_URL}{path}?{urllib.parse.urlencode(params)}")
+    with urllib.request.urlopen(request, timeout=PROMETHEUS_TIMEOUT) as response:
+        payload = json.load(response)
+    if payload.get("status") != "success":
+        raise RuntimeError(payload.get("error") or "prometheus rejected the query")
+    return (payload.get("data") or {}).get("result", [])
+
+
+def check_node_certs():
+    """k3s's own certificates, which cert-manager knows nothing about.
+
+    `k3s_certificate_expiration_seconds` is scraped continuously, which is why
+    it is used instead of the CertificateExpirationWarning events: events are
+    kept about an hour, so a once-a-day job would usually run when none exist
+    and report all clear. The runbook noted nothing routed these anywhere; this
+    is what routes them.
+
+    Aggregated per node because all thirteen certificates on a node share one
+    expiry — without the min() a single stale node fills the whole message.
+    """
+    problems = []
+    for series in prom_query(
+        "/api/v1/query",
+        {"query": f"min by (instance) (k3s_certificate_expiration_seconds) < {K3S_CERT_WARN_DAYS * 86400}"},
+    ):
+        node = (series["metric"].get("instance") or "?").split(":")[0]
+        days = float(series["value"][1]) / 86400
+        problems.append(f"k3s certificates on {node}: {days:.0f}d left")
+    # One node reports on two ports; the certificates behind them are the same.
+    return sorted(set(problems))
+
+
+def check_disk_headroom():
+    """Longhorn disks past the point where a replica rebuild still fits."""
+    problems = []
+    for series in prom_query(
+        "/api/v1/query",
+        {
+            "query": "100 * longhorn_disk_usage_bytes / longhorn_disk_capacity_bytes"
+            f" > {DISK_WARN_PERCENT}"
+        },
+    ):
+        node = series["metric"].get("node", "?")
+        problems.append(
+            f"Longhorn disk on {node}: {float(series['value'][1]):.0f}% used,"
+            f" past {DISK_WARN_PERCENT:.0f}%"
+        )
+    return problems
+
+
+def check_overnight_alerts(now=None):
+    """Alert names that were firing at any point in the window.
+
+    Alertmanager keeps no history worth reading and Campfire's bot API is
+    create-only, so the room the alerts were posted into cannot be read back.
+    Prometheus does keep it: ALERTS is an ordinary series, so a range query
+    answers "what fired overnight" without this holding any state of its own.
+
+    Deliberately reports names and not much else. An alert that is still firing
+    is already in the checks above; the value here is the one that fired at
+    03:00 and resolved itself, which is invisible everywhere else.
+    """
+    now = now or datetime.now(timezone.utc)
+    series_list = prom_query(
+        "/api/v1/query_range",
+        {
+            "query": 'ALERTS{alertstate="firing"}',
+            "start": (now - timedelta(hours=BRIEFING_WINDOW_HOURS)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            ),
+            "end": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            # Coarse on purpose: this asks which alerts existed, not when. A
+            # 5m step over 24h is 288 points per series, which is cheap.
+            "step": "5m",
+        },
+    )
+
+    names = {}
+    for series in series_list:
+        metric = series.get("metric") or {}
+        name = metric.get("alertname")
+        if not name or name in BRIEFING_ALERT_EXCLUDE:
+            continue
+        # Same alert on twenty pods is one line, not twenty.
+        names[name] = names.get(name, 0) + 1
+    return [
+        f"{name} (×{count})" if count > 1 else name
+        for name, count in sorted(names.items())
+    ]
+
+
+def render_briefing(now=None):
+    """The 07:00 message, or None when there is nothing worth waking up to.
+
+    Returning None is the whole design. A briefing that arrives every morning
+    saying everything is fine is a briefing you stop opening, and then it is
+    worth less than nothing, because its silence no longer means anything
+    either. So: problems, overnight alerts, and checks that could not run get a
+    message. A clean cluster gets nothing.
+
+    A check that failed to run is NOT silence. An unknown reported as healthy
+    is the one failure mode that makes this worse than having no briefing —
+    the same rule render_status follows.
+    """
+    deadline = time.monotonic() + DEADLINE
+    problems, skipped = [], []
+
+    for label, check in (("flux", check_flux), ("pods", check_pods)):
+        try:
+            problems += check(deadline)
+        except API_ERRORS as error:
+            skipped.append(f"{label}: {error}")
+
+    try:
+        problems += check_backups(deadline)[1]
+    except API_ERRORS as error:
+        skipped.append(f"postgres backups: {error}")
+
+    try:
+        problems += check_certs(deadline)[1]
+    except API_ERRORS as error:
+        skipped.append(f"certs: {error}")
+
+    try:
+        problems += check_volumes(deadline)[2]
+    except API_ERRORS as error:
+        skipped.append(f"volumes: {error}")
+
+    # Everything below this line asks Prometheus rather than the Kubernetes
+    # API: node certificates and disk headroom are not in the API at all, and
+    # an alert that already resolved exists nowhere else.
+    for label, check in (
+        ("node certificates", check_node_certs),
+        ("disk headroom", check_disk_headroom),
+    ):
+        try:
+            problems += check()
+        except API_ERRORS + (RuntimeError,) as error:
+            skipped.append(f"{label}: {error}")
+
+    try:
+        overnight = check_overnight_alerts(now)
+    except API_ERRORS + (RuntimeError,) as error:
+        overnight = []
+        skipped.append(f"overnight alerts: {error}")
+
+    if not problems and not overnight and not skipped:
+        return None
+
+    parts = []
+    if problems:
+        plural = "" if len(problems) == 1 else "s"
+        parts += [heading(f"⚠️ {len(problems)} problem{plural}"), bullets(problems)]
+    if overnight:
+        parts += [
+            heading(f"\U0001f319 fired in the last {BRIEFING_WINDOW_HOURS}h"),
+            bullets(overnight),
+        ]
+    if skipped:
+        parts += [heading("❓ not checked"), bullets(skipped)]
+    return "".join(parts)
+
+
+def post_url(url, body):
+    """Post to a full bot URL, for the scheduled run that has no webhook to reply to."""
+    request = urllib.request.Request(
+        url,
+        data=body.encode("utf-8"),
+        headers={"Content-Type": "text/html; charset=utf-8"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=POST_TIMEOUT) as response:
+        return response.status
+
+
+def run_briefing():
+    body = render_briefing()
+    if body is None:
+        log("briefing: nothing to report, saying nothing")
+        return 0
+    if not CAMPFIRE_URL:
+        log("briefing: CAMPFIRE_URL unset, nowhere to post")
+        return 1
+    log(f"briefing: posted, campfire returned {post_url(CAMPFIRE_URL, body)}")
+    return 0
+
+
 def render_verb(verb):
     if verb in ("", "status"):
         return render_status()
@@ -906,6 +1160,10 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    # Same image, same checks, same thresholds — a CronJob passes --briefing
+    # rather than a second script reimplementing any of it.
+    if "--briefing" in sys.argv:
+        return run_briefing()
     log(f"listening on :{LISTEN_PORT}, reading {KUBE_API}")
     ThreadingHTTPServer(("", LISTEN_PORT), Handler).serve_forever()
 

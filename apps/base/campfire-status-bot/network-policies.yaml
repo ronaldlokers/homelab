@@ -98,3 +98,32 @@ spec:
       ports:
         - protocol: TCP
           port: 80
+---
+# The briefing's egress half, for the one question it asks that the Kubernetes
+# API cannot answer: what fired overnight and then resolved. The matching
+# ingress rule is in infrastructure/configs/production, next to the other
+# cross-namespace rules into monitoring.
+#
+# Only the CronJob needs this, but the label is shared with the Deployment, so
+# the webhook pod gets it too. Widening a read-only path to a metrics endpoint
+# it never calls is a smaller cost than a second label and a second copy of
+# every other rule that label already grants.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-status-bot-egress-to-prometheus
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-status-bot
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090

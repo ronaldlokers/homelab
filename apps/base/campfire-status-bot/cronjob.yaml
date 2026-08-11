@@ -1,0 +1,78 @@
+# The morning briefing: the same checks the bot answers on demand, run once at
+# 07:00 and posted only if there is something to say.
+#
+# It lives in this directory rather than its own because it is not a second
+# app — it is the same script with --briefing, mounting the same ConfigMap. A
+# separate app would have meant a second copy of every threshold, and the
+# thresholds are the part that took the longest to get right.
+#
+# Pods carry app: campfire-status-bot deliberately. That label already grants
+# egress to the Kubernetes API (infrastructure/configs/production) and to
+# Campfire on :80 (network-policies.yaml here), which is exactly what this
+# needs; a new label would have meant re-stating both.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: campfire-morning-briefing
+  namespace: campfire
+spec:
+  # 07:00 local all year rather than a UTC time that drifts an hour with DST.
+  # timeZone reached GA in Kubernetes 1.27 and this cluster runs 1.33; on an
+  # older control plane the field is ignored silently, which would put this an
+  # hour early half the year rather than fail visibly.
+  schedule: "0 7 * * *"
+  timeZone: "Europe/Amsterdam"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # A briefing that arrives twice is worse than one that arrives late, and
+      # a retry storm at 06:00 would be both. One retry, then leave it.
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: campfire-status-bot
+            component: morning-briefing
+        spec:
+          restartPolicy: Never
+          serviceAccountName: campfire-status-bot
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: briefing
+              image: python:3.13-alpine
+              command: ["python3", "/opt/bot/campfire-status-bot.py", "--briefing"]
+              env:
+                # The full bot URL, room and bot key included. The webhook path
+                # the interactive verbs reply on does not exist here: nobody
+                # asked anything, so there is no payload to reply to.
+                - name: CAMPFIRE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: campfire-morning-briefing
+                      key: CAMPFIRE_URL
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+              volumeMounts:
+                - name: script
+                  mountPath: /opt/bot
+          volumes:
+            - name: script
+              configMap:
+                name: campfire-status-bot-script
