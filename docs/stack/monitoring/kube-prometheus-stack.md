@@ -50,16 +50,52 @@ Dashboards and visualization.
 - Longhorn dashboard (production only)
 
 ## Alertmanager
-Alert routing and management.
 
-**Features**:
-- Alert grouping and deduplication
-- Notification routing
-- Silencing
+Alert routing, grouping, deduplication and silencing. Configured in
+`monitoring/controllers/production/kube-prometheus-stack/alertmanager-config.yaml`
+as a single `AlertmanagerConfig`.
 
-**Configuration**:
-- Can integrate with Slack, email, PagerDuty, etc.
-- Currently not configured for external notifications
+Everything lands in one of three receivers:
+
+| Receiver | What goes there |
+|---|---|
+| `campfire` | Every real alert, via `campfire-alert-bridge` into the `#Alertmanager` room |
+| `blackhole` | `InfoInhibitor` — machinery, not news |
+| `deadman` | `Watchdog`, out to healthchecks.io |
+
+`alertmanagerConfigMatcherStrategy: type: None` is what makes delivery outside
+the `monitoring` namespace work at all, and it leaves the top route without
+matchers — so it catches everything and the exceptions have to be **child
+routes**, which are evaluated first and do not continue.
+
+### The deadman
+
+`Watchdog` fires forever by design. On its own that is worth nothing: a
+heartbeat only means something when something notices it **stopping**.
+
+It is routed off-cluster, to a healthchecks.io check, and no longer into the
+room. Off-cluster is the whole point — Gatus, a PrometheusRule and a check in
+the status bot were all considered, and each has to deliver its warning through
+the path it is testing, so the single failure it exists to catch is the one it
+cannot report. Gatus in particular runs *in* the production cluster.
+
+- `repeatInterval: 15m` on that route overrides the parent's `12h`. It is the
+  detection window: half a day of a dead cluster before anything says so is not
+  a deadman worth having.
+- `sendResolved: false`. A resolved `Watchdog` means Alertmanager stopped seeing
+  the alert that always fires — the exact failure being watched. Pinging on it
+  would reset the timer and hide it.
+- The ping URL **is** the credential; anyone holding it can ping the check and
+  mask an outage. It lives in the `alertmanager-deadman` SOPS secret, referenced
+  via `urlSecret`.
+
+Alertmanager reaches the internet through `allow-internet-egress`, which already
+permits 443 to public addresses from every pod in the namespace.
+
+**A missing `alertmanager-deadman` secret is not harmless.** prometheus-operator
+will not generate a config it cannot resolve, so the whole `AlertmanagerConfig`
+is skipped and alerts stop reaching Campfire. Create the secret before the route
+that references it.
 
 ## Node Exporter
 Node-level metrics.
