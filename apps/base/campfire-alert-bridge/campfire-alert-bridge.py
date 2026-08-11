@@ -24,6 +24,7 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -41,6 +42,25 @@ TIMEOUT = 10
 # in a chat message — alertname and severity are already in the heading, and
 # the rest (job, endpoint, prometheus, ...) are for querying, not reading.
 LABELS = ("namespace", "cluster", "pod", "instance", "node", "volume", "persistentvolumeclaim")
+
+# Silencing goes through Grafana, not Alertmanager: Alertmanager is ClusterIP
+# with no Ingress, so a link to its own UI would be dead from a phone — which is
+# the only place these are read.
+#
+# This only works because Alertmanager is registered as a Grafana datasource
+# (monitoring/controllers/production/kube-prometheus-stack/release.yaml). Without
+# it the link resolves to Grafana's *built-in* Alertmanager, and a silence
+# created there would look like it worked while silencing nothing.
+#
+# The Grafana Ingress is local-network-only, so this works on the LAN and over
+# Tailscale and 403s elsewhere. Deliberate: silencing an alert from an untrusted
+# network is not something to make easy.
+GRAFANA_BASE = os.environ.get("GRAFANA_BASE", "https://grafana.ronaldlokers.nl")
+SILENCE_DATASOURCE = os.environ.get("SILENCE_DATASOURCE", "Alertmanager")
+# alertname alone silences the rule everywhere; adding namespace keeps it to the
+# app that is actually broken. Anything narrower (pod, instance) would be
+# outlived by the next restart, and the matchers are editable on the page.
+SILENCE_MATCHERS = ("alertname", "namespace")
 
 
 def log(msg):
@@ -84,11 +104,35 @@ def render_alert(alert):
     if description:
         parts.append(f"<pre>{html.escape(description)}</pre>")
 
+    links = []
     url = alert.get("generatorURL", "")
     if url:
-        parts.append(f'<a href="{html.escape(url, quote=True)}">source</a>')
+        links.append(("source", url))
+    # 134 of 162 rules already carry this; it costs nothing to render and puts
+    # the fix one tap away from the alert.
+    runbook = annotations.get("runbook_url", "").strip()
+    if runbook:
+        links.append(("runbook", runbook))
+    # Only while firing. A resolved alert has nothing left to silence.
+    if status != "resolved":
+        links.append(("silence", silence_url(labels)))
+    if links:
+        parts.append(
+            " · ".join(
+                f'<a href="{html.escape(u, quote=True)}">{text}</a>' for text, u in links
+            )
+        )
 
     return "".join(parts)
+
+
+def silence_url(labels):
+    """A Grafana new-silence page with the matchers already filled in."""
+    params = [("alertmanager", SILENCE_DATASOURCE)]
+    params += [
+        ("matcher", f"{key}={labels[key]}") for key in SILENCE_MATCHERS if labels.get(key)
+    ]
+    return f"{GRAFANA_BASE}/alerting/silence/new?{urllib.parse.urlencode(params)}"
 
 
 def render(payload):

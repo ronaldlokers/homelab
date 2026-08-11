@@ -17,6 +17,7 @@ spec:
         # Invisible in pg_stat_activity because it only connects on replica rejoin.
         - alert: PostgreSQLReplicationRoleCannotConnect
           annotations:
+            runbook_url: https://github.com/ronaldlokers/homelab/blob/main/docs/runbooks/postgres-replica-networkpolicy-dataplane-sync.md
             summary: "streaming_replica cannot connect to the postgres database on {{ $labels.pod }}"
             description: "CloudNativePG uses database=postgres for replica rejoin, and streaming_replica is not a superuser so it does not bypass CONNECT. Replication looks healthy until a replica restarts, then it cannot rejoin. Fix with: GRANT CONNECT ON DATABASE postgres TO streaming_replica;"
           expr: |
@@ -28,6 +29,7 @@ spec:
         # hand later (#296).
         - alert: PostgreSQLDatabaseNotIsolated
           annotations:
+            runbook_url: https://github.com/ronaldlokers/homelab/blob/main/docs/runbooks/postgres-per-app-role-migration.md
             summary: "PUBLIC can connect to database {{ $labels.datname }}"
             description: "Database {{ $labels.datname }} has lost the REVOKE that isolates it, so any role in the cluster can connect to it. This is the state #219 removed. A cluster rebuilt with initdb rather than restored from backup comes back this way. Fix with: REVOKE CONNECT ON DATABASE {{ $labels.datname }} FROM PUBLIC;"
           expr: |
