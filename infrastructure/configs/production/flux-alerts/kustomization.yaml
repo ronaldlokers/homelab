@@ -25,7 +25,7 @@ patches:
         value: "http://campfire-alert-bridge.campfire.svc.cluster.local:8080/flux"
   - target:
       kind: Alert
-      name: flux-errors
+      name: flux-events
     patch: |
       # Both clusters post into the same #Flux room, so every event says which
       # one it came from. notification-controller merges eventMetadata into the
