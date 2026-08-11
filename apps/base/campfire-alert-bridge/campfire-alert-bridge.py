@@ -47,10 +47,10 @@ LABELS = ("namespace", "cluster", "pod", "instance", "node", "volume", "persiste
 # with no Ingress, so a link to its own UI would be dead from a phone — which is
 # the only place these are read.
 #
-# This only works because Alertmanager is registered as a Grafana datasource
-# (monitoring/controllers/production/kube-prometheus-stack/release.yaml). Without
-# it the link resolves to Grafana's *built-in* Alertmanager, and a silence
-# created there would look like it worked while silencing nothing.
+# This works because kube-prometheus-stack provisions an Alertmanager
+# datasource named "Alertmanager". Point the link at anything else and it
+# resolves to Grafana's *built-in* Alertmanager, where a silence would look
+# like it worked while silencing nothing.
 #
 # The Grafana Ingress is local-network-only, so this works on the LAN and over
 # Tailscale and 403s elsewhere. Deliberate: silencing an alert from an untrusted
