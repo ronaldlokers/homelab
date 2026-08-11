@@ -1,28 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - ntfy-publisher-secret.yaml
   - ../../base/flux-alerts
 patches:
-  - target:
-      kind: Provider
-      name: ntfy
-    patch: |
-      # Production posts to the Campfire bridge, which renders the event as
-      # HTML into the #Flux room. Staging keeps the ntfy address from the base:
-      # it has no Campfire, and its noise is exactly what #384 separated out.
-      #
-      # Flux offers no body templating on a `generic` Provider — the ntfy
-      # address above worked because ntfy itself templated the JSON via
-      # ?tpl=yes. Campfire treats the body as the message, so raw Event JSON
-      # would land in the room; the bridge exists to format it.
-      #
-      # secretRef is left in place: notification-controller merges an
-      # Authorization header the bridge ignores, and keeping it means reverting
-      # to ntfy is a one-line change rather than a re-plumbing.
-      - op: replace
-        path: /spec/address
-        value: "http://campfire-alert-bridge.campfire.svc.cluster.local:8080/flux"
+  # No Provider patch here. Production runs the bridge, so the base address is
+  # already correct for it; staging is the one that has to reach across. The
+  # patch this replaced only existed because the base still pointed at ntfy.
   - target:
       kind: Alert
       name: flux-events

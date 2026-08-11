@@ -1,7 +1,15 @@
+# prometheus-operator flattens every AlertmanagerConfig into Alertmanager's one
+# global receiver list, naming each receiver
+# `<namespace>/<AlertmanagerConfig name>/<receiver name>`. So this resource's
+# name is not private: it shows up in `amtool config routes test` output and in
+# the generated config.
+#
+# Named `ntfy-config` until 2026-08-11, long after the receiver stopped being
+# ntfy, which made that output read `monitoring/ntfy-config/campfire`.
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: AlertmanagerConfig
 metadata:
-  name: ntfy-config
+  name: campfire-config
   namespace: monitoring
 spec:
   route:
