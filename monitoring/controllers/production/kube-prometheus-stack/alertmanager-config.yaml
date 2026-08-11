@@ -42,21 +42,51 @@ spec:
     # A child route is the fix: children are evaluated before the parent's
     # receiver and do not continue, so this terminates.
     #
-    # Watchdog is deliberately not in here. It also reaches the room, which the
-    # chart likewise does not intend — but at one message per repeatInterval it
-    # is the only end-to-end proof the alert path still works, and nothing else
-    # consumes it. Worth replacing with something that alerts on its *absence*,
-    # which is the only thing a deadman switch is actually for.
+    # Watchdog now leaves the room too, because something finally alerts on its
+    # absence — which is the only thing a deadman switch is for. It used to be
+    # delivered here as a crude proof-of-life, but nothing checked for its
+    # silence, so a message every twelve hours proved the path worked only on
+    # the mornings someone happened to look.
+    #
+    # It goes off-cluster on purpose. Every in-cluster option — Gatus, a
+    # PrometheusRule, a check in the status bot — has to deliver its warning
+    # through the path it is testing, so the one failure it exists to catch is
+    # the one it cannot report.
+    #
+    # repeatInterval here overrides the parent's 12h: that is the detection
+    # window, and half a day of a dead cluster before anything says so is not
+    # a deadman worth having.
     routes:
       - receiver: 'blackhole'
         matchers:
           - name: alertname
             matchType: '='
             value: 'InfoInhibitor'
+      - receiver: 'deadman'
+        repeatInterval: 15m
+        matchers:
+          - name: alertname
+            matchType: '='
+            value: 'Watchdog'
   receivers:
     # No integrations, so Alertmanager drops anything routed here. Same shape as
     # the chart's own 'null' receiver, which is not reachable from this route.
     - name: 'blackhole'
+    # healthchecks.io. Any POST to the ping URL is a ping; the body is ignored,
+    # so Alertmanager's own JSON needs no templating.
+    #
+    # The URL *is* the credential — anyone holding it can ping the check and
+    # mask a real outage — so it lives in a SOPS secret rather than here.
+    #
+    # sendResolved is off deliberately. A resolved Watchdog means Alertmanager
+    # stopped seeing the alert that always fires, which is the failure this
+    # watches for; pinging on it would reset the timer and hide exactly that.
+    - name: 'deadman'
+      webhookConfigs:
+        - urlSecret:
+            name: alertmanager-deadman
+            key: url
+          sendResolved: false
     # Campfire only, as of 2026-08-10. Alerts also went to ntfy until then; the
     # room is readable (HTML, so labels are a list and errors keep their shape),
     # searchable, and can be replied to, which a broadcast topic cannot.
