@@ -6,6 +6,7 @@ resources:
   - allow-gatus-to-grafana.yaml
   - allow-homepage-widget-targets.yaml
   - allow-grafana-oidc-egress.yaml
+  - allow-status-bot-to-prometheus.yaml
   - cert-manager
   - cloudnative-pg
   - external-services

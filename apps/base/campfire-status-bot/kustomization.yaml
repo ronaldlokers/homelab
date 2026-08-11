@@ -12,6 +12,7 @@ resources:
   - rbac.yaml
   - deployment.yaml
   - service.yaml
+  - cronjob.yaml
   - network-policies.yaml
 
 # Hash suffix left ON: the suffix changes when the script changes, which

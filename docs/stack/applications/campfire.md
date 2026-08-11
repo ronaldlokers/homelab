@@ -306,6 +306,84 @@ kubectl exec -n campfire --context=production deploy/campfire -- \
 Run from the Campfire pod on purpose: from anywhere else the NetworkPolicy
 refuses the connection, which is the behaviour being checked.
 
+## Morning briefing
+
+`campfire-morning-briefing` is a daily CronJob (06:00 UTC — 07:00 in winter,
+08:00 in summer) that runs the status bot's own checks once and posts into
+`#All Talk`.
+
+It is not a separate app. It is `campfire-status-bot.py --briefing`, mounting
+the same ConfigMap as the Deployment, so there is exactly one definition of
+every threshold. A second script would have meant a second copy of
+`BACKUP_MAX_AGE_HOURS`, `PROGRESSING_GRACE_MINUTES` and the rest, and those are
+the part that took longest to get right.
+
+**Most mornings it says nothing at all.** That is the design, and it is the
+only thing about this worth defending:
+
+> Only send a message when there is something meaningful to show. Else this
+> will become a thing I don't read.
+
+A briefing that arrives every day saying everything is fine is one you stop
+opening — and then its silence means nothing either, because you were not
+reading it anyway. So a clean cluster gets no message. What does get a message:
+
+| Condition | Why it is worth waking up to |
+|---|---|
+| Any check reports a problem | Same checks as `@Kubernetes status` |
+| An alert fired in the last 24h | Including one that already resolved |
+| A check could not run | An unknown is never reported as healthy |
+
+The third row is the one that keeps the silence honest. If the briefing were
+quiet when Prometheus was unreachable, quiet would stop meaning "fine" and
+start meaning "unknown", which is the failure mode that makes a status worse
+than none.
+
+### Overnight alerts come from Prometheus, not Campfire
+
+The obvious source is the `#Alertmanager` room — read back what arrived
+overnight. That does not work: **Campfire's bot API is create-only**, so a bot
+cannot read the room it posts into. Alertmanager keeps no usable history
+either.
+
+Prometheus does. `ALERTS` is an ordinary series, so a range query over the
+window answers "what fired" without the briefing holding any state:
+
+```promql
+ALERTS{alertstate="firing"}
+```
+
+`Watchdog` and `InfoInhibitor` are excluded — both fire by design and neither
+is news. A still-firing alert is already covered by the checks above; the value
+here is the one that fired at 03:00 and cleared itself, which is otherwise
+invisible.
+
+This is the briefing's only dependency outside the Kubernetes API, and it needs
+**two** NetworkPolicies — egress in
+`apps/base/campfire-status-bot/network-policies.yaml`, ingress in
+`infrastructure/configs/production/allow-status-bot-to-prometheus.yaml`. The
+`monitoring` namespace denies ingress by default, so one half alone gets a
+connection refused at the far end.
+
+### What is deliberately not in it
+
+**Open Renovate PRs.** The card asked for them; the weekly digest already
+covers them, and a PR backlog that barely moves day to day is precisely the
+line you learn to skip. Adding it would have traded the silence rule for a
+number nobody acts on.
+
+### Testing it
+
+```bash
+kubectl create job -n campfire --context=production \
+  --from=cronjob/campfire-morning-briefing briefing-test
+kubectl logs -n campfire --context=production job/briefing-test
+```
+
+`briefing: nothing to report, saying nothing` is a pass, not a failure — it
+means the cluster was clean. To see it actually post, break something first or
+shorten `BRIEFING_WINDOW_HOURS` so a recent alert falls inside the window.
+
 ## Renovate digest
 
 `campfire-renovate-digest` is a weekly CronJob (Monday 08:00) that posts open
