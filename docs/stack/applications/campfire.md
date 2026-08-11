@@ -192,12 +192,17 @@ alert on a phone and acting on one:
 with no Ingress, so a link to its own UI would be dead from the only place
 these are read.
 
-That only works because Alertmanager is registered as a Grafana **datasource**.
-Without it the link resolves to Grafana's *built-in* Alertmanager, and a
-silence created there would look like it worked while silencing nothing — worse
-than having no link at all. The datasource name is load-bearing: the bridge
-puts it in the URL as `?alertmanager=Alertmanager`, so renaming it breaks every
-silence link already posted.
+That works because kube-prometheus-stack provisions an Alertmanager
+**datasource** named `Alertmanager`. Point the link anywhere else and it
+resolves to Grafana's *built-in* Alertmanager, where a silence would look like
+it worked while silencing nothing — worse than having no link at all. The
+datasource name is load-bearing: the bridge writes it into the URL as
+`?alertmanager=Alertmanager`.
+
+> The chart's datasources do **not** appear in `release.yaml`, which holds only
+> our overrides. #450 read that file as the whole picture and added a second
+> datasource under the same name; #451 removed it. To see what Grafana actually
+> has, read the rendered `kube-prometheus-stack-grafana-datasource` ConfigMap.
 
 ```
 /alerting/silence/new?alertmanager=Alertmanager
