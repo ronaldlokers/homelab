@@ -33,6 +33,11 @@ A **runbook** is an action-oriented guide for handling specific incidents. Unlik
 
 ### Infrastructure Issues
 
+- [**k3s Node Certificates Approaching Expiry**](k3s-certificate-rotation.md)
+  - **Symptoms**: `CertificateExpirationWarning` events; nothing broken yet
+  - **Severity**: Medium
+  - **Time to Fix**: 15 minutes for all three nodes
+
 - [**inotify Limits Exhausted**](inotify-limits-exhausted.md)
   - **Symptoms**: Pods crash with "too many open files"
   - **Severity**: High
