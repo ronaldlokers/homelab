@@ -49,3 +49,52 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+---
+# `why` answers asynchronously, which made the bot a *sender* for the first
+# time. Every other verb replies in the HTTP response body, so until now the
+# only hop was campfire -> bot, and the reverse direction was never allowed.
+#
+# The symptom was a "thinking…" message and then silence: the model ran, the
+# answer was paid for, and the post failed with ECONNREFUSED. Refused rather
+# than timed out because k3s enforces NetworkPolicy with REJECT — a connection
+# refused between two pods in a default-deny namespace is a policy, not a
+# listener that is down.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-status-bot-egress-to-campfire
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-status-bot
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: campfire
+      ports:
+        - protocol: TCP
+          port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-status-bot-ingress-to-campfire
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: campfire-status-bot
+      ports:
+        - protocol: TCP
+          port: 80
