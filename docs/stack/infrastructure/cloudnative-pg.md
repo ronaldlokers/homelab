@@ -91,28 +91,61 @@ kubectl get secret -n database postgres-cluster-app -o jsonpath='{.data.password
 
 **Backup and Recovery**:
 
-CloudNative-PG uses Barman for automated backups to Backblaze B2 object storage.
+CloudNative-PG uses Barman for automated backups to Backblaze B2 object storage,
+through the [Barman Cloud Plugin](https://cloudnative-pg.io/plugin-barman-cloud/)
+rather than the in-tree `barmanObjectStore`, which the operator removes in
+1.31 (#377).
+
+**Where the configuration lives** — this is the part that moved:
+
+| What | Before (in-tree) | Now (plugin) |
+|------|------------------|--------------|
+| Destination, endpoint, credentials, compression | `Cluster.spec.backup.barmanObjectStore` | `ObjectStore.spec.configuration` |
+| Retention | `Cluster.spec.backup.retentionPolicy` | `ObjectStore.spec.retentionPolicy` |
+| Who archives WAL | the operator | `Cluster.spec.plugins[].isWALArchiver: true` |
+| Recovery source | `externalClusters[].barmanObjectStore` | `externalClusters[].plugin`, naming an ObjectStore |
+| Backup method | implicit | `ScheduledBackup.spec.method: plugin` |
+
+Two things bite if missed. Retention left on the Cluster silently becomes *no*
+retention, because the field only governs the in-tree path. And a
+`ScheduledBackup` without `method: plugin` defaults to `barmanObjectStore` and
+fails nightly with "no barmanObjectStore section defined on the target cluster"
+(#388).
+
+`serverName` on the ObjectStore must stay empty — the plugin keeps the field
+only for API compatibility. Where a name is needed it is a plugin parameter on
+the Cluster, defaulting to the cluster name.
 
 **Backup Configuration**:
 - **Storage**: Backblaze B2 (`s3://homelab-postgres-backups/`)
 - **Schedule** (one `ScheduledBackup` per cluster; note CNPG cron has **six fields** with leading seconds — `"0 3 * * *"` means hourly at :03, a bug that ran for months):
-  - Staging: postgres-cluster daily at 2:00, immich-cluster at 2:30
-  - Production: postgres-cluster daily at 3:00, immich-cluster at 3:30
-- **Retention**:
+  - Staging: postgres-cluster daily at 2:00, nightscout-cluster at 2:45
+  - Production: nightscout-cluster daily at 2:45, postgres-cluster at 3:00, immich-cluster at 3:30
+- **Retention** (on each `ObjectStore`):
   - Staging: 14 days
   - Production: 7 days (optimized for homelab cost efficiency)
 - **WAL Archiving**: Continuous (enables point-in-time recovery)
 - **Compression**: gzip (both WAL and data)
-- **Backup Paths**:
-  - postgres-cluster: `production-2026-03/`
-  - immich-cluster: `production-2026-03-immich/`
+- **Backup Paths** — one prefix per cluster. A shared prefix trips barman's
+  "Expected empty archive" check and makes a restore ambiguous about which
+  cluster it is restoring:
+  - staging postgres-cluster: `staging-2026-07/`
+  - staging nightscout-cluster: `staging-2026-08-nightscout/`
+  - production postgres-cluster: `production-2026-08-postgres/`
+  - production nightscout-cluster: `production-2026-08-nightscout/`
+  - production immich-cluster: `production-2026-09-immich/`
 
 **How Backups Work**:
 1. A `ScheduledBackup` resource creates a `Backup` object daily per cluster
-2. Full backup of database cluster uploaded to B2
+2. Full backup of database cluster uploaded to B2 by the plugin's sidecar
 3. WAL (Write-Ahead Log) files continuously archived
-4. Old backups automatically deleted per retention policy
+4. Old backups marked obsolete per the ObjectStore's retention policy and
+   deleted after the next backup completes
 5. Backups stored in separate staging/production paths
+
+Retention bounds what barman lists, not what the bucket holds: the bucket is
+versioned with no lifecycle rule, so each retention delete leaves a version and
+a delete marker behind (#395).
 
 **Checking Backup Status**:
 ```bash
@@ -158,18 +191,17 @@ spec:
       source: postgres-cluster
       recoveryTarget:
         targetTime: "2025-12-03 10:00:00+00:00"  # Optional: point-in-time
+  # Names the existing ObjectStore rather than respecifying the bucket. The
+  # destination, endpoint and credentials all live there.
   externalClusters:
     - name: postgres-cluster
-      barmanObjectStore:
-        destinationPath: "s3://homelab-postgres-backups/production/"
-        endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-        s3Credentials:
-          accessKeyId:
-            name: b2-credentials
-            key: ACCESS_KEY_ID
-          secretAccessKey:
-            name: b2-credentials
-            key: ACCESS_SECRET_KEY
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: postgres-store
+          # The server whose catalogue to read inside that prefix — the name of
+          # the cluster being restored FROM, not the new one.
+          serverName: postgres-cluster
 EOF
 
 # Verify recovery
