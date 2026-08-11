@@ -166,6 +166,42 @@ directly at each other, the room fills with raw JSON.
 - `/healthz` returns 503 while `CAMPFIRE_URL` is unset, so a missing secret
   fails readiness rather than silently swallowing alerts.
 
+### Links on an alert
+
+Every alert renders up to three, which is the difference between reading an
+alert on a phone and acting on one:
+
+| Link | Source | Shown |
+|---|---|---|
+| `source` | `generatorURL` | always, when present |
+| `runbook` | the `runbook_url` annotation | 139 of 162 rules carry one |
+| `silence` | built from the labels | firing only — a resolved alert has nothing to silence |
+
+**Silencing goes through Grafana, not Alertmanager.** Alertmanager is ClusterIP
+with no Ingress, so a link to its own UI would be dead from the only place
+these are read.
+
+That only works because Alertmanager is registered as a Grafana **datasource**.
+Without it the link resolves to Grafana's *built-in* Alertmanager, and a
+silence created there would look like it worked while silencing nothing — worse
+than having no link at all. The datasource name is load-bearing: the bridge
+puts it in the URL as `?alertmanager=Alertmanager`, so renaming it breaks every
+silence link already posted.
+
+```
+/alerting/silence/new?alertmanager=Alertmanager
+  &matcher=alertname%3DLonghornBackupFailed
+  &matcher=namespace%3Dlonghorn-system
+```
+
+Matchers are `alertname` plus `namespace`. Narrower labels — `pod`, `instance` —
+would be outlived by the next restart, and the page lets you edit them anyway.
+
+**The Grafana Ingress is local-network-only**, so silence links work on the LAN
+and over Tailscale and 403 elsewhere. That is deliberate rather than an
+oversight: silencing an alert from an untrusted network is not something worth
+making easy.
+
 The script is mounted from a hash-suffixed ConfigMap on a stock
 `python:3.13-alpine`, so editing it rolls the pod and there is no image to
 build.

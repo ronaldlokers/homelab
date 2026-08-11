@@ -197,3 +197,24 @@ spec:
           url: http://loki-gateway.monitoring.svc.cluster.local:80
           isDefault: false
           editable: false
+        # Registers the *real* Alertmanager so Grafana can silence the alerts
+        # that actually fire. Without this Grafana only knows its own built-in
+        # Alertmanager, and a silence created there would appear to succeed
+        # while silencing nothing — which is worse than having no silence link.
+        #
+        # The name matters: campfire-alert-bridge puts it in the silence links
+        # it renders (?alertmanager=Alertmanager), so renaming this breaks them.
+        - name: Alertmanager
+          type: alertmanager
+          uid: alertmanager-production
+          access: proxy
+          url: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
+          isDefault: false
+          editable: false
+          jsonData:
+            # This is a Prometheus Alertmanager, not a Grafana-managed one; the
+            # API shapes differ and Grafana needs telling which it is.
+            implementation: prometheus
+            # Grafana-managed alerts keep going to Grafana's own Alertmanager.
+            # This datasource is for reading and silencing what Prometheus sends.
+            handleGrafanaManagedAlerts: false

@@ -74,6 +74,7 @@ spec:
         # less-proven backup path.
         - alert: LonghornBackupStale
           annotations:
+            runbook_url: https://github.com/ronaldlokers/homelab/blob/main/docs/runbooks/longhorn-s3-backup-connectivity-minio.md
             summary: "Longhorn volume {{ $labels.volume }} has no recent backup"
             description: >-
               No completed backup for {{ $labels.volume }} (PVC
@@ -91,6 +92,7 @@ spec:
         # longhorn_backup_state: 3 = Completed, 4 = Error.
         - alert: LonghornBackupFailed
           annotations:
+            runbook_url: https://github.com/ronaldlokers/homelab/blob/main/docs/runbooks/longhorn-s3-backup-connectivity-minio.md
             summary: "Longhorn backup failed for volume {{ $labels.volume }}"
             description: >-
               Backup {{ $labels.backup }} for volume {{ $labels.volume }}
