@@ -1,0 +1,25 @@
+# No `namespace:` here on purpose — each resource declares its own, matching
+# the other campfire workloads. The RBAC is the exception: the ServiceAccount
+# is in campfire, the Role is in flux-system where the Kustomizations live.
+#
+# Egress to the Kubernetes API is NOT here. It lives with the other
+# allow-*-to-k8s-api policies in infrastructure/configs/production, which is
+# where a reader looks for them and where the control plane addresses are
+# already written down.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - rbac.yaml
+  - deployment.yaml
+  - service.yaml
+  - network-policies.yaml
+
+# Hash suffix left ON, same as the status bot: the suffix changes when the
+# script changes, which rewrites the Deployment's volume reference and rolls
+# the pod. Without it an edited allowlist applies cleanly and the running
+# process keeps enforcing the old one.
+configMapGenerator:
+  - name: campfire-kube-actor-script
+    namespace: campfire
+    files:
+      - kube-actor.py

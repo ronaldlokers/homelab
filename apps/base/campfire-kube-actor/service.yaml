@@ -1,0 +1,17 @@
+# ClusterIP, no Ingress, and one caller: the status bot. Campfire never reaches
+# this directly — an action arrives as a message to the status bot, which checks
+# who asked and forwards. The NetworkPolicy beside this file is what enforces
+# that only the bot can open a socket here, and it is the only authentication
+# this endpoint has.
+apiVersion: v1
+kind: Service
+metadata:
+  name: campfire-kube-actor
+  namespace: campfire
+spec:
+  ports:
+    - port: 8080
+      targetPort: http
+  selector:
+    app: campfire-kube-actor
+  type: ClusterIP

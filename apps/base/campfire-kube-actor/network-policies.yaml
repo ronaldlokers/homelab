@@ -1,0 +1,46 @@
+---
+# The status bot is the only thing allowed to reach the actor, and this rule is
+# the only authentication the /act endpoint has — it carries no token and
+# checks no signature, exactly like the Campfire webhook it sits behind.
+#
+# The campfire namespace default-denies both directions, so the hop is stated
+# twice: egress from the bot, ingress to the actor.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-status-bot-to-kube-actor
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-kube-actor
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: campfire-status-bot
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-status-bot-egress-to-kube-actor
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-status-bot
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: campfire-kube-actor
+      ports:
+        - protocol: TCP
+          port: 8080
