@@ -38,6 +38,13 @@ A **runbook** is an action-oriented guide for handling specific incidents. Unlik
   - **Severity**: Medium
   - **Time to Fix**: 15 minutes for all three nodes
 
+- [**Restore a SQLite App from a Longhorn Backup**](sqlite-app-restore-from-longhorn-backup.md)
+  - **Symptoms**: Lost or corrupt state for Campfire, Fizzy or linkding — or a drill
+  - **Severity**: Varies
+  - **Time to Fix**: 15 minutes, measured
+  - **Note**: The `-wal` file carries the most recent writes; copying only the
+    `.sqlite3` loses them silently
+
 - [**inotify Limits Exhausted**](inotify-limits-exhausted.md)
   - **Symptoms**: Pods crash with "too many open files"
   - **Severity**: High
