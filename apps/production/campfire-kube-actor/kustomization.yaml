@@ -1,0 +1,8 @@
+# Nothing to overlay. The actor holds no secret, has no Ingress and takes no
+# environment — the base is the whole app. This directory exists so the
+# production apps list references the same shape as its neighbours, and so
+# there is somewhere obvious to put a patch when one is eventually needed.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base/campfire-kube-actor/

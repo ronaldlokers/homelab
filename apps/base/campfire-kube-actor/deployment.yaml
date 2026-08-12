@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: campfire-kube-actor
+  namespace: campfire
+spec:
+  # Same reasoning as the status bot: stateless, idle between requests, and one
+  # ServiceAccount token in flight rather than two. This one holds the only
+  # write credential in the namespace, which is its own argument for one.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: campfire-kube-actor
+  template:
+    metadata:
+      labels:
+        app: campfire-kube-actor
+    spec:
+      serviceAccountName: campfire-kube-actor
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      containers:
+        - name: actor
+          image: python:3.13-alpine
+          command: ["python3", "/opt/actor/kube-actor.py"]
+          ports:
+            - name: http
+              containerPort: 8080
+          # No env at all, and that is deliberate. No API key, no bot key, no
+          # Campfire URL — this process has no way to talk to Campfire and no
+          # model to call. It takes a verb and a target and patches an
+          # annotation.
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          volumeMounts:
+            - name: script
+              mountPath: /opt/actor
+      volumes:
+        - name: script
+          configMap:
+            name: campfire-kube-actor-script

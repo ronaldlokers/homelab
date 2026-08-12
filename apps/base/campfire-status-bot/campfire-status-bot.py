@@ -24,6 +24,11 @@ puts a model behind the same loop, with read-only tools, and is the only part
 that costs money or can be prompt-injected. It answers to one Campfire user id
 and posts asynchronously, because inference is far past the 7s timeout above.
 
+`reconcile` and `restart` change the cluster, and this process does not perform
+them. It holds no write RBAC at all: it checks who asked and forwards to
+campfire-kube-actor, which reads no logs and calls no model. That split is the
+point — see act() and that app's rbac.yaml.
+
 Run with --briefing and it does not serve at all: it runs the same checks once,
 posts to CAMPFIRE_URL only if something is worth saying, and exits. That mode
 is deliberately silent on a normal morning — see render_briefing.
@@ -35,8 +40,10 @@ Env:
     LISTEN_PORT        default 8080
     ANTHROPIC_API_KEY  enables `why`; without it the verb says so
     ANTHROPIC_MODEL    default claude-opus-5
-    TRIAGE_USER_ID     Campfire user allowed to invoke `why`, default 1
+    TRIAGE_USER_ID     Campfire user allowed to invoke `why`, `reconcile`
+                       and `restart`; default 1
     CAMPFIRE_BASE      where async replies are posted
+    KUBE_ACTOR_URL     campfire-kube-actor, which performs the acting verbs
     CAMPFIRE_URL       --briefing only: full bot URL including room and bot key
     PROMETHEUS_URL     --briefing only: where to ask what fired overnight
     BRIEFING_WINDOW_HOURS  --briefing only, default 24
@@ -120,6 +127,15 @@ NEW_VOLUME_GRACE_HOURS = BACKUP_MAX_AGE_HOURS
 # and every Kustomization here waits on its dependencies being healthy.
 PROGRESSING_GRACE_MINUTES = 10
 
+# `reconcile` and `restart` are performed by campfire-kube-actor, not here.
+# This process reads pod logs and puts a model in front of them, so it
+# deliberately holds no write RBAC — see that app's rbac.yaml. All it does is
+# check who asked and forward a verb and a target.
+KUBE_ACTOR_URL = os.environ.get(
+    "KUBE_ACTOR_URL", "http://campfire-kube-actor.campfire.svc.cluster.local:8080/act"
+)
+ACTOR_TIMEOUT = 10
+
 # --briefing only.
 CAMPFIRE_URL = os.environ.get("CAMPFIRE_URL", "")
 PROMETHEUS_URL = os.environ.get(
@@ -170,6 +186,8 @@ HELP = heading("commands") + (
     "<li><code>backups</code> — Longhorn backup recency per volume</li>"
     "<li><code>longhorn</code> — volume health and replica state</li>"
     "<li><code>why</code> — ask a model to explain a failure (operator only)</li>"
+    "<li><code>reconcile &lt;kustomization&gt;</code> — ask Flux to sync now (operator only)</li>"
+    "<li><code>restart &lt;namespace&gt;/&lt;deployment&gt;</code> — roll a workload (operator only)</li>"
     "<li><code>help</code> — this</li>"
     "</ul>"
 )
@@ -1037,6 +1055,63 @@ def run_briefing():
     return 0
 
 
+def act(verb, rest, user):
+    """Ask campfire-kube-actor to do something, having checked who asked.
+
+    Two checks in two processes: this one knows who sent the message and the
+    actor knows what may be touched. Neither is sufficient alone and neither
+    trusts the other — the actor re-checks its allowlist rather than believing
+    a target this process forwarded.
+
+    Same gate as `why`, and for a related reason. `why` is gated because it
+    spends money; this is gated because it changes the cluster. The read-only
+    verbs stay open to everyone.
+    """
+    if int(user.get("id") or 0) != TRIAGE_USER_ID:
+        log(f"{verb} refused for user {user.get('id')} ({user.get('name')})")
+        return heading("🔒 that verb is operator-only") + (
+            "<div>Open to everyone: <code>status</code>, <code>certs</code>, "
+            "<code>backups</code>, <code>longhorn</code>.</div>"
+        )
+
+    target = rest[0] if rest else ""
+    if not target:
+        example = (
+            "reconcile apps" if verb == "reconcile" else "restart immich/immich-server"
+        )
+        return heading(f"{verb} needs a target") + (
+            f"<div>For example <code>{example}</code>.</div>"
+        )
+
+    body = json.dumps(
+        {"verb": verb, "target": target, "who": user.get("name", "?")}
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        KUBE_ACTOR_URL,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=ACTOR_TIMEOUT) as response:
+            answer = json.load(response)
+    except urllib.error.HTTPError as error:
+        # The actor answers 403 with a reason when it refuses, and the reason
+        # is the useful part — usually that the target is not on its list.
+        try:
+            answer = json.load(error)
+        except Exception:  # noqa: BLE001
+            return heading("⚠️ the actor refused") + f"<pre>{html.escape(str(error))}</pre>"
+    except (urllib.error.URLError, TimeoutError, OSError) as error:
+        return heading("⚠️ could not reach the actor") + (
+            f"<pre>{html.escape(str(error))}</pre>"
+        )
+
+    detail = html.escape(str(answer.get("detail", "")))
+    mark = "✅" if answer.get("ok") else "🚫"
+    return heading(f"{mark} {verb}") + f"<div>{detail}</div>"
+
+
 def render_verb(verb):
     if verb in ("", "status"):
         return render_status()
@@ -1092,6 +1167,10 @@ class Handler(BaseHTTPRequestHandler):
 
         if verb == "why":
             self.reply(self.start_why(user, words[1:], payload))
+            return
+
+        if verb in ("reconcile", "restart"):
+            self.reply(act(verb, words[1:], user))
             return
 
         if verb in ("", "status", "certs", "backups", "longhorn"):

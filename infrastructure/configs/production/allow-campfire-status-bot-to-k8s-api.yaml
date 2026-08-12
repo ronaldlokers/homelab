@@ -34,7 +34,7 @@ spec:
     matchExpressions:
       - key: app
         operator: In
-        values: [campfire-status-bot, campfire-notify-check]
+        values: [campfire-status-bot, campfire-notify-check, campfire-kube-actor]
   policyTypes:
     - Egress
   egress:

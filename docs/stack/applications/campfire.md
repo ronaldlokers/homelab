@@ -394,6 +394,65 @@ kubectl exec -n campfire --context=production deploy/campfire -- \
 Run from the Campfire pod on purpose: from anywhere else the NetworkPolicy
 refuses the connection, which is the behaviour being checked.
 
+### `reconcile` and `restart` — the acting verbs
+
+```
+@Kubernetes reconcile apps
+@Kubernetes restart immich/immich-server
+```
+
+Both are the things most often done by hand after reading a status, both are
+idempotent, and both are annotation patches — so there is no `kubectl` and no
+Flux CLI in any image:
+
+| Verb | Patch |
+|---|---|
+| `reconcile` | `reconcile.fluxcd.io/requestedAt` on a Kustomization |
+| `restart` | `kubectl.kubernetes.io/restartedAt` on a Deployment's pod template |
+
+**They run in a different process, and that is the whole design.**
+`campfire-kube-actor` is a separate Deployment with its own ServiceAccount. The
+status bot forwards to it and holds no write RBAC whatsoever.
+
+The reason is `why`. It puts a model in front of pod logs, and a log line is
+written by whatever is running in the pod — attacker-influenced text. Give that
+process write permission and one bad log line plus one bug share a blast radius
+with restarting workloads. Splitting them means the model-driven path has
+nothing to actuate with.
+
+What the actor holds:
+
+```yaml
+# flux-system Role
+- apiGroups: ["kustomize.toolkit.fluxcd.io"]
+  resources: [kustomizations]
+  verbs: [patch]
+# ClusterRole
+- apiGroups: ["apps"]
+  resources: [deployments]
+  verbs: [patch]
+```
+
+No `get`, no `list`, no secrets, no pods, no logs, no exec, no create, no
+delete. It has no environment either — no API key, no bot key, no Campfire URL
+— so it cannot talk to Campfire even if it wanted to.
+
+Three independent controls, in three places:
+
+1. **Who** — the status bot checks the webhook payload's user id against
+   `TRIAGE_USER_ID` and refuses before any network call is made.
+2. **What** — the actor re-checks its own allowlist rather than trusting the
+   target it was handed. Seven Kustomizations and seventeen Deployments, by
+   exact name.
+3. **Reachability** — a NetworkPolicy allows only the status bot pod to open a
+   socket to the actor, which is the only authentication `/act` has.
+
+`campfire/campfire` and `campfire/campfire-status-bot` are deliberately absent
+from the restart allowlist: restarting Campfire kills the room the answer posts
+to, and restarting the bot kills the process waiting to report the result.
+
+Every decision is logged on both sides, with the name of whoever asked.
+
 ## Morning briefing
 
 `campfire-morning-briefing` is a daily CronJob (07:00 Europe/Amsterdam, pinned
