@@ -38,6 +38,13 @@ A **runbook** is an action-oriented guide for handling specific incidents. Unlik
   - **Severity**: Medium
   - **Time to Fix**: 15 minutes for all three nodes
 
+- [**Upgrade Campfire**](campfire-upgrade.md)
+  - **Symptoms**: Planned upgrade; or a pod stuck in `CrashLoopBackOff` after one
+  - **Severity**: Planned change with a one-way step
+  - **Time to Fix**: 10 minutes, ~1 minute of downtime
+  - **Note**: Whether the release contains migrations decides whether rollback
+    is a re-pin or a restore. Check before upgrading.
+
 - [**Restore a SQLite App from a Longhorn Backup**](sqlite-app-restore-from-longhorn-backup.md)
   - **Symptoms**: Lost or corrupt state for Campfire, Fizzy or linkding — or a drill
   - **Severity**: Varies
