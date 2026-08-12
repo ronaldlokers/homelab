@@ -22,6 +22,13 @@ That has consequences worth stating plainly:
 - A Longhorn snapshot of a live SQLite file can catch a torn write; upstream's
   documentation warns the database "may be written to at any moment". Acceptable
   for chat history. It would not be for anything transactional.
+- **A restore has actually been performed** — 2026-08-12, from the previous
+  night's backup. `integrity_check` returned `ok` and every room, user and
+  attachment was intact. The torn write did not materialise, on a sample of one.
+  Procedure and two non-obvious traps in
+  [`docs/runbooks/sqlite-app-restore-from-longhorn-backup.md`](../../runbooks/sqlite-app-restore-from-longhorn-backup.md);
+  the important one is that the `-wal` file carried the most recent hour of
+  messages, so copying only the `.sqlite3` loses data silently.
 
 Config that is not obvious:
 
