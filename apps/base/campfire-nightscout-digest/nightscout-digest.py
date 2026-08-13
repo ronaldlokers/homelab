@@ -256,7 +256,15 @@ def main():
     # of nothing is worse than no picture.
     if len(readings) / EXPECTED_READINGS * 100 >= MIN_UPTIME_PERCENT:
         try:
-            png = chart.render(readings, BANDS, start_ms)
+            values = [v for _, v in readings]
+            png = chart.render(
+                readings,
+                BANDS,
+                start_ms,
+                title=day.strftime("%A %-d %B"),
+                subtitle=f"{len(values)} readings   "
+                f"{len(values) / EXPECTED_READINGS * 100:.0f}% sensor coverage",
+            )
             log(f"chart {len(png)} bytes, campfire returned {post_image(png)}")
         except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
             # The numbers are already posted; a missing picture is not worth
