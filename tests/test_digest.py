@@ -119,6 +119,33 @@ class SplitIntoDays(unittest.TestCase):
         days = module.split_into_days(kept, start)
         self.assertEqual(len(days), 13)
 
+    def test_minutes_are_wall_clock_so_hours_line_up_across_days(self):
+        """The subtlety worth a test: hours must mean the same thing every day.
+
+        `(when - midnight)` reads like elapsed time and is not — Python ignores
+        the offset when both datetimes share a tzinfo. On the day the clocks go
+        back that is the difference between a reading at 23:55 landing on
+        minute 1435 and on minute 1495, and a minute past 1439 falls off both
+        the counted row and the right-hand edge of the plot.
+
+        It also decides whether "the 08:00 hour" means 08:00 on every day or
+        drifts by an hour after each changeover.
+        """
+        module = digest()
+        start = datetime(2026, 10, 25, tzinfo=AMSTERDAM)
+        first = start.timestamp()
+        # A real sensor: one reading every five minutes of actual elapsed time,
+        # so a 25-hour day produces 300 of them rather than 288.
+        entries = [(int((first + i * 300) * 1000), 110) for i in range(300)]
+
+        days = module.split_into_days(entries, start, count=1)
+        minutes = [minute for minute, _ in days[0][1]]
+        self.assertEqual(len(minutes), 300, "no reading may be dropped")
+        self.assertLess(max(minutes), 1440, "a minute past 1439 falls off the sheet")
+        # The hour that happened twice lands in the same slot twice, which is
+        # the honest answer: it did happen twice.
+        self.assertEqual(len(minutes) - len(set(minutes)), 12)
+
     def test_the_spring_forward_day_is_short_but_kept(self):
         module = digest()
         start = datetime(2026, 3, 29, tzinfo=AMSTERDAM)

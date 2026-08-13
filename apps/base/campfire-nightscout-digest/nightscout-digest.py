@@ -211,6 +211,17 @@ def split_into_days(entries, day_start, count=HISTORY_DAYS):
     for stamp, value in entries:
         when = datetime.fromtimestamp(stamp / 1000, local)
         midnight = when.replace(hour=0, minute=0, second=0, microsecond=0)
+        # Wall clock, not elapsed time, and deliberately so — though the line
+        # below does not look like it. Python ignores the offset when both
+        # datetimes carry the same tzinfo, so this is 23:55 rather than 24:55
+        # on the day the clocks go back.
+        #
+        # That is what the chart needs. Hours have to line up across days for
+        # "the 08:00 hour ran out of range on 12 of 14 days" to be comparing
+        # like with like; elapsed minutes would shift every reading after a
+        # changeover by an hour and drag the modal-day curve with them. The
+        # repeated hour lands twice in the same slot, which is the honest
+        # answer: it happened twice.
         minute = (when - midnight).total_seconds() / 60
         buckets.setdefault(midnight.date(), []).append((minute, value))
 
