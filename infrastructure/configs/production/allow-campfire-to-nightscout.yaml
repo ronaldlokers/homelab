@@ -1,0 +1,28 @@
+# Ingress for the daily glucose digest.
+#
+# The egress half is in apps/base/campfire-nightscout-digest/network-policies.yaml.
+# nightscout denies ingress by default, so without this the digest reports
+# "could not read Nightscout" in the room — the intended failure, but still one.
+#
+# Production only, like the other campfire rules: the namespace does not exist
+# in staging, and a policy naming a missing namespace wedges the whole
+# Kustomization (#426).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-campfire-to-nightscout
+  namespace: nightscout
+spec:
+  podSelector:
+    matchLabels:
+      app: nightscout
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: campfire
+      ports:
+        - protocol: TCP
+          port: 1337

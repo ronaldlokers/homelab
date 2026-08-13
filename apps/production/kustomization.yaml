@@ -5,6 +5,7 @@ resources:
   - campfire
   - campfire-alert-bridge
   - campfire-kube-actor
+  - campfire-nightscout-digest
   - campfire-notify-check
   - campfire-renovate-digest
   - campfire-status-bot

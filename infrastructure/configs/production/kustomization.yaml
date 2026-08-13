@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - ../base/network-policies
   - allow-campfire-status-bot-to-k8s-api.yaml
+  - allow-campfire-to-nightscout.yaml
   - allow-gatus-to-grafana.yaml
   - allow-homepage-widget-targets.yaml
   - allow-grafana-oidc-egress.yaml

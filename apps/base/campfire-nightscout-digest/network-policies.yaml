@@ -1,0 +1,57 @@
+---
+# The digest reads Nightscout across a namespace boundary, so both halves are
+# required: campfire denies egress by default and nightscout denies ingress.
+# One half alone gets a connection refused at the far end, which reads exactly
+# like the service being down.
+#
+# Note for anyone debugging this by hand: Nightscout binds to the **pod IP**,
+# not 0.0.0.0, so `kubectl port-forward` cannot reach it and neither can the
+# pod itself over localhost. Service traffic from another pod is unaffected,
+# which is the only path used here.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-nightscout-digest-egress
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-nightscout-digest
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: nightscout
+      ports:
+        - protocol: TCP
+          port: 1337
+    # The room it posts into.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: campfire
+      ports:
+        - protocol: TCP
+          port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-nightscout-digest-to-campfire
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: campfire-nightscout-digest
+      ports:
+        - protocol: TCP
+          port: 80
