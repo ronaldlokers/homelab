@@ -62,9 +62,9 @@ the entire baked-type pipeline are deleted rather than translated. Expect ~200
 lines of layout to replace ~1,000 of renderer.
 
 `@resvg/resvg-js` publishes prebuilt binaries for both architectures this repo
-runs on, including musl, so an Alpine base works:
-`@resvg/resvg-js-linux-arm64-musl` (production, Pi CM5) and
-`@resvg/resvg-js-linux-x64-musl` (staging, k3d on a Proxmox VM).
+runs on, in both libc flavours: `-linux-arm64-gnu` (production, Pi CM5) and
+`-linux-x64-gnu` (staging, k3d on a Proxmox VM), with musl variants if the base
+ever changes.
 
 Satori was considered and rejected: it is a CSS engine for OG images, and this
 is a data chart. Hand-built SVG is less magic and more controllable.
@@ -97,13 +97,20 @@ Each phase ships independently and is revertable on its own.
 
 ### 1. Skeleton and CI
 
-Repo, TypeScript config, linting, `Dockerfile` on `node:22-alpine`, and a
-multi-arch build publishing `linux/amd64` and `linux/arm64` to `ghcr.io`.
+Repo, TypeScript config, linting, `Dockerfile` on `node:22-bookworm-slim`, and
+a multi-arch build publishing `linux/amd64` and `linux/arm64` to `ghcr.io`,
+public.
 
 **Both architectures are mandatory** — staging is amd64 and production is arm64,
 and a single-arch image would pass in staging and fail on the Pis.
 
-*Exit:* a hello-world image runs on both clusters.
+**`tzdata` is installed explicitly**, never assumed. Every day boundary this
+program computes is a local midnight in `Europe/Amsterdam`, and a missing zone
+database does not crash — it silently falls back to UTC and reports the wrong
+day. A test asserts that a DST changeover produces a 23-hour day.
+
+*Exit:* a hello-world image runs on both clusters, and the DST test passes
+inside it.
 
 ### 2. Findings engine, with golden tests
 
@@ -189,14 +196,16 @@ new one has run in production for a week.
   the normal condition during a strangler migration, but it does mean two ways
   of doing the same thing while it lasts.
 
-## Open decisions
+## Decisions
 
-1. **Registry visibility** — `ghcr.io` public, or private with an
-   `imagePullSecret` in both clusters?
-2. **Node runtime** — `node:22-alpine`, or Debian slim if the musl binaries
-   cause trouble?
-3. **Does `stringer` publish to npm at all**, or only as a container image? Only
-   the image is needed; npm would be for its own sake.
+1. **Registry** — `ghcr.io`, **public**. No `imagePullSecret` in either cluster.
+2. **Base image** — **`node:22-bookworm-slim`**, not Alpine. Alpine's only real
+   advantage is ~35MB, which is nothing on three Pis with NVMe, and musl costs
+   the better-trodden arm64 path, the more widely exercised native binaries, and
+   an easy-to-forget `apk add tzdata` guarding a bug that would silently report
+   the wrong day.
+3. **No npm publish.** The container image is the only artefact. Publishing a
+   package with one consumer would be for its own sake.
 
 ## Out of scope
 
