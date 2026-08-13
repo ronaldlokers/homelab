@@ -57,6 +57,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -83,6 +84,19 @@ MARKER = "CAMPFIRE_NOTIFY_CHECK"
 # configured — the exit code has always been the load-bearing part.
 ROOM_URL = os.environ.get("CAMPFIRE_URL", "").strip()
 POST_TIMEOUT = 15
+
+# Retries, because a Job that posts seconds after starting races the CNI.
+#
+# NetworkPolicy is programmed asynchronously: k3s enforces it with REJECT, and
+# a pod whose first outbound connection happens before its rules are in place
+# gets ECONNREFUSED — indistinguishable from a listener that is down, and gone
+# by the time you look. Measured here: probes that connected after a delay
+# succeeded every time, and this Job, which posts within seconds of starting,
+# failed every time against the same policy.
+#
+# So back off and try again rather than treat the first refusal as an answer.
+# Worst case is 17 seconds against a Job that has minutes.
+POST_BACKOFF = (2, 5, 10)
 
 QUERY = f"""
 require "json"
@@ -127,11 +141,16 @@ def announce(found):
         headers={"Content-Type": "text/html; charset=utf-8"},
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(request, timeout=POST_TIMEOUT) as response:
-            log(f"posted the finding to Campfire ({response.status})")
-    except (urllib.error.URLError, OSError) as error:
-        log(f"could not post the finding: {error}")
+    for attempt, pause in enumerate((0, *POST_BACKOFF)):
+        if pause:
+            time.sleep(pause)
+        try:
+            with urllib.request.urlopen(request, timeout=POST_TIMEOUT) as response:
+                log(f"posted the finding to Campfire ({response.status})")
+                return
+        except (urllib.error.URLError, OSError) as error:
+            log(f"post attempt {attempt + 1} failed ({error})")
+    log("could not post the finding; reporting by exit code alone")
 
 
 def read_state():
