@@ -183,10 +183,58 @@ image, against the same Nightscout, reported the same 280 readings and 13 days
 of history as the Python, and posted one sheet into the room beside the
 Python's for the same day.
 
-### 6. `alerts`
+### 6. `alerts` — withdrawn
 
-A Deployment rather than a CronJob, so it exercises the long-running path and
-the readiness/liveness surface.
+**Not moving, and the plan was wrong to assume it could.** It was listed here as
+"a Deployment rather than a CronJob", as though the shape of the workload were
+the interesting difference. It is not.
+
+The bridge amends the message that announced an alert rather than posting a
+second one, so the room shows the current state instead of a log of states. That
+is not decoration — it is built on a Campfire implementation detail:
+`MessagesController#update` does not call `room.receive`, so **an edit notifies
+nobody**. The whole delivery rule falls out of that one fact:
+
+  * a fingerprint that was not firing before  → POST, so it pushes
+  * only resolutions since last time          → PATCH, silently
+  * the whole group resolved                  → PATCH, then forget it
+
+It also PATCHes `{destination}/{message_id}`, recovers that id from the
+`Location` header of its own POST, and needs a Campfire feature
+(basecamp/once-campfire#239) that the image is pinned to a digest for.
+
+A `Round` is `say` and `show`. It cannot express "amend the thing you said
+before, quietly", and neither can ntfy or most other destinations. Porting this
+room-agnostically means one of two things, and both are worse than leaving it:
+
+  * **drop the amending** — the room becomes a log of firing and resolved
+    states, and every resolution pushes a notification to a phone; or
+  * **add an `amend` capability to `Round`** that exactly one transport can
+    implement — an abstraction shaped by a single implementation, which is the
+    thing the seam exists to avoid.
+
+This is the same test `status-bot` failed, and it fails it harder: that one
+*reads* Campfire's stream, this one uses Campfire's editing semantics as a
+design primitive. A bot that only needs somewhere to post is portable. A bot
+that needs Campfire to behave like Campfire is not, and pretending otherwise
+buys nothing.
+
+## Where this ends
+
+The migration is finished at phase 5, and the line it drew is the honest one:
+the two bots that only ever needed somewhere to post — `glucose` and
+`renovate` — moved. The four that use Campfire as more than a destination, or
+are not bots at all, stayed:
+
+| App | Why it stayed |
+|---|---|
+| `campfire-alert-bridge` | amends its own messages; relies on edits not notifying |
+| `campfire-status-bot` | reads Campfire's message stream, holds an Anthropic key |
+| `campfire-kube-actor` | serves an API to the status bot; not a bot |
+| `campfire-notify-check` | checks notification config; not a bot |
+
+That is a better outcome than moving all six. "Campfire bots" turned out to name
+two different things, and only one of them was ever about the room.
 
 ## How homelab consumes it
 
