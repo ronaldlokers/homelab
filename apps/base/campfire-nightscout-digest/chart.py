@@ -100,7 +100,10 @@ CHIPS = (600, 678)
 CHIP_GAP = 16
 # The left edge is set so the widest y label starts exactly on the page margin:
 # the axis column is part of the page's left edge, not an indent from it.
-PLOT = (108, 766, WIDTH - MARGIN, 1110)
+PLOT = (MARGIN, 766, WIDTH - MARGIN, 1110)
+# The axis label column, inside the card, and a matching breath on the right so
+# the trace does not run into the border.
+PLOT_GUTTER, PLOT_EDGE = 96, 20
 PLOT_INSET = 30
 
 MMOL = 18.0182
@@ -456,10 +459,21 @@ def _draw_split_bar(canvas, parts):
     canvas.round_corners(left, top, right, bottom, (bottom - top) // 2, PANEL)
 
 
+def plot_area():
+    """The data rectangle inside the plot card.
+
+    The axis labels live in a column *inside* the card rather than beside it.
+    Outside, they pushed the card's left edge 52px further in than its right,
+    so the one element with an axis was the one element not on the page margin.
+    """
+    panel_left, top, panel_right, bottom = PLOT
+    return panel_left + PLOT_GUTTER, top, panel_right - PLOT_EDGE, bottom
+
+
 def draw_day(canvas, type_, readings, bands, day_start_ms):
     """Glucose against time of day, with the target band shaded and labelled."""
-    left, top, right, bottom = PLOT
-    canvas.round_rect(left, top, right, bottom, 12, PANEL)
+    canvas.round_rect(*PLOT, 12, PANEL)
+    left, top, right, bottom = plot_area()
 
     # The scale stops short of the frame at both ends. Without that gutter a
     # reading at the ceiling is drawn on the border itself, and the label for a
@@ -482,7 +496,7 @@ def draw_day(canvas, type_, readings, bands, day_start_ms):
         y = y_for(mmol * MMOL)
         if mmol * MMOL not in (70, 180):
             canvas.rect(left, y, right, y + 1, GRID)
-        type_.right(canvas, left - 14, int(y) + 8, "tick", f"{mmol:.1f}", MUTED)
+        type_.right(canvas, left - 16, int(y) + 11, "tick", f"{mmol:.1f}", MUTED)
     type_.draw(canvas, MARGIN, top - 30, "body", "mmol/L", MUTED)
 
     # Every three hours, but only the six-hour marks are labelled and ruled.
@@ -526,7 +540,7 @@ def _mark_extremes(canvas, type_, points, bands):
     cannot give you. They were a line of text under the chart; on the curve
     they also say *when*, which is the more useful half.
     """
-    left, top, right, bottom = PLOT
+    left, top, right, bottom = plot_area()
     lowest = min(points, key=lambda p: p[2])
     highest = max(points, key=lambda p: p[2])
 
