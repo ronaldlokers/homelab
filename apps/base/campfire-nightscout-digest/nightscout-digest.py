@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Post yesterday's glucose statistics into the private #Health room.
+"""Post the glucose sheet into the private #Health room.
 
 **This is not an alarm path and must never become one.** Campfire cannot carry
 CGM alarms: Web Push works only from an installed PWA, delivery is suppressed
@@ -19,8 +19,13 @@ are withheld and the coverage is reported instead.
 A day with no readings at all says so plainly. That is a real state, not an
 edge case — a sensor between sessions produces exactly it.
 
-Units: entries are stored in mg/dL whatever DISPLAY_UNITS says, so everything
-is computed in mg/dL and converted for display. The thresholds below are the
+The sheet is the whole post. It carries the date, the exact figures and what
+the fortnight noticed, so nothing is posted alongside it — on an ordinary
+morning this program sends one image and no words. Words are for the days with
+nothing to draw, and for saying out loud that something broke.
+
+Units: entries are stored in mg/dL whatever DISPLAY_UNITS says, so everything is
+computed in mg/dL and converted for display. The thresholds below are the
 international consensus targets, in their mg/dL form.
 
 Posts as a dedicated **Health** bot rather than the Kubernetes one. The
@@ -37,13 +42,15 @@ Env:
     DIGEST_DATE                 report this day (YYYY-MM-DD) instead of
                                 yesterday; unset on the CronJob, for manual
                                 runs and backfill
+    DIGEST_SHEET                force "day" or "fortnight"; unset lets the
+                                calendar decide, which means the fortnight
+                                sheet on Saturdays
 """
 
 import html
 import json
 import os
 import secrets
-import statistics
 import sys
 import time
 import urllib.error
@@ -73,8 +80,6 @@ TIMEOUT = 20
 # while its NetworkPolicy is still being programmed.
 FETCH_ATTEMPTS = 3
 FETCH_RETRY_SECONDS = 5
-
-MMOL = 18.0182  # mg/dL per mmol/L
 
 # One reading per five minutes.
 EXPECTED_READINGS = 288
@@ -221,6 +226,18 @@ def split_into_days(entries, day_start, count=HISTORY_DAYS):
 
 
 def render(day, readings):
+    """The message posted **only when there will be no picture**.
+
+    On an ordinary day the sheet is the whole post. It carries the date, the
+    exact figures and what the fortnight noticed, so a message repeating them
+    was two objects saying one thing — and the repetition is why the sheet's
+    legend was dropped in the first place.
+
+    What is left here are the days with nothing to draw. Those must still say
+    something: a digest that simply stops arriving is indistinguishable from a
+    day nobody looked at, and silence is the one outcome that teaches you to
+    stop checking.
+    """
     values = [v for _, v in readings]
     date = day.strftime("%A %-d %B")
     uptime = len(values) / EXPECTED_READINGS * 100
@@ -232,31 +249,12 @@ def render(day, readings):
             "between sessions looks exactly like this.</div>"
         )
 
-    if uptime < MIN_UPTIME_PERCENT:
-        return (
-            f"<div><strong>🩺 {date}</strong></div>"
-            f"<div>Only {uptime:.0f}% sensor coverage "
-            f"({len(values)} of ~{EXPECTED_READINGS} readings), so the "
-            "statistics are left out: a range figure from a partial day "
-            "describes when the sensor was on, not the day.</div>"
-        )
-
-    mean = statistics.fmean(values)
-    rows = "".join(
-        f"<li>{name}: <code>{sum(1 for v in values if low <= v <= high) / len(values) * 100:.0f}%</code></li>"
-        for name, low, high in BANDS
-    )
     return (
         f"<div><strong>🩺 {date}</strong></div>"
-        f"<ul>{rows}</ul>"
-        "<div>"
-        f"average <code>{mean / MMOL:.1f}</code> mmol/L · "
-        # Glucose Management Indicator, the standard estimate of HbA1c from
-        # mean glucose. Defined on mg/dL, hence the unconverted mean.
-        f"GMI <code>{3.31 + 0.02392 * mean:.1f}%</code> · "
-        f"SD <code>{statistics.pstdev(values) / MMOL:.1f}</code> · "
-        f"sensor <code>{uptime:.0f}%</code>"
-        "</div>"
+        f"<div>Only {uptime:.0f}% sensor coverage "
+        f"({len(values)} of ~{EXPECTED_READINGS} readings), so the "
+        "statistics are left out: a range figure from a partial day "
+        "describes when the sensor was on, not the day.</div>"
     )
 
 
@@ -312,34 +310,46 @@ def main():
         # Say so in the room rather than failing quietly. A digest that simply
         # stops arriving is indistinguishable from a day nobody looked at.
         log(f"could not read Nightscout: {error!r}")
-        body = (
+        return post_words(
             "<div><strong>🩺 could not read Nightscout</strong></div>"
             f"<pre>{html.escape(str(error))}</pre>"
         )
-        entries, readings, days = [], [], []
-    else:
-        readings = [(stamp, value) for stamp, value in entries if stamp >= start_ms]
-        days = split_into_days(entries, day)
-        log(f"{day.date()}: {len(readings)} readings, {len(days)} days of history")
-        body = render(day, readings)
 
-    log(f"posted, campfire returned {post(body)}")
+    readings = [(stamp, value) for stamp, value in entries if stamp >= start_ms]
+    days = split_into_days(entries, day)
+    log(f"{day.date()}: {len(readings)} readings, {len(days)} days of history")
 
-    # The chart only when the statistics were shown. A picture of a partial day
-    # makes the same false claim the withheld numbers would have, and a picture
-    # of nothing is worse than no picture.
-    if days and len(readings) / EXPECTED_READINGS * 100 >= MIN_UPTIME_PERCENT:
-        try:
-            weekly = sheet_for(day)
-            png = (chart.render_fortnight if weekly else chart.render_day)(days, BANDS)
-            log(
-                f"{'fortnight' if weekly else 'day'} chart {len(png)} bytes, "
-                f"campfire returned {post_image(png)}"
-            )
-        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
-            # The numbers are already posted; a missing picture is not worth
-            # failing the run over.
-            log(f"chart failed: {error!r}")
+    # The sheet is the whole post. It carries the date, the exact figures and
+    # what the fortnight noticed, so there is nothing left for a message to add
+    # — and one thing said twice is one thing too many in a room read daily.
+    #
+    # Words only when there is no picture: a partial day makes the same false
+    # claim the withheld statistics would have, and a picture of nothing is
+    # worse than no picture. Those days still have to say something.
+    if not days or len(readings) / EXPECTED_READINGS * 100 < MIN_UPTIME_PERCENT:
+        return post_words(render(day, readings))
+
+    try:
+        weekly = sheet_for(day)
+        png = (chart.render_fortnight if weekly else chart.render_day)(days, BANDS)
+        log(
+            f"{'fortnight' if weekly else 'day'} chart {len(png)} bytes, "
+            f"campfire returned {post_image(png)}"
+        )
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
+        # The picture was the post, so its failure has to be said out loud.
+        # Falling silent here would look exactly like a morning that went fine.
+        log(f"chart failed: {error!r}")
+        return post_words(
+            "<div><strong>🩺 could not draw the chart</strong></div>"
+            f"<pre>{html.escape(str(error))}</pre>"
+        )
+    return 0
+
+
+def post_words(body):
+    """Post a message and report success, for the days with nothing to draw."""
+    log(f"posted words, campfire returned {post(body)}")
     return 0
 
 
