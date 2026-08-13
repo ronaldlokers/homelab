@@ -24,3 +24,22 @@ resources:
   - tandoor
   - netpol-check
   - recovery-source-check
+
+# One tag for every stringer workload in this cluster.
+#
+# The bridge, the responder, the briefing and both digests are the same build
+# running different beats, so pinning them separately only ever produced drift:
+# before this they sat at v0.4.0, v0.6.1, v0.7.0, v0.2.0 and v0.3.1, which meant
+# a fix to shared code — the outbound seam, the log redactor — reached whichever
+# workload happened to get bumped and silently missed the rest.
+#
+# Per-cluster rather than in base: staging soaking a release before production
+# takes it is the one difference worth keeping, and it is a cluster's decision.
+#
+# Renovate reads this through its kustomize manager, against the registry rather
+# than the release list. That is the stricter of the two: a tag only exists here
+# once the multi-arch image is actually pushed, so a release whose build failed
+# cannot be proposed.
+images:
+  - name: ghcr.io/ronaldlokers/stringer
+    newTag: v0.7.0

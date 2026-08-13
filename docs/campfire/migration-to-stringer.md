@@ -415,3 +415,34 @@ the same shape.
 The split between them is the point of the design — one process reads logs and
 calls a model, the other holds the RBAC — and it survives the move unchanged,
 because it was never about where the code lived.
+
+
+## One tag, after the fact
+
+Five workloads came out of this migration — the bridge, the responder, the
+briefing and the two digests — and each arrived with its own pinned tag, because
+each was ported in its own phase and bumped when its own beat changed. That is
+defensible one commit at a time and wrong in aggregate: by the end they sat at
+v0.4.0, v0.6.1, v0.7.0, v0.2.0 and v0.3.1 at once.
+
+They are the same build. A fix to anything shared — `rounds.ts`, the log
+redactor, the time handling — reached whichever workload happened to be bumped
+next and silently missed the other four. The bearer-token redaction fix is in
+v0.6.1; the bridge was on v0.4.0 and did not have it.
+
+So the tag lives once, in the cluster overlay:
+
+```yaml
+images:
+  - name: ghcr.io/ronaldlokers/stringer
+    newTag: v0.7.0
+```
+
+Base carries no tag at all. That is deliberate, and it introduces exactly one
+new way to be wrong — lose the overlay entry and all five quietly become
+`:latest` — so `validate.sh` fails any cluster render with an untagged image.
+The guard was checked by removing the entry and watching it fail, rather than by
+being read.
+
+Per cluster rather than in base, because staging soaking a release before
+production takes it is a real difference and a cluster's decision to make.

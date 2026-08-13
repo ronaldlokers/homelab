@@ -24,8 +24,11 @@ spec:
         runAsGroup: 1000
       containers:
         - name: bridge
-          # renovate: datasource=github-releases depName=ronaldlokers/stringer
-          image: ghcr.io/ronaldlokers/stringer:v0.4.0
+          # Untagged on purpose. Every stringer workload runs the same build, and the
+          # tag that build is lives once, in the cluster overlay's `images:` block —
+          # see apps/production/kustomization.yaml. Five separately-pinned copies is
+          # how the bridge ended up four releases behind the briefing.
+          image: ghcr.io/ronaldlokers/stringer
           args: ["alerts"]
           ports:
             - name: http
