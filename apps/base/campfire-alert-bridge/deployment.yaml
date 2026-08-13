@@ -41,6 +41,20 @@ spec:
                 secretKeyRef:
                   name: campfire-alert-bridge
                   key: CAMPFIRE_URL
+            # Where a cluster with no Campfire of its own files its
+            # briefing. The briefing's own Secret rather than a copy of the
+            # URL: same room, same bot key, and a second copy of a credential
+            # is the drift secret-refs-check exists to catch.
+            #
+            # Unset would not break anything — /briefing is the one path whose
+            # absence does not make the bridge unhealthy, because the Job that
+            # files a briefing fails visibly in the cluster that sent it, while
+            # Alertmanager and Flux retry a 404 in silence.
+            - name: CAMPFIRE_BRIEFING_URL
+              valueFrom:
+                secretKeyRef:
+                  name: campfire-morning-briefing
+                  key: CAMPFIRE_URL
             - name: CAMPFIRE_FLUX_URL
               valueFrom:
                 secretKeyRef:

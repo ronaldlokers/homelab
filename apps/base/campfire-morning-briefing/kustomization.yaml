@@ -1,0 +1,22 @@
+# The morning briefing, in its own directory since a second cluster wants it
+# without the responder.
+#
+# It used to live beside the responder, on the argument that it is not a second
+# app — the same checks, run on a schedule instead of on demand. That was right
+# while one cluster ran both. It stopped being right when staging, which has no
+# Campfire and no interactive bot, needed the briefing alone: a base that
+# bundles them is a base staging cannot consume.
+#
+# The pods still carry `app: campfire-status-bot`. That label is a policy
+# selector rather than an identity — it already grants egress to the Kubernetes
+# API, to Campfire on :80 and to Prometheus — and splitting the directory is no
+# reason to restate four network policies. The identity that does matter, the
+# ServiceAccount, was separated already and lives in rbac.yaml here.
+#
+# No `namespace:` — each resource declares its own, matching the sibling
+# campfire-* directories.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - rbac.yaml
+  - cronjob.yaml

@@ -3,7 +3,6 @@ kind: Kustomization
 resources:
   - ../../base/campfire-status-bot/
   - campfire-status-bot-secret.yaml
-  - campfire-morning-briefing-secret.yaml
 
 patches:
   # Opt in to Reloader so rotating the API key rolls the pod. ANTHROPIC_API_KEY
