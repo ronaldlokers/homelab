@@ -23,5 +23,4 @@ resources:
   - speedtest
   - tandoor
   - netpol-check
-  - secret-refs-check
   - recovery-source-check

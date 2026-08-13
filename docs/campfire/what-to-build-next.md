@@ -46,10 +46,33 @@ So folding all three in would have traded a hard boundary for a soft one:
 
   * The briefing has its own ServiceAccount now, so a grant it needs is not a
     grant the responder gets.
-  * The two Secret readers can move behind that identity. Both are pure reads.
-  * **`netpol-check` stays where it is.** `pods/exec` is write-shaped, and a
-    daily reporting job should not be able to run commands in arbitrary pods.
-    If its findings should be visible, that is option A for that one script.
+  * **`secret-refs-check` moved.** It is a pure read, and the way it reads
+    matters: the cluster-wide list asks for metadata only, so no value crosses
+    the wire, and drift is reported as SHA-256 prefixes rather than values.
+  * **`recovery-source-check` cannot move either** — this is the part the plan
+    got wrong. It reads Secrets *and* runs `barman-cloud-backup-list` inside a
+    postgres pod, deliberately, so that the catalogue is read by the tool a real
+    restore would use rather than by this repository's idea of barman. That
+    design is right and it needs `pods/exec`. So it stays too.
+  * **`netpol-check` stays where it is**, for the same reason. `pods/exec` is
+    write-shaped, and a daily reporting job should not be able to run commands
+    in arbitrary pods.
+
+So the answer is one of three, not three. The two that stay are not stuck: if
+their findings should be visible, that is option A for those two scripts, and
+worth deciding on its own.
+
+### One more thing the move did not fix
+
+Campfire is production-only, so staging keeps running the Python CronJob — 4
+mirrored credentials there, and no briefing to fold them into. Two
+implementations of one check, in two languages, which is exactly the drift the
+`validate.sh` copy gate exists to prevent, one layer up.
+
+The fix is not to duplicate harder. It is to give staging a briefing: stringer
+already speaks ntfy, staging already has a Prometheus and an ntfy topic, and
+staging would gain the other seven checks rather than keeping only this one.
+Then the Python goes.
 
 ## 2. Speedtest, as the press's second tenant
 
