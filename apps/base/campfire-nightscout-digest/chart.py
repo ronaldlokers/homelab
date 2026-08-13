@@ -93,27 +93,29 @@ COLOURS = {
 
 WIDTH, HEIGHT = 1000, 1200
 MARGIN = 56
-HERO = (MARGIN, 320)
-BAR = (MARGIN, 412, WIDTH - MARGIN, 454)
-ENCOURAGEMENT = 512
-CHIPS = (552, 630)
+HERO = (MARGIN, 340)
+BAR = (MARGIN, 444, WIDTH - MARGIN, 486)
+ENCOURAGEMENT = 552
+CHIPS = (600, 678)
 CHIP_GAP = 16
 # The left edge is set so the widest y label starts exactly on the page margin:
 # the axis column is part of the page's left edge, not an indent from it.
-PLOT = (108, 714, WIDTH - MARGIN, 1128)
+PLOT = (108, 766, WIDTH - MARGIN, 1110)
 PLOT_INSET = 30
 
 MMOL = 18.0182
 # Fixed vertical extent rather than one fitted to the data: a flat day should
-# look flat, not fill the frame. The ceiling is 300 mg/dL because readings above
-# it are rare and reserving a third of the plot for them wastes the part you
-# actually read; anything higher clamps to the top edge, still plainly orange.
-Y_MIN, Y_MAX = 40, 300
+# look flat, not fill the frame. The ceiling is 14 mmol/L, the top of the "high"
+# band — above it the readings are rare and the space they reserve is stolen
+# from the part actually read, which is the four mmol either side of target.
+# Anything higher clamps to the top edge, still plainly orange, and the marker
+# on the day's peak still carries its true value.
+Y_MIN, Y_MAX = 40, 14.0 * MMOL
 # Gridlines and labels, in mmol/L. 3.9 and 10.0 are the target edges and are
 # the two that matter. The last is the ceiling itself: without it the top of
 # the frame is an unlabelled edge, and a trace pinned against it looks like a
 # reading rather than a clamp. The true value is still on the high marker.
-Y_TICKS = (3.9, 6.0, 10.0, 14.0, Y_MAX / MMOL)
+Y_TICKS = (3.9, 6.0, 10.0, Y_MAX / MMOL)
 # Shaded as night. Not an interval anyone chose — it is simply the part of the
 # day whose numbers were produced while asleep, and it reads differently.
 NIGHT_HOURS = (0, 6)
@@ -428,7 +430,7 @@ def draw_summary(canvas, type_, values, bands):
 
     in_range = dict(parts)["in range"]
     type_.draw(canvas, HERO[0], HERO[1], "hero", f"{in_range * 100:.0f}%", INK)
-    type_.draw(canvas, HERO[0], HERO[1] + 52, "body", "time in range 3.9-10.0", MUTED)
+    type_.draw(canvas, HERO[0], HERO[1] + 56, "body", "time in range 3.9-10.0", MUTED)
 
     _draw_split_bar(canvas, parts)
     type_.draw(canvas, MARGIN, ENCOURAGEMENT, "body", encouragement(values, bands), INK)
@@ -525,11 +527,16 @@ def _mark_extremes(canvas, type_, points, bands):
     they also say *when*, which is the more useful half.
     """
     left, top, right, bottom = PLOT
-    for point, above in (
-        (min(points, key=lambda p: p[2]), False),
-        (max(points, key=lambda p: p[2]), True),
-    ):
-        x, y, value = point
+    lowest = min(points, key=lambda p: p[2])
+    highest = max(points, key=lambda p: p[2])
+
+    # A day that never moved has one extreme, not two. Marking it twice draws
+    # both labels on the same reading, where they overlap into nonsense — which
+    # is exactly what a flat day above the ceiling produced.
+    marks = [(highest, True)] if lowest[2] == highest[2] else [(lowest, False), (highest, True)]
+
+    placed = []
+    for (x, y, value), above in marks:
         colour = COLOURS[band_of(value, bands)]
         canvas.dot(x, y, 6, PAGE, 0.75)
         canvas.dot(x, y, 4.5, colour)
@@ -541,23 +548,31 @@ def _mark_extremes(canvas, type_, points, bands):
         # on, so a label flipped over there lands squarely on the curve. When
         # the preferred side is out of frame the label goes *beside* the
         # reading instead, level with it, on whichever side has more room.
-        room = (y - 52 >= top + 4) if above else (y + 52 <= bottom - 4)
-        if room:
-            band = (y - 52, y - 12) if above else (y + 12, y + 52)
-            baseline = (y - 20) if above else (y + 44)
+        if (y - 52 >= top + 4) if above else (y + 52 <= bottom - 4):
+            box = [y - 52, y - 12] if above else [y + 12, y + 52]
             # The extreme is often at one end of the day — a night that ended
             # low, a dinner still climbing — so the label slides along the axis
             # to stay in frame while the marker stays on the reading.
             centre = min(max(x, left + half + 4), right - half - 4)
         else:
-            band = (y - 20, y + 20)
+            box = [y - 20, y + 20]
             offset = half + 26
             centre = x + offset if x < (left + right) / 2 else x - offset
             centre = min(max(centre, left + half + 4), right - half - 4)
-            baseline = y + 12
 
-        canvas.round_rect(centre - half, band[0], centre + half, band[1], 10, PAGE, 0.85)
-        type_.centre(canvas, centre, baseline, "tick", label, INK)
+        # A spike whose peak and trough are minutes apart puts the two labels
+        # on top of each other. Push the later one clear rather than dropping
+        # it: both numbers are only on the chart, not in the message.
+        for other_centre, other_half, other_box in placed:
+            overlaps_x = abs(centre - other_centre) < half + other_half
+            overlaps_y = box[0] < other_box[1] and other_box[0] < box[1]
+            if overlaps_x and overlaps_y:
+                shift = other_box[1] - box[0] + 8 if above else other_box[0] - box[1] - 8
+                box = [box[0] + shift, box[1] + shift]
+
+        placed.append((centre, half, box))
+        canvas.round_rect(centre - half, box[0], centre + half, box[1], 10, PAGE, 0.85)
+        type_.centre(canvas, centre, box[0] + 32, "tick", label, INK)
 
 
 def draw_chips(canvas, type_, values):
@@ -593,10 +608,10 @@ def render(readings, bands, day_start_ms, title="", subtitle="", source=SOURCE):
     # the provenance, on one line under it. It spent a version as a kicker above
     # the date, which is a label wearing a heading's position: it took the eye
     # first and said the one thing that never changes.
-    type_.draw(canvas, MARGIN, 88, "title", title, INK)
+    type_.draw(canvas, MARGIN, 92, "title", title, INK)
     meta = " · ".join(part for part in (source, subtitle) if part)
     if meta:
-        type_.draw(canvas, MARGIN, 142, "body", meta, MUTED)
+        type_.draw(canvas, MARGIN, 148, "body", meta, MUTED)
 
     draw_summary(canvas, type_, values, bands)
     draw_chips(canvas, type_, values)
