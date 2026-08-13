@@ -335,7 +335,7 @@ A `Round` is outbound only. None of the above is outbound.
 Two phases, and they only make sense together — phase seven alone would leave
 the same checks written twice in two languages, which is worse than today.
 
-### 7. The briefing, and the checks under it
+### 7. The briefing, and the checks under it — done
 
 `--briefing` is already a CronJob that runs the checks once and posts only if
 something is worth saying. That is a beat, and it is the same shape as
@@ -347,8 +347,16 @@ meanwhile, still from its own copy — the duplication is real but lasts one
 phase, and the briefing is the half that can be verified by simply reading what
 lands in the room.
 
-*Exit:* the briefing posts from the image, and its output matches the Python's
-on the same cluster.
+**Done.** `beats/briefing.ts` runs the same checks from `src/copy/cluster/`,
+and the CronJob takes the image. The Deployment keeps the ConfigMap and keeps
+serving the interactive verbs from Python, so the checks exist twice until
+phase 8 — which is the cost this phase was always going to carry, and the
+reason the two were planned together.
+
+What carried over intact is the rule that a clean cluster gets no message, and
+its corollary: a check that could not run reports itself under "not checked"
+rather than contributing nothing. An unknown reported as healthy is the one
+failure mode that makes a briefing worse than having none.
 
 ### 8. The responder, and an inbound seam
 
