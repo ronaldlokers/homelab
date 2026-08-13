@@ -2,10 +2,14 @@
 
 <!-- impeccable:product-schema 1 -->
 
-Scope note: this record covers the **images and messages this homelab posts into
-Campfire** — the daily glucose digest first, and the house style the other
-automated posts will inherit. It is not a record of the cluster itself, which
-`CLAUDE.md` and `docs/` already document.
+Scope: everything in the **campfire namespace** that posts into a room —
+`campfire-nightscout-digest` first, and the house style the other bots
+(`campfire-morning-briefing`, `campfire-renovate-digest`, `campfire-status-bot`,
+`campfire-alert-bridge`, `campfire-kube-actor`, `campfire-notify-check`) will
+inherit. Not a record of the cluster itself; `CLAUDE.md` and the rest of `docs/`
+already cover that.
+
+Companion: [DESIGN.md](DESIGN.md) records the visual system built from this.
 
 ## Platform
 

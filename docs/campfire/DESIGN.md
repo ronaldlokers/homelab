@@ -2,8 +2,10 @@
 
 <!-- impeccable:design-schema 1 -->
 
-Scope: the images this homelab posts into Campfire. Recorded from the built
+Scope: the images posted by the **campfire namespace**. Recorded from the built
 sheets in `apps/base/campfire-nightscout-digest/chart.py`, not from intentions.
+
+Product truth lives in [PRODUCT.md](PRODUCT.md) beside this file.
 
 ## The world
 
