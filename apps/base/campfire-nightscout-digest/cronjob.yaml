@@ -5,6 +5,15 @@
 # The briefing is exception-driven because a green cluster is not information;
 # a day's glucose statistics are, and the trend only exists if the number
 # arrives daily.
+#
+# To re-post an older day — one missed while something was broken, or simply a
+# day with a sensor on it — set DIGEST_DATE on a one-off Job. It is deliberately
+# absent here, so the scheduled run always means yesterday:
+#
+#   kubectl create job --from=cronjob/campfire-nightscout-digest digest-manual \
+#     -n campfire --dry-run=client -o yaml |
+#     kubectl set env --local -f - DIGEST_DATE=2026-08-05 -o yaml |
+#     kubectl apply -f -
 apiVersion: batch/v1
 kind: CronJob
 metadata:
