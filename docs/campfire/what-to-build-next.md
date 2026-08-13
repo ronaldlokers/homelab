@@ -69,10 +69,20 @@ mirrored credentials there, and no briefing to fold them into. Two
 implementations of one check, in two languages, which is exactly the drift the
 `validate.sh` copy gate exists to prevent, one layer up.
 
-The fix is not to duplicate harder. It is to give staging a briefing: stringer
-already speaks ntfy, staging already has a Prometheus and an ntfy topic, and
-staging would gain the other seven checks rather than keeping only this one.
-Then the Python goes.
+**Done, and not the way that paragraph said.** ntfy was the wrong answer: staging
+already talks to production's Campfire, and has since the Flux alerts were
+pointed at `campfire-bridge.ronaldlokers.nl`. It holds no bot key to do it —
+it POSTs to the bridge, which holds the key.
+
+So the briefing crosses the same way. `BRIEFING_BRIDGE_URL` on the beat,
+`/briefing` on the bridge, `CLUSTER: staging` on the message. What crosses is
+the briefing, not the markup: the bridge's only authentication is a LAN-only
+ingress, so a path taking rendered HTML would let anything on that network post
+arbitrary markup into a room.
+
+Staging gained the other eight checks rather than keeping one, and
+`scripts/secret-refs-check.py`, its base CronJob and its copy-match gate entry
+are gone.
 
 ## 2. Speedtest, as the press's second tenant
 

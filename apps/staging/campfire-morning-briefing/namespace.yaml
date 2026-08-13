@@ -1,0 +1,10 @@
+# Staging has no Campfire, and this namespace still gets its name — the base
+# manifests declare it, and renaming it here would mean patching every resource
+# to say something that is only cosmetically more honest.
+#
+# What lives in it is one CronJob. Nothing listens, nothing is exposed, and the
+# only thing leaving is a briefing filed to the other cluster's bridge.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: campfire

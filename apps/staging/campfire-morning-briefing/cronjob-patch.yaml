@@ -1,0 +1,29 @@
+# Staging files its briefing through production's bridge rather than posting it.
+#
+# The same crossing the Flux alerts already make, for the same reason: staging
+# has no Campfire, and giving it a bot key would put a second copy of a
+# credential in a second cluster to keep in step. The bridge holds the key and
+# does the posting; what leaves here is the briefing itself.
+#
+# A JSON patch replacing the whole env list, not a strategic merge. A merge
+# patches env by name and leaves entries it does not mention — so the base's
+# CAMPFIRE_URL survived, pointing at a bot key that does not exist here, and
+# the pod would have sat in CreateContainerConfigError while every controller
+# above it reported Ready. That is the failure this briefing's own
+# secret-reference check exists to catch, and shipping one to introduce it
+# would have been a poor joke. Caught by reading the render.
+#
+# No CAMPFIRE_URL at all: with none set the beat would file to stdout, and it
+# is filing through a bridge instead.
+- op: replace
+  path: /spec/jobTemplate/spec/template/spec/containers/0/env
+  value:
+    - name: BRIEFING_BRIDGE_URL
+      value: "https://campfire-bridge.ronaldlokers.nl/briefing"
+    # Both clusters file into the same room. Without this a staging failure
+    # reads as a production one — the confusion the Flux events are already
+    # labelled against.
+    - name: CLUSTER
+      value: "staging"
+    - name: PROMETHEUS_URL
+      value: "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090"
