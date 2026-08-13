@@ -22,14 +22,18 @@ spec:
           restartPolicy: Never
           securityContext:
             runAsNonRoot: true
-            runAsUser: 65534
-            runAsGroup: 65534
+            # The image runs as `node` (uid 1000); 65534 has no home and npm's
+            # entrypoint does not need one, but the uid must exist in the image
+            # for runAsNonRoot to be satisfiable without surprises.
+            runAsUser: 1000
+            runAsGroup: 1000
             seccompProfile:
               type: RuntimeDefault
           containers:
             - name: digest
-              image: python:3.13-alpine
-              command: ["python3", "/opt/digest/renovate-digest.py"]
+              # renovate: datasource=github-releases depName=ronaldlokers/stringer
+              image: ghcr.io/ronaldlokers/stringer:v0.2.0
+              args: ["renovate"]
               env:
                 # GITHUB_TOKEN is Renovate's own token. It can write, which a
                 # digest has no use for — worth replacing with a read-only
@@ -39,6 +43,9 @@ spec:
                     secretKeyRef:
                       name: campfire-renovate-digest
                       key: GITHUB_TOKEN
+                # Still CAMPFIRE_URL: stringer reads it as a deprecated alias
+                # for ROOM_URL, so the Secret can migrate on its own schedule
+                # rather than on this one.
                 - name: CAMPFIRE_URL
                   valueFrom:
                     secretKeyRef:
@@ -56,10 +63,4 @@ spec:
                 limits:
                   cpu: 200m
                   memory: 128Mi
-              volumeMounts:
-                - name: script
-                  mountPath: /opt/digest
-          volumes:
-            - name: script
-              configMap:
-                name: campfire-renovate-digest-script
+          # No script volume: the code is in the image now.
