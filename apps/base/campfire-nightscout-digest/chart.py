@@ -66,15 +66,20 @@ COLOURS = {
 
 # --- layout ----------------------------------------------------------------
 
-WIDTH, HEIGHT = 800, 1360
+WIDTH, HEIGHT = 800, 1386
 MARGIN = 48
-CARD = (MARGIN, 150, WIDTH - MARGIN, 470)
-HERO = (80, 268)
-BAR = (80, 390, WIDTH - 80, 424)
-LEGEND = (430, 196)
+CARD = (MARGIN, 176, WIDTH - MARGIN, 496)
+HERO = (80, 294)
+BAR = (80, 416, WIDTH - 80, 450)
+LEGEND = (430, 222)
 LEGEND_ROW = 34
-PLOT = (118, 570, WIDTH - MARGIN, 1170)
-TILES = (1230, 1330)
+PLOT = (118, 596, WIDTH - MARGIN, 1196)
+TILES = (1256, 1356)
+
+# What the picture is of. The date is the title because the date is what
+# changes, but a date alone is not a subject: opened full screen the message it
+# was attached to is no longer on the page, and forwarded it never was.
+HEADING = "Blood glucose · Nightscout"
 
 MMOL = 18.0182
 # Fixed vertical extent rather than one fitted to the data: a flat day should
@@ -507,14 +512,15 @@ def draw_tiles(canvas, type_, values):
         type_.right(canvas, left + width - 20, top + 78, "body", unit, FAINT)
 
 
-def render(readings, bands, day_start_ms, title="", subtitle=""):
+def render(readings, bands, day_start_ms, title="", subtitle="", heading=HEADING):
     canvas = Canvas(WIDTH, HEIGHT, PAGE)
     type_ = Type()
     values = [v for _, v in readings]
 
-    type_.draw(canvas, MARGIN, 78, "title", title, INK)
+    type_.draw(canvas, MARGIN, 46, "body", heading, MUTED)
+    type_.draw(canvas, MARGIN, 104, "title", title, INK)
     if subtitle:
-        type_.draw(canvas, MARGIN, 116, "body", subtitle, MUTED)
+        type_.draw(canvas, MARGIN, 142, "body", subtitle, MUTED)
 
     draw_summary(canvas, type_, values, bands)
     draw_day(canvas, type_, readings, bands, day_start_ms)
