@@ -46,7 +46,7 @@ spec:
           containers:
             - name: digest
               # renovate: datasource=github-releases depName=ronaldlokers/stringer
-              image: ghcr.io/ronaldlokers/stringer:v0.3.0
+              image: ghcr.io/ronaldlokers/stringer:v0.3.1
               args: ["glucose"]
               envFrom:
                 - secretRef:
