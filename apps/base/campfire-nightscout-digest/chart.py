@@ -20,13 +20,14 @@ where 3.9 and 10.0 sit, the eye reads the plot background as the target range,
 and a day that was 100% in range looks like it has excursions. A chart that
 disagrees with its own caption is worse than no chart.
 
-*It is portrait, and sized for a phone*, which is where the digest is read. A
-wide chart arrives in the room scaled to the width of the message column, which
-is where small text stops being legible.
+*It is sized to the box it is shown in*, which a screenshot settled: Campfire
+caps an attachment on height, so a tall image is scaled down and shown narrow.
+The canvas is 1000x1200 because that is the box exactly.
 
-*It is self-contained.* Tap the attachment and the message is no longer on
-screen, so the statistics are drawn into the image rather than left to the text
-beside it.
+*It draws only what stays legible at that size.* Roughly 340 CSS pixels across
+is not enough for a five-row legend and three statistic tiles as well, and
+every number those carried is in the message posted directly above the picture.
+Type big enough to read beats a second copy of the text.
 """
 
 import math
@@ -80,23 +81,27 @@ COLOURS = {
 
 # --- layout ----------------------------------------------------------------
 #
-# One spacing step, used everywhere: PAD inside a card, 2*PAD between blocks.
-# The previous version had card padding of 32, tile padding of 20 and a page
-# margin of 48, so nothing lined up with anything at three different depths.
+# Sized to the box Campfire actually gives an attachment, which a screenshot
+# settled: it is capped on *height*, at about 339x400 CSS px, and 3x on a
+# phone makes that 1017x1200 device pixels. The old 800x1360 hit the height cap
+# first and was drawn at 706x1200 — downscaled twelve percent with a third of
+# the available width left empty. Portrait was the wrong instinct: past this
+# aspect ratio, taller only means smaller.
+#
+# 1000x1200 fills the box at 1:1. Nothing here is drawn smaller than it has to
+# be, and nothing is drawn that the message beside it already says.
 
-WIDTH, HEIGHT = 800, 1360
-MARGIN = 48
-PAD = 24
-CARD = (MARGIN, 150, WIDTH - MARGIN, 470)
-HERO = (MARGIN + PAD, 268)
-BAR = (MARGIN + PAD, 390, WIDTH - MARGIN - PAD, 424)
-LEGEND = (422, 196)
-LEGEND_ROW = 34
+WIDTH, HEIGHT = 1000, 1200
+MARGIN = 56
+HERO = (MARGIN, 300)
+BAR = (MARGIN, 380, WIDTH - MARGIN, 422)
+ENCOURAGEMENT = 470
+CHIPS = (500, 578)
+CHIP_GAP = 16
 # The left edge is set so the widest y label starts exactly on the page margin:
 # the axis column is part of the page's left edge, not an indent from it.
-PLOT = (115, 570, WIDTH - MARGIN, 1170)
-PLOT_INSET = 26
-TILES = (1230, 1330)
+PLOT = (108, 650, WIDTH - MARGIN, 1130)
+PLOT_INSET = 30
 
 MMOL = 18.0182
 # Fixed vertical extent rather than one fitted to the data: a flat day should
@@ -378,49 +383,62 @@ def shares(values, bands):
     ]
 
 
+def encouragement(values, bands):
+    """One line about how the day went, in the room's own voice.
+
+    Rules it is written to. It praises a good day and stays warm on a hard one.
+    It never instructs, never implies fault, and never says anything that could
+    be mistaken for medical advice — this is a review of a day already over, so
+    there is nothing left to act on and nothing to be told. A digest that
+    scolds is a digest that gets muted, and the whole point of it arriving
+    daily is that the trend only exists if it keeps arriving.
+
+    70% in range is the consensus target, so the ladder is hung off that rather
+    than off a number invented here.
+    """
+    in_range = dict(shares(values, bands))["in range"]
+    lows = sum(1 for v in values if v < 70) / len(values)
+    if in_range >= 0.95:
+        return "Outstanding! Almost the whole day in range."
+    if in_range >= 0.85:
+        return "Great day! Comfortably past the 70% target."
+    if in_range >= 0.70:
+        return "Target hit! That's the number that counts."
+    if lows >= 0.06:
+        return "A bumpy night, but you rode it out."
+    if in_range >= 0.50:
+        return "Not your day, and that's fine. One day is never a trend."
+    return "Some days just go like this. The average forgives it."
+
+
 def draw_summary(canvas, type_, values, bands):
-    """Time in range as the headline, the full split beside and below it.
+    """Time in range as the headline, the split beneath it as a length.
 
     The one number worth reading from across the room is time in range, so it
-    is the only thing set large. The bar carries the same five figures as the
-    legend; it is there because a proportion is easier to judge as a length
-    than as a percentage, and the legend is there because "no lows" is worth
-    reading and a bar cannot show a band that is 0% wide.
+    is the only thing set large. The bar is there because a proportion is
+    easier to judge as a length than as a percentage.
+
+    The five-row legend and the average/GMI/spread tiles that used to sit here
+    are gone. Campfire renders this image about 340 CSS pixels wide, which is
+    not enough for all of it at a legible size, and every number they carried
+    is already in the message posted directly above the picture. Type big
+    enough to read beats a second copy of the text.
     """
-    canvas.round_rect(*CARD, 16, PANEL)
     parts = shares(values, bands)
 
     in_range = dict(parts)["in range"]
     type_.draw(canvas, HERO[0], HERO[1], "hero", f"{in_range * 100:.0f}%", INK)
-    type_.draw(canvas, HERO[0], HERO[1] + 40, "body", "time in range 3.9-10.0", MUTED)
-
-    # Bands that did not happen stay on the list and step back out of the way.
-    # Removing them would lose the "no lows" that is worth reading; leaving them
-    # at full strength lets three zeroes outshout the two rows that describe the
-    # day, which on a good day is exactly what happened.
-    x, baseline = LEGEND
-    for name, share in parts:
-        # The swatch keeps its full strength whatever the row says: it is the
-        # key to the trace, and a dimmed orange is a different colour, not a
-        # quieter one. Only the words step back.
-        canvas.dot(x + 7, baseline - 7, 7, COLOURS[name])
-        ink = INK if share else MUTED
-        type_.draw(canvas, x + 28, baseline, "body", name, ink)
-        type_.right(canvas, CARD[2] - PAD, baseline, "stat", f"{share * 100:.0f}%", ink)
-        baseline += LEGEND_ROW
+    type_.draw(canvas, HERO[0], HERO[1] + 48, "body", "time in range 3.9-10.0", MUTED)
 
     _draw_split_bar(canvas, parts)
+    type_.draw(canvas, MARGIN, ENCOURAGEMENT, "body", encouragement(values, bands), INK)
 
 
 def _draw_split_bar(canvas, parts):
-    """The same five figures as a length, which is easier to judge than a list.
-
-    Two pixels of card colour between segments, so the split is legible as
+    """Two pixels of page colour between segments, so the split is legible as
     shape and not only as hue — the boundary between two adjacent bands is
     exactly where colour vision fails. That gap and the fixed band order are
-    what stop the bar depending on hue alone; the numbers are already in the
-    legend directly above it, and printing them a third time inside the bar
-    only crowds it.
+    what stop the bar depending on hue alone.
     """
     left, top, right, bottom = BAR
     span = right - left
@@ -463,7 +481,7 @@ def draw_day(canvas, type_, readings, bands, day_start_ms):
         if mmol * MMOL not in (70, 180):
             canvas.rect(left, y, right, y + 1, GRID)
         type_.right(canvas, left - 14, int(y) + 8, "tick", f"{mmol:.1f}", MUTED)
-    type_.draw(canvas, left, top - 15, "body", "mmol/L", MUTED)
+    type_.draw(canvas, MARGIN, top - 26, "body", "mmol/L", MUTED)
 
     # Every three hours, but only the six-hour marks are labelled and ruled.
     # The short ticks are enough to count 03:00 off without another line
@@ -542,26 +560,28 @@ def _mark_extremes(canvas, type_, points, bands):
         type_.centre(canvas, centre, (y - 22) if above else (y + 36), "tick", label, INK)
 
 
-def draw_tiles(canvas, type_, values):
-    """The three numbers that describe the day's shape rather than its extremes."""
+def draw_chips(canvas, type_, values):
+    """The three numbers that describe the day's shape rather than its extremes.
+
+    One line each, label and value side by side: at this size a stacked chip
+    would cost twice the height and buy nothing. Values are mono so the three
+    of them line up as a row of figures rather than three separate labels.
+    """
     mean = statistics.fmean(values)
-    tiles = (
-        ("average", f"{mean / MMOL:.1f}", "mmol/L"),
+    chips = (
+        ("average", f"{mean / MMOL:.1f}"),
         # Glucose Management Indicator, the standard estimate of HbA1c from
         # mean glucose. Defined on mg/dL, hence the unconverted mean.
-        ("GMI", f"{3.31 + 0.02392 * mean:.1f}%", "HbA1c"),
-        ("spread", f"{statistics.pstdev(values) / MMOL:.1f}", "SD"),
+        ("GMI", f"{3.31 + 0.02392 * mean:.1f}%"),
+        ("spread", f"{statistics.pstdev(values) / MMOL:.1f}"),
     )
-    top, bottom = TILES
-    width = (WIDTH - 2 * MARGIN - 32) / 3
-    for index, (label, value, unit) in enumerate(tiles):
-        left = MARGIN + index * (width + 16)
+    top, bottom = CHIPS
+    width = (WIDTH - 2 * MARGIN - 2 * CHIP_GAP) / 3
+    for index, (label, value) in enumerate(chips):
+        left = MARGIN + index * (width + CHIP_GAP)
         canvas.round_rect(left, top, left + width, bottom, 14, PANEL)
-        # Label alone on the first line, unit trailing the value on the second.
-        # Both on one line is how the widest pair — GMI and its unit — collided.
-        type_.draw(canvas, left + PAD, top + 32, "body", label, MUTED)
-        type_.draw(canvas, left + PAD, top + 78, "stat", value, INK)
-        type_.right(canvas, left + width - PAD, top + 78, "body", unit, MUTED)
+        type_.draw(canvas, left + 22, top + 52, "body", label, MUTED)
+        type_.right(canvas, left + width - 22, top + 54, "stat", value, INK)
 
 
 def render(readings, bands, day_start_ms, title="", subtitle="", source=SOURCE):
@@ -573,12 +593,12 @@ def render(readings, bands, day_start_ms, title="", subtitle="", source=SOURCE):
     # the provenance, on one line under it. It spent a version as a kicker above
     # the date, which is a label wearing a heading's position: it took the eye
     # first and said the one thing that never changes.
-    type_.draw(canvas, MARGIN, 78, "title", title, INK)
+    type_.draw(canvas, MARGIN, 88, "title", title, INK)
     meta = " · ".join(part for part in (source, subtitle) if part)
     if meta:
-        type_.draw(canvas, MARGIN, 116, "body", meta, MUTED)
+        type_.draw(canvas, MARGIN, 138, "body", meta, MUTED)
 
     draw_summary(canvas, type_, values, bands)
+    draw_chips(canvas, type_, values)
     draw_day(canvas, type_, readings, bands, day_start_ms)
-    draw_tiles(canvas, type_, values)
     return canvas.png()

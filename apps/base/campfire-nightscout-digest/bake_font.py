@@ -32,15 +32,20 @@ JETBRAINS = "/usr/share/fonts/TTF/JetBrainsMonoNLNerdFontMono-%s.ttf"
 
 LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 DIGITS = "0123456789"
-PUNCTUATION = " .,:%/-()·"
+PUNCTUATION = " .,:%/-()·!'"
 
 # name -> (font file, variable-font instance or None, size, charset)
+#
+# Sized for the box Campfire gives the attachment, not for the file. It renders
+# the image at 1017x1200 device pixels, so 34px of body type here is about 11
+# CSS pixels on the phone — near the floor, and nearly twice what the previous
+# 22px managed on a canvas that was being downscaled to fit.
 FACES = {
-    "title": (ADWAITA, "Bold", 46, LETTERS + DIGITS + " "),
-    "body": (ADWAITA, "Regular", 22, LETTERS + DIGITS + PUNCTUATION),
-    "hero": (JETBRAINS % "Bold", None, 96, DIGITS + "%"),
-    "stat": (JETBRAINS % "Bold", None, 28, DIGITS + "%.-"),
-    "tick": (JETBRAINS % "Regular", None, 22, DIGITS + ".:-"),
+    "title": (ADWAITA, "Bold", 64, LETTERS + DIGITS + " "),
+    "body": (ADWAITA, "Regular", 34, LETTERS + DIGITS + PUNCTUATION),
+    "hero": (JETBRAINS % "Bold", None, 180, DIGITS + "%"),
+    "stat": (JETBRAINS % "Bold", None, 40, DIGITS + "%.-"),
+    "tick": (JETBRAINS % "Regular", None, 30, DIGITS + ".:-"),
 }
 
 

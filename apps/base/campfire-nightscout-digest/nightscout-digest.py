@@ -283,8 +283,10 @@ def main():
                 BANDS,
                 start_ms,
                 title=day.strftime("%A %-d %B"),
-                subtitle=f"{len(values)} readings · "
-                f"{len(values) / EXPECTED_READINGS * 100:.0f}% sensor coverage",
+                # Just the coverage: the chart's metadata line has room for one
+                # more fact beside the source, and the reading count is in the
+                # message posted with it.
+                subtitle=f"{len(values) / EXPECTED_READINGS * 100:.0f}% sensor coverage",
             )
             log(f"chart {len(png)} bytes, campfire returned {post_image(png)}")
         except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
