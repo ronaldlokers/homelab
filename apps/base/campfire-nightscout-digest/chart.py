@@ -93,14 +93,14 @@ COLOURS = {
 
 WIDTH, HEIGHT = 1000, 1200
 MARGIN = 56
-HERO = (MARGIN, 300)
-BAR = (MARGIN, 380, WIDTH - MARGIN, 422)
-ENCOURAGEMENT = 470
-CHIPS = (500, 578)
+HERO = (MARGIN, 320)
+BAR = (MARGIN, 412, WIDTH - MARGIN, 454)
+ENCOURAGEMENT = 512
+CHIPS = (552, 630)
 CHIP_GAP = 16
 # The left edge is set so the widest y label starts exactly on the page margin:
 # the axis column is part of the page's left edge, not an indent from it.
-PLOT = (108, 650, WIDTH - MARGIN, 1130)
+PLOT = (108, 714, WIDTH - MARGIN, 1128)
 PLOT_INSET = 30
 
 MMOL = 18.0182
@@ -428,7 +428,7 @@ def draw_summary(canvas, type_, values, bands):
 
     in_range = dict(parts)["in range"]
     type_.draw(canvas, HERO[0], HERO[1], "hero", f"{in_range * 100:.0f}%", INK)
-    type_.draw(canvas, HERO[0], HERO[1] + 48, "body", "time in range 3.9-10.0", MUTED)
+    type_.draw(canvas, HERO[0], HERO[1] + 52, "body", "time in range 3.9-10.0", MUTED)
 
     _draw_split_bar(canvas, parts)
     type_.draw(canvas, MARGIN, ENCOURAGEMENT, "body", encouragement(values, bands), INK)
@@ -481,7 +481,7 @@ def draw_day(canvas, type_, readings, bands, day_start_ms):
         if mmol * MMOL not in (70, 180):
             canvas.rect(left, y, right, y + 1, GRID)
         type_.right(canvas, left - 14, int(y) + 8, "tick", f"{mmol:.1f}", MUTED)
-    type_.draw(canvas, MARGIN, top - 26, "body", "mmol/L", MUTED)
+    type_.draw(canvas, MARGIN, top - 30, "body", "mmol/L", MUTED)
 
     # Every three hours, but only the six-hour marks are labelled and ruled.
     # The short ticks are enough to count 03:00 off without another line
@@ -525,39 +525,39 @@ def _mark_extremes(canvas, type_, points, bands):
     they also say *when*, which is the more useful half.
     """
     left, top, right, bottom = PLOT
-    for point, prefer_above in (
+    for point, above in (
         (min(points, key=lambda p: p[2]), False),
         (max(points, key=lambda p: p[2]), True),
     ):
         x, y, value = point
-        # Below the low and above the high, unless that would put the label
-        # through the frame — a day that spent the night against the floor puts
-        # its minimum within a few pixels of the bottom edge.
-        above = prefer_above
-        if above and y - 44 < top + 4:
-            above = False
-        elif not above and y + 44 > bottom - 4:
-            above = True
         colour = COLOURS[band_of(value, bands)]
         canvas.dot(x, y, 6, PAGE, 0.75)
         canvas.dot(x, y, 4.5, colour)
 
         label = f"{value / MMOL:.1f}"
-        half = type_.width("tick", label) / 2 + 10
-        # The extreme is very often at one edge — a day that starts high, a
-        # sensor that ends low — so the label slides along to stay in frame
-        # while the marker stays on the reading.
-        centre = min(max(x, left + half + 4), right - half - 4)
-        canvas.round_rect(
-            centre - half,
-            (y - 44) if above else (y + 14),
-            centre + half,
-            (y - 14) if above else (y + 44),
-            8,
-            PAGE,
-            0.82,
-        )
-        type_.centre(canvas, centre, (y - 22) if above else (y + 36), "tick", label, INK)
+        half = type_.width("tick", label) / 2 + 12
+        # Below the low and above the high — never the other way round. The
+        # opposite side of an extreme is the side the trace arrived and left
+        # on, so a label flipped over there lands squarely on the curve. When
+        # the preferred side is out of frame the label goes *beside* the
+        # reading instead, level with it, on whichever side has more room.
+        room = (y - 52 >= top + 4) if above else (y + 52 <= bottom - 4)
+        if room:
+            band = (y - 52, y - 12) if above else (y + 12, y + 52)
+            baseline = (y - 20) if above else (y + 44)
+            # The extreme is often at one end of the day — a night that ended
+            # low, a dinner still climbing — so the label slides along the axis
+            # to stay in frame while the marker stays on the reading.
+            centre = min(max(x, left + half + 4), right - half - 4)
+        else:
+            band = (y - 20, y + 20)
+            offset = half + 26
+            centre = x + offset if x < (left + right) / 2 else x - offset
+            centre = min(max(centre, left + half + 4), right - half - 4)
+            baseline = y + 12
+
+        canvas.round_rect(centre - half, band[0], centre + half, band[1], 10, PAGE, 0.85)
+        type_.centre(canvas, centre, baseline, "tick", label, INK)
 
 
 def draw_chips(canvas, type_, values):
@@ -596,7 +596,7 @@ def render(readings, bands, day_start_ms, title="", subtitle="", source=SOURCE):
     type_.draw(canvas, MARGIN, 88, "title", title, INK)
     meta = " · ".join(part for part in (source, subtitle) if part)
     if meta:
-        type_.draw(canvas, MARGIN, 138, "body", meta, MUTED)
+        type_.draw(canvas, MARGIN, 142, "body", meta, MUTED)
 
     draw_summary(canvas, type_, values, bands)
     draw_chips(canvas, type_, values)
