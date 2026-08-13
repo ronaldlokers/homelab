@@ -25,15 +25,47 @@ Usage:
 
 Exit code is non-zero if any recovery source is empty, unreadable, or behind
 the prefix the cluster actually archives to.
+
+With --report-to, findings are also filed with the campfire bridge. Until that
+existed the output of this check went nowhere at all: a pod log, garbage
+collected, for a check whose whole subject is a failure nobody notices.
 """
 
 import argparse
 import base64
 import json
+import os
 import re
 import subprocess
 import sys
+import urllib.request
 from datetime import datetime, timedelta, timezone
+
+# Findings, in the words the room gets rather than the columns the log gets.
+FINDINGS = []
+
+
+def finding(subject, text):
+    """Record a failure, for a room rather than for a pod log."""
+    FINDINGS.append(f"{subject}: {text}")
+
+
+def file_findings(url, check, cluster, findings, timeout=15):
+    """File findings with the campfire bridge, which decides whether to say them.
+
+    Every run reports, a clean one included: the bridge cannot tell a check
+    that found nothing from a check that did not run, and only a run saying
+    "nothing" can clear what an earlier run said.
+    """
+    body = json.dumps({
+        "check": check,
+        "cluster": cluster or "",
+        "findings": findings,
+    }).encode()
+    request = urllib.request.Request(
+        url, data=body, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return response.status
 
 # The invariant is NOT "the recovery source is recent". Absolute age misses the
 # thing that actually went wrong: on the morning #260 was found, the stale
@@ -119,6 +151,12 @@ def running_pod(ctx, ns, cluster):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--context")
+    ap.add_argument("--report-to", default=os.environ.get("CHECK_BRIDGE_URL"),
+                    help="bridge URL to file findings with; defaults to "
+                         "$CHECK_BRIDGE_URL, and nothing is filed without one")
+    ap.add_argument("--cluster", default=os.environ.get("CLUSTER"),
+                    help="which cluster the findings are about, for a room that "
+                         "serves more than one; defaults to $CLUSTER")
     args = ap.parse_args()
     ctx = args.context
     failed = False
@@ -149,6 +187,8 @@ def main():
                 server = params.get("serverName")
         if not store:
             failed = True
+            finding(name, f"recovery source '{source}' resolves to no object store, "
+                          f"so a rebuild would have nothing to restore from")
             print(f"  FAIL {name:<20} recovery source '{source}' resolves to no object "
                   f"store, so a rebuild would have nothing to restore from")
             continue
@@ -158,6 +198,8 @@ def main():
         pod = running_pod(ctx, ns, name)
         if not pod:
             failed = True
+            finding(name, "no running pod to read the catalogue from, so the "
+                          "recovery source could not be checked at all")
             print(f"  FAIL {name:<20} no running pod to read the catalogue from")
             continue
 
@@ -171,6 +213,8 @@ def main():
 
         if newest is None:
             failed = True
+            finding(name, f"{prefix}: no base backup found — a rebuild would have "
+                          f"nothing to restore ({err})")
             print(f"  FAIL {name:<20} {prefix}: no base backup found — a rebuild would "
                   f"have nothing to restore ({err})")
             continue
@@ -190,6 +234,8 @@ def main():
                 a_server = plugin["parameters"].get("serverName")
         if not archive:
             failed = True
+            finding(name, f"{prefix}: cannot resolve where this cluster archives to, "
+                          f"so the pointer cannot be compared")
             print(f"  FAIL {name:<20} {prefix}: cannot resolve where this cluster "
                   f"archives to, so the pointer cannot be compared")
             continue
@@ -211,6 +257,10 @@ def main():
         lag = a_newest - newest
         if lag > MAX_LAG:
             failed = True
+            finding(name, f"recovery reads {prefix} (newest {stamp}) but the cluster "
+                          f"archives to {a_prefix} (newest "
+                          f"{a_newest.strftime('%Y-%m-%d %H:%M')}) — {lag.days}d behind, "
+                          f"and a rebuild would restore the older one")
             print(f"  FAIL {name:<20} recovery reads {prefix} (newest {stamp}) but the "
                   f"cluster archives to {a_prefix} (newest "
                   f"{a_newest.strftime('%Y-%m-%d %H:%M')}) — {lag.days}d behind, and "
@@ -221,6 +271,17 @@ def main():
 
     if not checked:
         print("  no cluster uses bootstrap.recovery — nothing to check")
+
+    if args.report_to:
+        try:
+            status = file_findings(args.report_to, "recovery-source", args.cluster, FINDINGS)
+            print(f"\n  filed {len(FINDINGS)} finding(s) with the bridge ({status})")
+        except Exception as error:  # noqa: BLE001 — any failure to file is the same failure
+            # A wrong recovery pointer that nobody is told about is exactly the
+            # failure this check exists to catch, so a run that cannot file its
+            # findings fails even when it found none. The Job's failure alerts.
+            failed = True
+            print(f"\n  FAILED to file findings with {args.report_to}: {error}")
 
     return 1 if failed else 0
 

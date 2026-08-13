@@ -1,6 +1,11 @@
-# Production carries no ntfy credential: a failed Job already reaches ntfy
-# through the KubeJobFailed alert, which is namespace-agnostic and routed by
-# the ntfy AlertmanagerConfig. One fewer credential to keep alive.
+# Production reaches the bridge in-cluster rather than back through its own
+# ingress: the Service is two namespaces away and the LAN round trip buys
+# nothing. No CLUSTER label — this is the cluster that owns the room, and
+# naming the common case adds a word to every heading while distinguishing
+# nothing.
+#
+# A crashed Job is still reported by KubeJobFailed, which is what this cluster
+# has always used instead of an ntfy credential of its own.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -15,3 +20,6 @@ spec:
               args:
                 - |
                   python3 /opt/check/netpol-check.py --ingress-ip 10.0.40.100
+              env:
+                - name: CHECK_BRIDGE_URL
+                  value: "http://campfire-alert-bridge.campfire.svc.cluster.local:8080/check"

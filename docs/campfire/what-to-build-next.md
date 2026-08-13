@@ -62,6 +62,19 @@ So the answer is one of three, not three. The two that stay are not stuck: if
 their findings should be visible, that is option A for those two scripts, and
 worth deciding on its own.
 
+**Decided and done: option A, through the bridge.** The objection to A was
+three more things holding a room URL — which stopped applying once the bridge
+existed. It gained a `/check` path taking `{check, cluster, findings}`, and both
+scripts file what they found to it on every run; neither holds a bot key, and
+staging crosses the same way its briefing does. The bridge decides what is worth
+saying: changed findings post, identical ones are silent, and a check that stops
+finding things says so once. netpol runs hourly, so that rule is the difference
+between a room that reads the bot and a room that mutes it.
+
+The ntfy path both checks used went with it. It said "a check failed" and left
+the finding in the pod log; a crashed Job still reaches the alerts room through
+`KubeJobFailed`, so nothing lost a signal and staging lost a credential.
+
 ### One more thing the move did not fix
 
 Campfire is production-only, so staging keeps running the Python CronJob — 4

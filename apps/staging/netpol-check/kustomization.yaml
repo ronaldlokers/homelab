@@ -3,7 +3,6 @@ kind: Kustomization
 namespace: netpol-check
 resources:
   - ../../base/netpol-check
-  - netpol-check-ntfy-secret.yaml
 patches:
   - path: cronjob-patch.yaml
     target:
