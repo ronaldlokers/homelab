@@ -555,6 +555,53 @@ kubectl logs -n campfire --context=production job/briefing-test
 means the cluster was clean. To see it actually post, break something first or
 shorten `BRIEFING_WINDOW_HOURS` so a recent alert falls inside the window.
 
+## Nightscout digest
+
+`campfire-nightscout-digest` is a daily CronJob (07:00 Europe/Amsterdam) that
+posts yesterday's glucose statistics into `#Health`.
+
+**`#Health` is a closed room with two members**: one human and a dedicated
+**Health** bot. The Kubernetes bot is deliberately not one of them — it holds
+an Anthropic API key, reads pod logs and can ask the actor to change the
+cluster, which is not an identity that should also publish health data. It was
+briefly a member while this was being built and was removed.
+
+**Not an alarm path, and it must not become one.** Campfire cannot carry CGM
+alarms: Web Push needs an installed PWA, delivery is suppressed while the room
+is connected, it depends on involvement staying `everything`, and there is no
+escalation and no acknowledgement. Nightscout's own alarms exist because low
+and high glucose are safety-critical. This is a review of a day already over.
+
+### The uptime floor
+
+A full day is about 288 readings. Time in range computed from a handful of them
+describes *when the sensor was on*, not the day — 34% coverage reporting "78%
+in range" reads as good control. So:
+
+| Coverage | Behaviour |
+|---|---|
+| none | "No readings" — a sensor between sessions looks exactly like this |
+| under 70% | Reports the coverage, withholds the statistics |
+| 70% or more | Full band breakdown, average, GMI, SD, sensor uptime |
+
+Not a hypothetical distinction: the first real run reported no readings,
+because there was no active sensor.
+
+### Two things worth knowing
+
+- **Entries are stored in mg/dL** whatever `DISPLAY_UNITS` says. Everything is
+  computed in mg/dL and converted for display; GMI is defined on mg/dL and uses
+  the unconverted mean.
+- **Nightscout binds to the pod IP, not `0.0.0.0`.** Its own loopback refuses
+  connections and `kubectl port-forward` cannot reach it. Service traffic from
+  another pod is unaffected, which is the only path the digest uses — but it
+  makes the obvious debugging move fail confusingly.
+
+The credential is Nightscout's `API_SECRET`, stored as its **SHA1** rather than
+the plaintext: the hash is what the `api-secret` header wants, so it opens the
+API but cannot be typed into the login form. Still read *and* write. A subject
+with the `readable` role is a drop-in replacement for that single value.
+
 ## Renovate digest
 
 `campfire-renovate-digest` is a weekly CronJob (Monday 08:00) that posts open

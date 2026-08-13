@@ -23,6 +23,11 @@ Units: entries are stored in mg/dL whatever DISPLAY_UNITS says, so everything
 is computed in mg/dL and converted for display. The thresholds below are the
 international consensus targets, in their mg/dL form.
 
+Posts as a dedicated **Health** bot rather than the Kubernetes one. The
+Kubernetes bot holds an Anthropic API key, reads pod logs and can ask the actor
+to change the cluster — not an identity that should also publish health data.
+It is not a member of the room.
+
 Env:
     CAMPFIRE_URL                full bot URL including the room and bot key
     NIGHTSCOUT_URL              base URL, default the in-cluster Service
