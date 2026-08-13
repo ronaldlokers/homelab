@@ -89,6 +89,26 @@ class Robustness(unittest.TestCase):
         png = chart.render_day(days, BANDS)
         self.assertEqual([t for t, _ in chunks(png)][-1], b"IEND")
 
+    def test_findings_never_grow_into_the_foot(self):
+        """The collision this test exists for was shipped and running.
+
+        Whenever the first finding wrapped to two lines the second was drawn
+        across the rule and the figures beneath it. Findings arrive in order of
+        consequence, so one that does not fit is dropped rather than drawn over
+        the numbers.
+        """
+        type_ = chart.Type()
+        long_ones = [
+            ("04:00", "ran 3.4 mmol below its usual, the day's biggest departure"),
+            ("in range", "88%, better than 8 of the last 13 days"),
+            ("the night", "1.2 mmol lower than your usual night"),
+        ]
+        for start in (chart.FINDINGS, chart.DAY_FINDINGS):
+            with self.subTest(start=start):
+                canvas = chart.Canvas(chart.WIDTH, chart.HEIGHT, chart.GROUND)
+                bottom = chart.draw_findings(canvas, type_, long_ones, start)
+                self.assertLessEqual(bottom, chart.FOOT - 24)
+
     def test_headline_wraps_rather_than_overflowing(self):
         """The headline is computed text, so its length is not knowable here."""
         type_ = chart.Type()
