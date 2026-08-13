@@ -16,6 +16,12 @@ nothing marking where 3.9 and 10.0 sit, the eye reads the plot background as the
 target range and a day that was 100% in range looks like it has excursions. A
 chart that disagrees with its own caption is worse than no chart, so everything
 is labelled now — axes, legend, and the day's range.
+
+The image is portrait and sized for a phone, which is where the digest is
+actually read. A wide chart arrives in the room scaled down to the width of the
+message column, which is where a 5x7 font stops being legible. Stacking the
+title, the pie with its legend, and the day plot means the picture fills a phone
+screen at close to its native size instead.
 """
 
 import math
@@ -41,10 +47,19 @@ PLOT_BG = (248, 250, 252)
 TARGET_BG = (219, 247, 228)
 TARGET_EDGE = (134, 213, 166)
 
-WIDTH, HEIGHT = 1100, 560
-PIE_CENTRE, PIE_RADIUS = (170, 320), 120
-LEGEND = (320, 200)
-PLOT = (630, 150, 1070, 470)
+# Portrait, because the digest is read on a phone. A landscape chart arrives in
+# the room shrunk to the width of the message column, which puts the 5x7 font
+# below the size it survives downscaling at. Taller than it is wide means the
+# image fills the screen instead, so TEXT is the size it looks here.
+WIDTH, HEIGHT = 800, 1300
+MARGIN = 48
+# Text sizes, in font pixels per glyph pixel. Everything the chart draws is one
+# of these three, so a change here is a change everywhere.
+TITLE, LABEL, UNIT = 5, 3, 3
+PIE_CENTRE, PIE_RADIUS = (196, 360), 140
+LEGEND = (390, 240)
+LEGEND_WIDTH, LEGEND_ROW = 362, 48
+PLOT = (110, 620, 760, 1180)
 
 MMOL = 18.0182
 # Fixed vertical extent rather than one fitted to the data: a flat day should
@@ -190,12 +205,12 @@ def draw_legend(canvas, values, bands):
     """
     x, y = LEGEND
     for name, share in shares(values, bands):
-        canvas.rect(x, y + 3, x + 18, y + 21, COLOURS[name])
-        canvas.rect(x, y + 3, x + 18, y + 4, INK)
-        canvas.rect(x, y + 20, x + 18, y + 21, INK)
-        canvas.text(x + 28, y + 5, name, INK, 2)
-        canvas.text_right(x + 215, y + 5, f"{share * 100:.0f}%", INK, 2)
-        y += 34
+        canvas.rect(x, y + 4, x + 28, y + 32, COLOURS[name])
+        canvas.rect(x, y + 4, x + 28, y + 6, INK)
+        canvas.rect(x, y + 30, x + 28, y + 32, INK)
+        canvas.text(x + 42, y + 8, name, INK, LABEL)
+        canvas.text_right(x + LEGEND_WIDTH, y + 8, f"{share * 100:.0f}%", INK, LABEL)
+        y += LEGEND_ROW
 
 
 def draw_day(canvas, readings, bands, day_start_ms):
@@ -210,25 +225,30 @@ def draw_day(canvas, readings, bands, day_start_ms):
     # The target range, shaded and edged, so "inside the green" is unambiguous.
     canvas.rect(left, y_for(180), right, y_for(70), TARGET_BG)
     for edge in (70, 180):
-        canvas.rect(left, y_for(edge), right, y_for(edge) + 2, TARGET_EDGE)
+        canvas.rect(left, y_for(edge), right, y_for(edge) + 3, TARGET_EDGE)
 
+    # Two pixels rather than one: the room scales the image down to the width of
+    # the message column, and a one-pixel rule is the first thing to disappear.
     for mmol in Y_TICKS:
         y = y_for(mmol * MMOL)
         if mmol * MMOL not in (70, 180):
-            canvas.rect(left, y, right, y + 1, GRID)
-        canvas.text_right(left - 10, y - 7, f"{mmol:.1f}", MUTED, 2)
-    canvas.text_right(left - 10, top - 34, "mmol/L", MUTED, 2)
+            canvas.rect(left, y, right, y + 2, GRID)
+        canvas.text_right(left - 12, y - 10, f"{mmol:.1f}", MUTED, LABEL)
+    # Left-aligned above the plot rather than over the tick column, which is not
+    # wide enough for the word at this size.
+    canvas.text(left, top - 36, "mmol/L", MUTED, UNIT)
 
     for hour in range(0, 25, 6):
         x = left + int(hour / 24 * (right - left))
-        canvas.rect(x, top, x + 1, bottom, GRID)
+        canvas.rect(x, top, x + 2, bottom, GRID)
         label = f"{hour:02d}:00"
+        width = font.text_width(label, LABEL)
         canvas.text(
-            min(x - font.text_width(label, 2) // 2, right - font.text_width(label, 2)),
-            bottom + 12,
+            min(x - width // 2, right - width),
+            bottom + 16,
             label,
             MUTED,
-            2,
+            LABEL,
         )
 
     points = []
@@ -239,12 +259,15 @@ def draw_day(canvas, readings, bands, day_start_ms):
         x = left + int(minutes / 1440 * (right - left))
         points.append((x, y_for(value), COLOURS[band_of(value, bands)]))
 
+    # Twenty minutes, expressed in pixels, so the join rule stays the same rule
+    # if the plot is ever resized again.
+    max_gap = max(3, int(20 / 1440 * (right - left)))
     previous = None
     for x, y, colour in points:
         # Only join readings adjacent in time. A gap where the sensor dropped
         # out should read as a gap, not as a straight line through values that
         # were never measured.
-        if previous and x - previous[0] <= 8:
+        if previous and x - previous[0] <= max_gap:
             canvas.line(previous[0], previous[1], x, y, colour, 1)
         canvas.dot(x, y, colour, 2)
         previous = (x, y)
@@ -254,22 +277,23 @@ def render(readings, bands, day_start_ms, title="", subtitle=""):
     canvas = Canvas(WIDTH, HEIGHT)
     values = [v for _, v in readings]
 
-    canvas.text(60, 40, title, INK, 4)
+    canvas.text(MARGIN, 44, title, INK, TITLE)
     if subtitle:
-        canvas.text(60, 92, subtitle, MUTED, 2)
+        canvas.text(MARGIN, 104, subtitle, MUTED, LABEL)
 
     draw_pie(canvas, values, bands)
     draw_legend(canvas, values, bands)
     draw_day(canvas, readings, bands, day_start_ms)
 
     # The extremes, which are the two numbers a glance actually wants and the
-    # ones a shaded band cannot give you.
+    # ones a shaded band cannot give you. Anchored to the margin rather than to
+    # the plot, because at this size the line is wider than the plot is.
     canvas.text(
-        PLOT[0],
-        PLOT[3] + 40,
+        MARGIN,
+        PLOT[3] + 60,
         f"low {min(values) / MMOL:.1f}   high {max(values) / MMOL:.1f}   "
         f"target 3.9-10.0",
         MUTED,
-        2,
+        LABEL,
     )
     return canvas.png()
