@@ -1,0 +1,59 @@
+# 07:00 local, alongside the morning briefing. Yesterday is a day already over,
+# so there is nothing here to act on and no reason for it to arrive earlier.
+#
+# Unlike the briefing, this posts every day whether or not anything stands out.
+# The briefing is exception-driven because a green cluster is not information;
+# a day's glucose statistics are, and the trend only exists if the number
+# arrives daily.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: campfire-nightscout-digest
+  namespace: campfire
+spec:
+  schedule: "0 7 * * *"
+  timeZone: "Europe/Amsterdam"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: campfire-nightscout-digest
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: digest
+              image: python:3.13-alpine
+              command: ["python3", "/opt/digest/nightscout-digest.py"]
+              envFrom:
+                - secretRef:
+                    name: campfire-nightscout-digest
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+              volumeMounts:
+                - name: script
+                  mountPath: /opt/digest
+          volumes:
+            - name: script
+              configMap:
+                name: campfire-nightscout-digest-script
