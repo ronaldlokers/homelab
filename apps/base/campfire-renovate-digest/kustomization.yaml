@@ -7,10 +7,6 @@ resources:
   - cronjob.yaml
   - network-policies.yaml
 
-# Hash suffix left ON: the suffix changes when the script changes, which
-# rewrites the CronJob's volume reference so the next run picks up new code.
-configMapGenerator:
-  - name: campfire-renovate-digest-script
-    namespace: campfire
-    files:
-      - renovate-digest.py
+# No configMapGenerator: the code lives in ghcr.io/ronaldlokers/stringer and
+# arrives by image tag, which Renovate bumps like any other image here. See
+# docs/campfire/migration-to-stringer.md.
