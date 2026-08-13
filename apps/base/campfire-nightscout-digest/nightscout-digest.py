@@ -34,6 +34,9 @@ Env:
     NIGHTSCOUT_API_SECRET_SHA1  sent as the api-secret header
     DIGEST_TIMEZONE             which day "yesterday" means, default
                                 Europe/Amsterdam
+    DIGEST_DATE                 report this day (YYYY-MM-DD) instead of
+                                yesterday; unset on the CronJob, for manual
+                                runs and backfill
 """
 
 import html
@@ -59,6 +62,9 @@ NIGHTSCOUT_URL = os.environ.get(
 # same header for both, so swapping to a read-only subject changes only this.
 API_SECRET_SHA1 = os.environ.get("NIGHTSCOUT_API_SECRET_SHA1", "")
 TIMEZONE = os.environ.get("DIGEST_TIMEZONE", "Europe/Amsterdam")
+# Empty on the CronJob. Set it on a one-off Job to report an older day — the
+# day a sensor was actually running, or one missed while something was broken.
+DIGEST_DATE = os.environ.get("DIGEST_DATE", "").strip()
 TIMEOUT = 20
 # See fetch_with_retry: the first connection from a new pod can be refused
 # while its NetworkPolicy is still being programmed.
@@ -142,11 +148,26 @@ def fetch(start_ms, end_ms):
     ]
 
 
-def yesterday_bounds():
+def day_bounds():
+    """The day to report, as (local midnight, start ms, end ms).
+
+    Yesterday unless DIGEST_DATE names another day. The day is bounded by local
+    midnights and not by 24 hours from a fixed instant, so the two days a year
+    that are 23 or 25 hours long still come out as whole days.
+    """
     local = ZoneInfo(TIMEZONE)
-    midnight = datetime.now(local).replace(hour=0, minute=0, second=0, microsecond=0)
-    start = midnight - timedelta(days=1)
-    return start, int(start.timestamp() * 1000), int(midnight.timestamp() * 1000)
+    if DIGEST_DATE:
+        # Deliberately unguarded: a malformed date raises, the Job fails and
+        # says why. Falling back to yesterday would silently report a different
+        # day than the one asked for, which is worse than a failed manual run.
+        start = datetime.strptime(DIGEST_DATE, "%Y-%m-%d").replace(tzinfo=local)
+    else:
+        midnight = datetime.now(local).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        start = midnight - timedelta(days=1)
+    end = start + timedelta(days=1)
+    return start, int(start.timestamp() * 1000), int(end.timestamp() * 1000)
 
 
 def render(day, readings):
@@ -233,7 +254,7 @@ def main():
         log("CAMPFIRE_URL or NIGHTSCOUT_API_SECRET_SHA1 unset")
         return 1
 
-    day, start_ms, end_ms = yesterday_bounds()
+    day, start_ms, end_ms = day_bounds()
     try:
         readings = fetch_with_retry(start_ms, end_ms)
     except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
