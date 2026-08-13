@@ -14,6 +14,8 @@
 #     -n campfire --dry-run=client -o yaml |
 #     kubectl set env --local -f - DIGEST_DATE=2026-08-05 -o yaml |
 #     kubectl apply -f -
+#
+# DIGEST_SHEET=fortnight forces the Saturday sheet on any day.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -36,14 +38,16 @@ spec:
           restartPolicy: Never
           securityContext:
             runAsNonRoot: true
-            runAsUser: 65534
-            runAsGroup: 65534
+            # The image runs as `node` (uid 1000); 65534 has no home in it.
+            runAsUser: 1000
+            runAsGroup: 1000
             seccompProfile:
               type: RuntimeDefault
           containers:
             - name: digest
-              image: python:3.13-alpine
-              command: ["python3", "/opt/digest/nightscout-digest.py"]
+              # renovate: datasource=github-releases depName=ronaldlokers/stringer
+              image: ghcr.io/ronaldlokers/stringer:v0.3.1
+              args: ["glucose"]
               envFrom:
                 - secretRef:
                     name: campfire-nightscout-digest
@@ -66,10 +70,4 @@ spec:
                   # nothing while the pod is idle.
                   cpu: 1000m
                   memory: 128Mi
-              volumeMounts:
-                - name: script
-                  mountPath: /opt/digest
-          volumes:
-            - name: script
-              configMap:
-                name: campfire-nightscout-digest-script
+          # No script volume: the code is in the image now.

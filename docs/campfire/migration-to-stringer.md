@@ -168,17 +168,20 @@ stringer describing them.
 Renovate summary. Proves image build → ghcr → Flux → Renovate bumping the tag,
 end to end, on something that does not matter.
 
-*Exit:* running from the image in production for a week, with the ConfigMap
-version deleted.
+**Done.** Output was checked against the Python on the live repository before
+the swap — ten open pull requests, two flagged, byte-identical HTML.
 
 ### 5. `glucose`
 
-The valuable one. Takes `glyphs.py` out of the repo and the bake step off the
-workstation.
+**Done.** The valuable one, and it took more than itself: `chart.py`,
+`glyphs.py`, `bake_font.py`, the golden fixtures and homelab's whole test suite
+were all glucose, so they went too. The hand-baked font pipeline is gone from
+the repository entirely.
 
-Run both implementations in parallel for a few days — the Python CronJob posting
-to the real room, the TypeScript one posting to a scratch room — and compare the
-sheets before cutting over.
+Verified in the cluster before the swap rather than over a week — the same
+image, against the same Nightscout, reported the same 280 readings and 13 days
+of history as the Python, and posted one sheet into the room beside the
+Python's for the same day.
 
 ### 6. `alerts`
 
