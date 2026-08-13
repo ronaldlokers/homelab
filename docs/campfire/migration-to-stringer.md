@@ -185,8 +185,44 @@ Python's for the same day.
 
 ### 6. `alerts`
 
-A Deployment rather than a CronJob, so it exercises the long-running path and
-the readiness/liveness surface.
+**Done, and it nearly was not.** The bridge amends the message that announced an
+alert rather than posting a second one, which rests on Campfire's update not
+calling `room.receive` — an edit notifies nobody, which is exactly what a
+resolution should do. A `Round` of `say` and `show` could not express that, and
+the case for leaving it here looked strong.
+
+The answer was to give `Round` the verb. `amend(id, html)` returns a handle
+either way: Campfire PATCHes and keeps the id; a transport that cannot change
+what it already delivered posts anew and hands back the new one. A beat never
+asks which happened, and the delivery rule reads the same in both worlds:
+
+  * a fingerprint that was not firing before  → post, so it pushes
+  * only resolutions since last time          → amend, silently
+  * the whole group resolved                  → amend, then forget it
+
+Where amending exists, a resolution reaches nobody's phone. Where it does not,
+all three become posts: the room becomes a log and resolutions notify. That is
+honest degradation rather than a failure, and both directions are tested.
+
+The lesson is worth keeping. "This cannot be shared" was really "this capability
+is not universal", and an optional capability with a fallback is the ordinary
+shape of that — not the same thing as bending an abstraction around one
+implementation.
+
+It is also the first beat that listens rather than being woken, so it brings a
+server, health that reports 503 while a destination is unconfigured, and 5xx on
+publish failure so the sender retries.
+
+## Where this ends
+
+Everything that posts into a room has moved: `glucose`, `renovate` and `alerts`.
+Three stayed, for reasons that have nothing to do with the transport:
+
+| App | Why it stayed |
+|---|---|
+| `campfire-status-bot` | reads Campfire's message stream, holds an Anthropic key |
+| `campfire-kube-actor` | serves an API to the status bot; not a bot |
+| `campfire-notify-check` | checks notification config; not a bot |
 
 ## How homelab consumes it
 
