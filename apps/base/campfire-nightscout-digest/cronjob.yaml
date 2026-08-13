@@ -57,7 +57,14 @@ spec:
                   cpu: 10m
                   memory: 32Mi
                 limits:
-                  cpu: 200m
+                  # Drawing the chart is a couple of seconds of pure-Python
+                  # per-pixel arithmetic, and it is the only thing this pod
+                  # does. Throttling that to 200m turns two seconds into a
+                  # minute of wall clock for no benefit — nothing is waiting
+                  # on this at 07:00, but nothing gains from it being slow
+                  # either. The request stays at 10m, so the ceiling costs
+                  # nothing while the pod is idle.
+                  cpu: 1000m
                   memory: 128Mi
               volumeMounts:
                 - name: script

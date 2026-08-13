@@ -11,10 +11,13 @@ resources:
 
 # Hash suffix left ON: the suffix changes when the script changes, which
 # rewrites the CronJob's volume reference so the next run picks up new code.
+#
+# `bake_font.py` is deliberately absent: it is the workstation tool that
+# generates `glyphs.py`, needs Pillow, and has no business in the pod.
 configMapGenerator:
   - name: campfire-nightscout-digest-script
     namespace: campfire
     files:
       - nightscout-digest.py
       - chart.py
-      - font.py
+      - glyphs.py
