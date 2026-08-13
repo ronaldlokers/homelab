@@ -283,7 +283,7 @@ def main():
                 BANDS,
                 start_ms,
                 title=day.strftime("%A %-d %B"),
-                subtitle=f"{len(values)} readings   "
+                subtitle=f"{len(values)} readings · "
                 f"{len(values) / EXPECTED_READINGS * 100:.0f}% sensor coverage",
             )
             log(f"chart {len(png)} bytes, campfire returned {post_image(png)}")
