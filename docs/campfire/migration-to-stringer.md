@@ -134,7 +134,25 @@ rounds. `docs/campfire/DESIGN.md` is the spec — tokens, type scale, compositio
 and refusals are all written down, so this is building to a specification rather
 than translating a Python file.
 
-*Exit:* fortnight and daily sheets visually match the approved renders.
+**DESIGN.md moves to stringer in this phase, with the renderer it describes.**
+It documents a visual system: a palette, a type scale, a composition and a list
+of refusals. All of that is a property of the thing that draws, and after this
+phase the thing that draws lives there. It gets rescoped on the way — it
+currently says "the campfire namespace", which stopped being true the moment
+the transports went room-agnostic; what it actually describes is what stringer
+draws, whichever room the copy goes out to.
+
+It does not move earlier. Until the renderer is there, a specification sitting
+in a repository that contains no implementation of it is a document nobody is
+reading while they edit the code it governs.
+
+**PRODUCT.md stays here.** It is not about the drawing — it is about the
+reader, the room, the cadence, the attachment box Campfire actually gives an
+image, and the cluster that runs the thing at 07:00. That is homelab's business
+and stays beside the manifests. Stringer's README covers what stringer is.
+
+*Exit:* fortnight and daily sheets visually match the approved renders, and
+DESIGN.md is in stringer describing them.
 
 ### 4. First mover: `renovate-digest`
 
