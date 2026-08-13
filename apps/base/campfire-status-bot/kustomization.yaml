@@ -18,8 +18,7 @@ resources:
 # Hash suffix left ON: the suffix changes when the script changes, which
 # rewrites the Deployment's volume reference and rolls the pod. Without it an
 # edited script applies cleanly and the running process keeps serving old code.
-configMapGenerator:
-  - name: campfire-status-bot-script
-    namespace: campfire
-    files:
-      - campfire-status-bot.py
+# No configMapGenerator: the checks and the verbs live in
+# ghcr.io/ronaldlokers/stringer and arrive by image tag, which Renovate bumps
+# like any other image here. A tag change rolls the pod on its own, which is
+# what the hash suffix used to be for. See docs/campfire/migration-to-stringer.md.

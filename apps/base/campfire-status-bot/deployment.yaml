@@ -19,12 +19,14 @@ spec:
       serviceAccountName: campfire-status-bot
       securityContext:
         runAsNonRoot: true
-        runAsUser: 65534
-        runAsGroup: 65534
+        # The image runs as `node` (uid 1000); 65534 has no home in it.
+        runAsUser: 1000
+        runAsGroup: 1000
       containers:
         - name: bot
-          image: python:3.13-alpine
-          command: ["python3", "/opt/bot/campfire-status-bot.py"]
+          # renovate: datasource=github-releases depName=ronaldlokers/stringer
+          image: ghcr.io/ronaldlokers/stringer:v0.6.0
+          args: ["status"]
           ports:
             - name: http
               containerPort: 8080
@@ -67,10 +69,3 @@ spec:
             limits:
               cpu: 200m
               memory: 128Mi
-          volumeMounts:
-            - name: script
-              mountPath: /opt/bot
-      volumes:
-        - name: script
-          configMap:
-            name: campfire-status-bot-script

@@ -358,7 +358,7 @@ its corollary: a check that could not run reports itself under "not checked"
 rather than contributing nothing. An unknown reported as healthy is the one
 failure mode that makes a briefing worse than having none.
 
-### 8. The responder, and an inbound seam
+### 8. The responder, and an inbound seam — done
 
 `Round` gains a sibling rather than a verb. Something like a `Desk`: it receives
 a question and answers it, and each transport decides what that means.
@@ -378,8 +378,33 @@ who asked, in its own terms, and the bot decides what that identity may do.
 `act()` does not change. It forwards to `campfire-kube-actor` over HTTP, which
 is already transport-agnostic and stays where it is.
 
-*Exit:* `@Kubernetes status` answers from the image, inside 7 seconds, with the
-Python deleted.
+**Done.** `Round` gained a sibling rather than a verb: a `Desk` takes a question
+in, and Campfire's implementation *is* the HTTP response, with the seven-second
+budget and the always-200 rule intact. Authorisation moved behind the seam —
+the desk says who asked in its own terms, and the bot decides what that identity
+may do.
+
+The duplication phase seven carried is gone with the Python.
+
+## Where this ends
+
+Every campfire bot now runs from `ghcr.io/ronaldlokers/stringer`:
+
+| Beat | Was |
+|---|---|
+| `glucose` | `campfire-nightscout-digest` |
+| `renovate` | `campfire-renovate-digest` |
+| `alerts` | `campfire-alert-bridge` |
+| `briefing` | `campfire-status-bot --briefing` |
+| `status` | `campfire-status-bot` |
+
+`campfire-kube-actor` and `campfire-notify-check` stay, and always were going
+to: neither posts to a room. The actor performs the writes and holds the write
+RBAC, which is the split the status bot was designed around — one process reads
+logs and calls a model, the other can change things. That survived the move
+unchanged, because it was never about which repository the code lived in.
+
+Homelab keeps every manifest. What left is the code.
 
 ## What still does not move
 
