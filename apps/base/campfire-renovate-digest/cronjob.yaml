@@ -31,8 +31,11 @@ spec:
               type: RuntimeDefault
           containers:
             - name: digest
-              # renovate: datasource=github-releases depName=ronaldlokers/stringer
-              image: ghcr.io/ronaldlokers/stringer:v0.2.0
+              # Untagged on purpose. Every stringer workload runs the same build, and the
+              # tag that build is lives once, in the cluster overlay's `images:` block —
+              # see apps/production/kustomization.yaml. Five separately-pinned copies is
+              # how the bridge ended up four releases behind the briefing.
+              image: ghcr.io/ronaldlokers/stringer
               args: ["renovate"]
               env:
                 # GITHUB_TOKEN is Renovate's own token. It can write, which a

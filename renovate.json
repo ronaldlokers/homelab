@@ -12,7 +12,7 @@
   },
   "customManagers": [
     {
-      "description": "Chart versions pinned per environment in overlay kustomize patches. The flux manager only sees spec.chart.spec.version in the base HelmRelease, and these patches override it \u2014 so without this, Renovate raises PRs against a value neither cluster actually renders.",
+      "description": "Chart versions pinned per environment in overlay kustomize patches. The flux manager only sees spec.chart.spec.version in the base HelmRelease, and these patches override it — so without this, Renovate raises PRs against a value neither cluster actually renders.",
       "customType": "regex",
       "managerFilePatterns": [
         "/^infrastructure/controllers/(staging|production)/.+/kustomization\\.yaml$/"
@@ -24,7 +24,7 @@
   ],
   "packageRules": [
     {
-      "description": "These base HelmReleases are version-overridden by every consuming overlay, so their spec.chart.spec.version is never rendered. Left enabled, the flux manager would keep raising PRs against it that change nothing in either cluster \u2014 the exact no-op this config exists to stop. The overlay pins are tracked by the custom manager above instead.",
+      "description": "These base HelmReleases are version-overridden by every consuming overlay, so their spec.chart.spec.version is never rendered. Left enabled, the flux manager would keep raising PRs against it that change nothing in either cluster — the exact no-op this config exists to stop. The overlay pins are tracked by the custom manager above instead.",
       "matchManagers": [
         "flux"
       ],
@@ -33,6 +33,29 @@
         "infrastructure/controllers/base/cloudnative-pg/**"
       ],
       "enabled": false
+    },
+    {
+      "description": "The stringer workloads are untagged in base — one `images:` entry per cluster overlay is what keeps five copies of the same build from drifting, which they did (v0.4.0 through v0.7.0 simultaneously). Left enabled here, the kubernetes manager would read the untagged base image as :latest and raise PRs pinning it back into base, undoing that. The overlay `images:` entry is tracked by the kustomize manager instead, which reads the registry rather than the release list — so a release whose multi-arch build failed cannot be proposed.",
+      "matchManagers": [
+        "kubernetes"
+      ],
+      "matchFileNames": [
+        "apps/base/campfire-*/**"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/ronaldlokers/stringer"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Promoting stringer is a deliberate step, same as a chart: the image carries every bot at once, so a bump moves the bridge, the responder, the briefing and both digests together.",
+      "matchManagers": [
+        "kustomize"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/ronaldlokers/stringer"
+      ],
+      "dependencyDashboardApproval": true
     },
     {
       "description": "Keep staging and production bumps in separate PRs so an upgrade can soak on staging before it is promoted.",
@@ -58,7 +81,7 @@
       "dependencyDashboardApproval": true
     },
     {
-      "description": "Longhorn only supports upgrading one minor at a time \u2014 1.8.x to 1.9.x, then 1.9.x to 1.10.x, and so on. Left at the default, Renovate collapses every available minor into a single PR to the newest version (PR #48 proposed 1.8.2 -> 1.12.0, skipping three minors), which passes CI and looks routine while being an unsupported upgrade of the cluster's storage layer. separateMultipleMinor makes Renovate raise one PR per minor instead, so the supported path is the path of least resistance and each step can be soaked before the next.",
+      "description": "Longhorn only supports upgrading one minor at a time — 1.8.x to 1.9.x, then 1.9.x to 1.10.x, and so on. Left at the default, Renovate collapses every available minor into a single PR to the newest version (PR #48 proposed 1.8.2 -> 1.12.0, skipping three minors), which passes CI and looks routine while being an unsupported upgrade of the cluster's storage layer. separateMultipleMinor makes Renovate raise one PR per minor instead, so the supported path is the path of least resistance and each step can be soaked before the next.",
       "matchPackageNames": [
         "longhorn"
       ],

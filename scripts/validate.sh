@@ -404,4 +404,41 @@ for name in netpol-check secret-refs-check recovery-source-check; do
   fi
 done
 
+# ---------------------------------------------------------------------------
+# Nothing a cluster runs may be untagged.
+#
+# The stringer workloads carry no tag in base on purpose — one `images:` entry
+# per overlay is what stops five copies of the same build drifting apart. The
+# cost of that is a new way to be wrong: drop the overlay entry and every one of
+# them silently becomes :latest, which Kubernetes will happily pull and which
+# means a different thing on each node and each restart.
+# ---------------------------------------------------------------------------
+
+echo "INFO - Checking every image a cluster renders carries a tag"
+for env in staging production; do
+  kustomize build "apps/$env" | ENV="$env" python3 -c '
+import os, re, sys
+
+env = os.environ["ENV"]
+bad = []
+for line in sys.stdin:
+    m = re.match(r"\s*-?\s*image:\s*(\S+)", line)
+    if not m:
+        continue
+    image = m.group(1).strip("\"\x27")
+    # A digest is a tag stricter cousin, and pins just as hard.
+    if "@" in image:
+        continue
+    name = image.rsplit("/", 1)[-1]
+    if ":" not in name or name.endswith(":latest"):
+        bad.append(image)
+if bad:
+    print("\nERROR - apps/%s renders %d image(s) with no explicit tag:" % (env, len(bad)))
+    for image in sorted(set(bad)):
+        print("  " + image)
+    print("  An overlay `images:` entry is probably missing or misspelt.")
+    sys.exit(1)
+' || exit 1
+done
+
 echo "INFO - Validation passed"
