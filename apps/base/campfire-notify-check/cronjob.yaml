@@ -33,6 +33,16 @@ spec:
             - name: check
               image: alpine/k8s:1.36.2
               command: ["python3", "/opt/check/campfire-notify-check.py"]
+              env:
+                # The room KubeJobFailed already lands in. The bridge's Secret
+                # rather than a copy of the URL: same room, same bot key, and a
+                # second copy of a credential is the drift secret-refs-check
+                # exists to catch.
+                - name: CAMPFIRE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: campfire-alert-bridge
+                      key: CAMPFIRE_URL
               securityContext:
                 allowPrivilegeEscalation: false
                 capabilities:
