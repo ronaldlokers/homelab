@@ -16,3 +16,4 @@ configMapGenerator:
     namespace: campfire
     files:
       - nightscout-digest.py
+      - chart.py

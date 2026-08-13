@@ -587,6 +587,27 @@ in range" reads as good control. So:
 Not a hypothetical distinction: the first real run reported no readings,
 because there was no active sensor.
 
+### The chart
+
+A second message carries a PNG: time in range as a pie, and the day as a curve
+with the target band shaded and every point coloured by its band. Attachments
+go through the same bot route — `Messages::ByBotsController` permits
+`attachment` when the multipart form carries one and falls back to the raw body
+otherwise — so an attachment message has no text, which is why the numbers post
+first.
+
+**It is drawn by hand in `chart.py`, with no dependencies.** matplotlib would
+have meant building a wheel on arm64 or carrying a much larger image, for two
+charts whose entire content is coloured rectangles and a line. `zlib` and
+`struct` are standard library and a PNG is an IHDR, a compressed block of RGB
+rows, and an IEND. The CronJob still runs on stock `python:3.13-alpine`.
+
+No text in the image: drawing glyphs without a font means shipping a bitmap
+font, and every number worth reading is in the message it is attached to.
+
+The chart is only drawn when the statistics were shown. A picture of a partial
+day makes the same false claim the withheld numbers would have.
+
 ### Two things worth knowing
 
 - **Entries are stored in mg/dL** whatever `DISPLAY_UNITS` says. Everything is
