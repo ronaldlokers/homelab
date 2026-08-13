@@ -405,6 +405,8 @@ See `docs/` dir for full docs:
 - **stack/**: Component-specific docs
 - **runbooks/**: Step-by-step operational procedures
 - **war-stories/**: Real-world troubleshooting experiences (highly recommended reading)
-- **campfire/**: What the campfire-namespace bots post and how it is designed
-  (`PRODUCT.md` for the surface, `DESIGN.md` for the visual system). Read both
-  before changing anything a bot draws or writes.
+- **campfire/**: What the campfire-namespace bots post (`PRODUCT.md`), and the
+  plan for moving the posting ones out to
+  [stringer](https://github.com/ronaldlokers/stringer). The visual system moved
+  there with the renderer: see stringer's `DESIGN.md` before changing anything a
+  bot draws.

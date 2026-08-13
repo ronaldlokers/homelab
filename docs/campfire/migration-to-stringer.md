@@ -129,12 +129,19 @@ everything after it is moving code around.
 
 ### 3. Renderer
 
-Rebuild both sheets as SVG, checked against the approved PNGs from the design
-rounds. `docs/campfire/DESIGN.md` is the spec — tokens, type scale, composition
-and refusals are all written down, so this is building to a specification rather
-than translating a Python file.
+**Done.** Both sheets are rebuilt as SVG in `src/press/`, rasterised by resvg,
+and DESIGN.md moved with them.
 
-**DESIGN.md moves to stringer in this phase, with the renderer it describes.**
+The metrics were the one thing that could not be thrown away: the sheet wraps a
+computed sentence at 56px across a fixed measure, and an estimate of average
+character width put the headline on a third line and into the rows. The
+per-character advances from the Python's baked glyph tables are kept in
+`src/press/metrics.ts`.
+
+The port also reproduced a live bug exactly — findings growing down into the
+figures whenever the first one wrapped — which is how it was found.
+
+DESIGN.md moved to stringer with the renderer it describes.
 It documents a visual system: a palette, a type scale, a composition and a list
 of refusals. All of that is a property of the thing that draws, and after this
 phase the thing that draws lives there. It gets rescoped on the way — it
@@ -142,7 +149,7 @@ currently says "the campfire namespace", which stopped being true the moment
 the transports went room-agnostic; what it actually describes is what stringer
 draws, whichever room the copy goes out to.
 
-It does not move earlier. Until the renderer is there, a specification sitting
+It did not move earlier. Until the renderer was there, a specification sitting
 in a repository that contains no implementation of it is a document nobody is
 reading while they edit the code it governs.
 
@@ -151,8 +158,9 @@ reader, the room, the cadence, the attachment box Campfire actually gives an
 image, and the cluster that runs the thing at 07:00. That is homelab's business
 and stays beside the manifests. Stringer's README covers what stringer is.
 
-*Exit:* fortnight and daily sheets visually match the approved renders, and
-DESIGN.md is in stringer describing them.
+*Exit:* met — fortnight and daily sheets match the approved renders, and
+[DESIGN.md](https://github.com/ronaldlokers/stringer/blob/main/DESIGN.md) is in
+stringer describing them.
 
 ### 4. First mover: `renovate-digest`
 
