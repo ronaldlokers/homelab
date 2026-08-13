@@ -48,7 +48,7 @@ spec:
           containers:
             - name: briefing
               # renovate: datasource=github-releases depName=ronaldlokers/stringer
-              image: ghcr.io/ronaldlokers/stringer:v0.5.0
+              image: ghcr.io/ronaldlokers/stringer:v0.5.1
               args: ["briefing"]
               env:
                 # The full bot URL, room and bot key included. The webhook path
