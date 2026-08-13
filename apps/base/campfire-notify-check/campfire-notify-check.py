@@ -32,17 +32,33 @@ bot in it is an alerting room. Adding a bot to a closed social room would make
 this ask for `everything` there too.
 
 Reporting is the house pattern — exit non-zero, let the Job fail, let
-KubeJobFailed reach Alertmanager. Note the circularity that creates: since
-Alertmanager now routes to Campfire only, a failure here is announced through
-the channel being checked. The message still lands in the room, so it is seen
-whenever Campfire is next opened; it just will not push. Fixing that properly
-means a second, independent channel, which is the trade recorded on the card.
+KubeJobFailed reach Alertmanager — plus the finding itself, posted to the room
+the alert lands in.
+
+Both, because they carry different things. KubeJobFailed says a Job failed and
+is bounded to 24 hours, which is right for an alert. What it cannot say is
+*which* room and *which* setting; that lived only in the pod log, and a pod log
+is not somewhere anyone looks unaided. The first time this fired for real, the
+alert arrived, the finding did not, and the room stayed muted for a day.
+
+Note the circularity, which posting does not fix and cannot: since Alertmanager
+routes to Campfire only, a failure here is announced through the channel being
+checked. The message still lands in the room, so it is seen whenever Campfire is
+next opened; it just will not push. Fixing that properly means a second,
+independent channel, which is the trade recorded on the card.
+
+What posting does add against that circularity is a small thing worth having: it
+names the room that is muted. A silent alert about an unnamed room is only
+useful once you go looking; a silent message that says "#Flux is muted" is
+useful the moment you glance at any room.
 """
 
 import json
 import os
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 
 # Unset in-cluster, where kubectl uses the ServiceAccount and there is exactly
 # one cluster to talk to. Set it to run this against production from a laptop,
@@ -57,6 +73,16 @@ TIMEOUT = 120
 # whatever Rails decides to log around it — boot warnings are noisy and are not
 # a failure.
 MARKER = "CAMPFIRE_NOTIFY_CHECK"
+
+# The room KubeJobFailed already lands in, so the finding sits beside the alert
+# that points at it. Deliberately the bridge's own Secret rather than a copy: it
+# is the same room and the same bot key, and a second copy of a credential is
+# the exact drift secret-refs-check exists to catch.
+#
+# Unset means "post nothing", so the check still runs anywhere it is not
+# configured — the exit code has always been the load-bearing part.
+ROOM_URL = os.environ.get("CAMPFIRE_URL", "").strip()
+POST_TIMEOUT = 15
 
 QUERY = f"""
 require "json"
@@ -73,6 +99,39 @@ puts "{MARKER}" + JSON.generate({{ rooms: rooms, subscriptions: Push::Subscripti
 
 def log(message):
     print(message, flush=True)
+
+
+def escape(text):
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def announce(found):
+    """Put the finding in the room. Never let this hide the finding.
+
+    A post that fails is logged and swallowed: the exit code is what makes the
+    Job fail, and losing that because the room was unreachable would trade a
+    reliable signal for a prettier one.
+    """
+    if not ROOM_URL:
+        log("no CAMPFIRE_URL set; reporting by exit code alone")
+        return
+    body = (
+        "<div><strong>🔕 Campfire would not notify you</strong></div>"
+        + "<ul>"
+        + "".join(f"<li>{escape(problem)}</li>" for problem in found)
+        + "</ul>"
+    )
+    request = urllib.request.Request(
+        ROOM_URL,
+        data=body.encode("utf-8"),
+        headers={"Content-Type": "text/html; charset=utf-8"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=POST_TIMEOUT) as response:
+            log(f"posted the finding to Campfire ({response.status})")
+    except (urllib.error.URLError, OSError) as error:
+        log(f"could not post the finding: {error}")
 
 
 def read_state():
@@ -118,7 +177,11 @@ def main():
     try:
         state = read_state()
     except (subprocess.SubprocessError, RuntimeError, ValueError) as error:
+        # A check that could not run is not a check that passed. Say so in the
+        # room too — if the reason is that Campfire is down, the post fails and
+        # is swallowed, which is the correct outcome and not a worse one.
         log(f"could not read Campfire state: {error}")
+        announce([f"the check could not run: {error}"])
         return 1
 
     rooms = ", ".join(r["name"] for r in state["rooms"]) or "(none)"
@@ -131,6 +194,7 @@ def main():
 
     for problem in found:
         log(f"PROBLEM {problem}")
+    announce(found)
     return 1
 
 
