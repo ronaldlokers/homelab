@@ -7,3 +7,6 @@ production-age.key
 staging-age.key
 .product-team-review/
 __pycache__/
+
+# Impeccable's scratch directory for design decision pages and sketches.
+.impeccable/

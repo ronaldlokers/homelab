@@ -29,6 +29,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 ADWAITA = "/usr/share/fonts/Adwaita/AdwaitaSans-Regular.ttf"  # variable
 JETBRAINS = "/usr/share/fonts/TTF/JetBrainsMonoNLNerdFontMono-%s.ttf"
+# URW Gothic is the Avant Garde clone, and the closest thing installed to the
+# geometric sans the Vienna Method's charts were set in. Chosen for that
+# lineage, not for being available.
+GOTHIC = "/usr/share/fonts/gsfonts/URWGothic-%s.otf"
 
 LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 DIGITS = "0123456789"
@@ -41,11 +45,14 @@ PUNCTUATION = " .,:%/-()·!'"
 # CSS pixels on the phone — near the floor, and nearly twice what the previous
 # 22px managed on a canvas that was being downscaled to fit.
 FACES = {
-    "title": (ADWAITA, "Bold", 64, LETTERS + DIGITS + " "),
-    "body": (ADWAITA, "Regular", 34, LETTERS + DIGITS + PUNCTUATION),
-    "hero": (JETBRAINS % "Bold", None, 180, DIGITS + "%"),
-    "stat": (JETBRAINS % "Bold", None, 40, DIGITS + "%.-"),
-    "tick": (JETBRAINS % "Regular", None, 30, DIGITS + ".:-"),
+    # The headline finding, which is the first thing read and often the only
+    # thing read. Two lines of this is the whole top of the sheet.
+    "headline": (GOTHIC % "Demi", None, 56, LETTERS + DIGITS + PUNCTUATION),
+    "body": (GOTHIC % "Book", None, 30, LETTERS + DIGITS + PUNCTUATION),
+    "small": (GOTHIC % "Book", None, 26, LETTERS + DIGITS + PUNCTUATION),
+    # Figures are mono so a column of them lines up as a column of figures.
+    "stat": (JETBRAINS % "Bold", None, 42, DIGITS + "%.-"),
+    "figure": (JETBRAINS % "Regular", None, 28, DIGITS + "%.-:"),
 }
 
 
