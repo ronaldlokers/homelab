@@ -1,0 +1,154 @@
+---
+# The campfire namespace's baseline, which in production comes with the Campfire
+# app itself (apps/base/campfire/network-policies.yaml). Staging has no Campfire,
+# so the namespace would otherwise have no policies at all — and a namespace with
+# none is a namespace that allows everything, which is the wrong default for one
+# whose single occupant reads the whole cluster.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: campfire
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: campfire
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: campfire
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# The Kubernetes API, which is where seven of the nine checks get their answers.
+#
+# Staging's addresses, not production's: on k3d the endpoint is the k3d server
+# container on the Docker network rather than three Pis on the LAN. Same pair
+# the monitoring and database namespaces already use here.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-briefing-to-k8s-api
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-status-bot
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
+    - to:
+        - ipBlock:
+            cidr: 172.16.0.0/12
+      ports:
+        - protocol: TCP
+          port: 6443
+---
+# The other two checks: what fired overnight, and disk headroom.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-briefing-to-prometheus
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-status-bot
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+---
+# The ingress half. monitoring denies ingress by default, so without this the
+# connection is refused at the far end and both checks report themselves
+# unrunnable — the intended failure, but still a failure.
+#
+# Here rather than in infrastructure/configs/staging, which is where production
+# keeps its copy: this rule names the campfire namespace, that namespace is
+# created by this same Kustomization, and keeping both in one place means
+# neither can be applied without the other.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-briefing-to-prometheus-ingress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: campfire
+      ports:
+        - protocol: TCP
+          port: 9090
+---
+# The one hop that leaves the cluster: the bridge, on production's MetalLB VIP.
+#
+# An ipBlock rather than a hostname, because NetworkPolicy has no notion of
+# names — and 10.0.40.100 is inside 10.0.0.0/8, which every allow-internet rule
+# in this repo deliberately excludes. So the general internet rule would not
+# have covered this even if the namespace had one, and this namespace has no
+# internet egress at all: a briefing has nowhere else to be going.
+#
+# This is the repo's second cross-cluster dependency, and it fails the same
+# direction as the first: production down means staging's briefing goes
+# nowhere, which is the quieter of the two problems.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-briefing-to-the-bridge
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-status-bot
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.40.100/32
+      ports:
+        - protocol: TCP
+          port: 443

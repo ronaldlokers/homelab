@@ -1,6 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
+  - campfire-morning-briefing
   - authentik/
   - linkding
   - mealie
@@ -20,6 +21,12 @@ resources:
   # restoring this one line.
   - gatus
   - netpol-check
-  - secret-refs-check
   - recovery-source-check
   - tandoor
+
+# One tag for every stringer workload in this cluster. Its own rather than
+# production's, so a release can soak here before it is promoted — which is the
+# whole reason this is per cluster and not in base.
+images:
+  - name: ghcr.io/ronaldlokers/stringer
+    newTag: v0.8.0
