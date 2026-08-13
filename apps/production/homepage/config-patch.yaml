@@ -67,6 +67,25 @@ data:
             icon: nightscout.png
             href: https://nightscout.ronaldlokers.nl
             description: CGM remote monitoring
+
+    # Both are Basecamp apps and neither has an entry in dashboard-icons, so
+    # these use Material Design icons instead. `basecamp.png` exists and would
+    # have been the obvious choice for both — which is exactly why it is not
+    # used: two identical icons side by side identify nothing.
+    #
+    # No widgets: homepage ships none for either, and neither exposes a metrics
+    # endpoint one could be built from. Plain links need no NetworkPolicy,
+    # since the browser navigates rather than this pod.
+    - Collaboration:
+        - Campfire:
+            icon: mdi-campfire-#f97316
+            href: https://campfire.ronaldlokers.nl
+            description: Chat — alerts, deploys and the Kubernetes bot
+        - Fizzy:
+            icon: mdi-view-column-#22c55e
+            href: https://fizzy.ronaldlokers.nl
+            description: Kanban — what is wanted and why it was deferred
+
     - DevOps:
         - Grafana:
             icon: grafana.png
