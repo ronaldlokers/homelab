@@ -1,15 +1,12 @@
 # The morning briefing: the same checks the bot answers on demand, run once at
 # 07:00 and posted only if there is something to say.
 #
-# It lives in this directory rather than its own because it is not a second
-# app — it is the same checks, now from the stringer image. A
-# separate app would have meant a second copy of every threshold, and the
-# thresholds are the part that took the longest to get right.
-#
-# Pods carry app: campfire-status-bot deliberately. That label already grants
-# egress to the Kubernetes API (infrastructure/configs/production) and to
-# Campfire on :80 (network-policies.yaml here), which is exactly what this
-# needs; a new label would have meant re-stating both.
+# Pods carry app: campfire-status-bot deliberately, even from this directory.
+# That label already grants egress to the Kubernetes API
+# (infrastructure/configs/production), to Campfire on :80 and to Prometheus
+# (apps/base/campfire-status-bot/network-policies.yaml), which is exactly what
+# this needs. A label is a policy selector, not an identity; the identity that
+# matters is the ServiceAccount, and that one is its own — see rbac.yaml.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -75,6 +72,3 @@ spec:
                 limits:
                   cpu: 200m
                   memory: 128Mi
-          # No script volume: the checks are in the image now. The ConfigMap
-          # stays for the Deployment, which still serves the interactive verbs
-          # from Python — see docs/campfire/migration-to-stringer.md.
