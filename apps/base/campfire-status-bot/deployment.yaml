@@ -25,7 +25,7 @@ spec:
       containers:
         - name: bot
           # renovate: datasource=github-releases depName=ronaldlokers/stringer
-          image: ghcr.io/ronaldlokers/stringer:v0.6.0
+          image: ghcr.io/ronaldlokers/stringer:v0.6.1
           args: ["status"]
           ports:
             - name: http
