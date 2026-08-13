@@ -10,11 +10,13 @@ safety-critical. This is a review of a day already over — nothing here is
 urgent, and nothing urgent should be added here.
 
 The one judgement in the code is the uptime floor. Nightscout stores a reading
-roughly every five minutes, so a full day is about 288. Time in range computed
-from a handful of readings is a number that looks authoritative and is not:
-34% coverage reporting "78% in range" describes the fraction of the day the
-sensor happened to be on, not the day. Below MIN_UPTIME_PERCENT the statistics
-are withheld and the coverage is reported instead.
+roughly every five minutes, so a whole day is 288 of them — except on the two
+days a year the clocks move, which hold 276 and 300, and are counted as such.
+Time in range computed from a handful of readings is a number that looks
+authoritative and is not: 34% coverage reporting "78% in range" describes the
+fraction of the day the sensor happened to be on, not the day. Below
+MIN_UPTIME_PERCENT the statistics are withheld and the coverage is reported
+instead.
 
 A day with no readings at all says so plainly. That is a real state, not an
 edge case — a sensor between sessions produces exactly it.
@@ -81,8 +83,11 @@ TIMEOUT = 20
 FETCH_ATTEMPTS = 3
 FETCH_RETRY_SECONDS = 5
 
-# One reading per five minutes.
-EXPECTED_READINGS = 288
+# One reading per five minutes, so a 24-hour day holds 288 of them — but two
+# days a year are not 24 hours long, and a fixed 288 reports a perfect sensor
+# as 104% covered in October and 96% in March. `whole_day` counts what the day
+# in question actually holds.
+READING_INTERVAL_MINUTES = 5
 # How much history the chart draws behind the reported day. Fourteen is the
 # clinical convention for a stable time-in-range figure, and it is what the
 # sheet has room for at type large enough to read on a phone.
@@ -182,6 +187,12 @@ def day_bounds():
     return start, int(start.timestamp() * 1000), int(end.timestamp() * 1000)
 
 
+def whole_day(start_ms, end_ms):
+    """How many readings a whole day holds: 288 usually, 276 and 300 twice a
+    year, when the clocks move and the day is 23 or 25 hours long."""
+    return round((end_ms - start_ms) / 60_000 / READING_INTERVAL_MINUTES)
+
+
 def sheet_for(day):
     """True for the fortnight sheet, False for the daily one.
 
@@ -231,12 +242,19 @@ def split_into_days(entries, day_start, count=HISTORY_DAYS):
         readings = sorted(buckets.get(date, []))
         # Below a third of a day there is not enough to describe; a row built
         # from a handful of readings claims a shape the sensor never measured.
-        if len(readings) >= EXPECTED_READINGS // 3:
+        # A third of *that* day, so the two short and long ones are judged by
+        # their own length rather than by a nominal 288.
+        midnight = datetime(date.year, date.month, date.day, tzinfo=local)
+        whole = whole_day(
+            int(midnight.timestamp() * 1000),
+            int((midnight + timedelta(days=1)).timestamp() * 1000),
+        )
+        if len(readings) >= whole // 3:
             days.append((date.strftime("%-d %b"), readings))
     return days
 
 
-def render(day, readings):
+def render(day, readings, expected):
     """The message posted **only when there will be no picture**.
 
     On an ordinary day the sheet is the whole post. It carries the date, the
@@ -251,7 +269,7 @@ def render(day, readings):
     """
     values = [v for _, v in readings]
     date = day.strftime("%A %-d %B")
-    uptime = len(values) / EXPECTED_READINGS * 100
+    uptime = len(values) / expected * 100
 
     if not values:
         return (
@@ -263,7 +281,7 @@ def render(day, readings):
     return (
         f"<div><strong>🩺 {date}</strong></div>"
         f"<div>Only {uptime:.0f}% sensor coverage "
-        f"({len(values)} of ~{EXPECTED_READINGS} readings), so the "
+        f"({len(values)} of ~{expected} readings), so the "
         "statistics are left out: a range figure from a partial day "
         "describes when the sensor was on, not the day.</div>"
     )
@@ -337,8 +355,9 @@ def main():
     # Words only when there is no picture: a partial day makes the same false
     # claim the withheld statistics would have, and a picture of nothing is
     # worse than no picture. Those days still have to say something.
-    if not days or len(readings) / EXPECTED_READINGS * 100 < MIN_UPTIME_PERCENT:
-        return post_words(render(day, readings))
+    expected = whole_day(start_ms, end_ms)
+    if not days or len(readings) / expected * 100 < MIN_UPTIME_PERCENT:
+        return post_words(render(day, readings, expected))
 
     try:
         weekly = sheet_for(day)
