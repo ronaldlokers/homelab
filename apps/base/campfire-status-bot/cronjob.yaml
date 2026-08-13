@@ -2,7 +2,7 @@
 # 07:00 and posted only if there is something to say.
 #
 # It lives in this directory rather than its own because it is not a second
-# app — it is the same script with --briefing, mounting the same ConfigMap. A
+# app — it is the same checks, now from the stringer image. A
 # separate app would have meant a second copy of every threshold, and the
 # thresholds are the part that took the longest to get right.
 #
@@ -40,14 +40,16 @@ spec:
           serviceAccountName: campfire-status-bot
           securityContext:
             runAsNonRoot: true
-            runAsUser: 65534
-            runAsGroup: 65534
+            # The image runs as `node` (uid 1000); 65534 has no home in it.
+            runAsUser: 1000
+            runAsGroup: 1000
             seccompProfile:
               type: RuntimeDefault
           containers:
             - name: briefing
-              image: python:3.13-alpine
-              command: ["python3", "/opt/bot/campfire-status-bot.py", "--briefing"]
+              # renovate: datasource=github-releases depName=ronaldlokers/stringer
+              image: ghcr.io/ronaldlokers/stringer:v0.5.0
+              args: ["briefing"]
               env:
                 # The full bot URL, room and bot key included. The webhook path
                 # the interactive verbs reply on does not exist here: nobody
@@ -69,10 +71,6 @@ spec:
                 limits:
                   cpu: 200m
                   memory: 128Mi
-              volumeMounts:
-                - name: script
-                  mountPath: /opt/bot
-          volumes:
-            - name: script
-              configMap:
-                name: campfire-status-bot-script
+          # No script volume: the checks are in the image now. The ConfigMap
+          # stays for the Deployment, which still serves the interactive verbs
+          # from Python — see docs/campfire/migration-to-stringer.md.
