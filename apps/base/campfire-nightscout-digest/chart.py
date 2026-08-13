@@ -45,41 +45,58 @@ import glyphs
 
 PAGE = (15, 21, 35)
 PANEL = (26, 34, 53)
-NIGHT = (21, 28, 45)
+NIGHT = (19, 26, 42)
 INK = (226, 232, 240)
+# Two text tones, not three. A third, fainter grey for units read at 2.2:1 on
+# the cards — below the 4.5:1 floor for text this size, and unreadable on a
+# phone in daylight, which is the whole use scene. Hierarchy comes from size
+# and weight instead, which costs nothing.
 MUTED = (128, 143, 170)
-FAINT = (74, 89, 116)
 GRID = (44, 57, 84)
-TARGET_FILL = (30, 58, 51)
-TARGET_EDGE = (52, 105, 84)
+TARGET_FILL = (28, 54, 43)
+TARGET_EDGE = (46, 96, 71)
 
-# Roughly the AGP convention: red below, green in range, amber and orange above,
-# lifted for a dark background where the original mid-tones went muddy. A colour
-# means the same thing in the ring, the bar and the trace.
+# The AGP convention — reds below, green in range, ambers above — re-stepped so
+# neighbouring bands differ in lightness as well as hue.
+#
+# The colours this replaces failed a colour-vision check badly: `low` and
+# `in range` were 2.2 ΔE apart under deuteranopia, which is to say identical to
+# roughly one man in twelve. On a chart about hypoglycaemia that is not a
+# styling nit. `high` and `very high` were 14.6 ΔE apart under *normal* vision,
+# too close for anyone.
+#
+# The ladder now runs pale-to-saturated on each side of the target, so severity
+# reads as intensity in either direction and survives every simulation:
+# adjacent pairs are ≥12 ΔE under protanopia, deuteranopia and tritanopia, and
+# every step clears 3:1 against the card it sits on. Checked with the dataviz
+# skill's validator, dark mode, surface #1A2235.
 COLOURS = {
-    "very low": (185, 28, 28),
-    "low": (248, 113, 113),
-    "in range": (52, 199, 123),
-    "high": (250, 204, 21),
-    "very high": (251, 146, 60),
+    "very low": (244, 63, 94),
+    "low": (253, 164, 175),
+    "in range": (34, 165, 90),
+    "high": (253, 224, 71),
+    "very high": (249, 115, 22),
 }
 
 # --- layout ----------------------------------------------------------------
+#
+# One spacing step, used everywhere: PAD inside a card, 2*PAD between blocks.
+# The previous version had card padding of 32, tile padding of 20 and a page
+# margin of 48, so nothing lined up with anything at three different depths.
 
-WIDTH, HEIGHT = 800, 1386
+WIDTH, HEIGHT = 800, 1360
 MARGIN = 48
-CARD = (MARGIN, 176, WIDTH - MARGIN, 496)
-HERO = (80, 294)
-BAR = (80, 416, WIDTH - 80, 450)
-LEGEND = (430, 222)
+PAD = 24
+CARD = (MARGIN, 150, WIDTH - MARGIN, 470)
+HERO = (MARGIN + PAD, 268)
+BAR = (MARGIN + PAD, 390, WIDTH - MARGIN - PAD, 424)
+LEGEND = (422, 196)
 LEGEND_ROW = 34
-PLOT = (118, 596, WIDTH - MARGIN, 1196)
-TILES = (1256, 1356)
-
-# What the picture is of. The date is the title because the date is what
-# changes, but a date alone is not a subject: opened full screen the message it
-# was attached to is no longer on the page, and forwarded it never was.
-HEADING = "Blood glucose · Nightscout"
+# The left edge is set so the widest y label starts exactly on the page margin:
+# the axis column is part of the page's left edge, not an indent from it.
+PLOT = (115, 570, WIDTH - MARGIN, 1170)
+PLOT_INSET = 26
+TILES = (1230, 1330)
 
 MMOL = 18.0182
 # Fixed vertical extent rather than one fitted to the data: a flat day should
@@ -88,11 +105,17 @@ MMOL = 18.0182
 # actually read; anything higher clamps to the top edge, still plainly orange.
 Y_MIN, Y_MAX = 40, 300
 # Gridlines and labels, in mmol/L. 3.9 and 10.0 are the target edges and are
-# the two that matter.
-Y_TICKS = (3.9, 6.0, 10.0, 14.0)
+# the two that matter. The last is the ceiling itself: without it the top of
+# the frame is an unlabelled edge, and a trace pinned against it looks like a
+# reading rather than a clamp. The true value is still on the high marker.
+Y_TICKS = (3.9, 6.0, 10.0, 14.0, Y_MAX / MMOL)
 # Shaded as night. Not an interval anyone chose — it is simply the part of the
 # day whose numbers were produced while asleep, and it reads differently.
 NIGHT_HOURS = (0, 6)
+
+# What the picture is of. Opened full screen the message it was attached to is
+# no longer on the page, and forwarded it never was, so the image has to say.
+SOURCE = "Blood glucose · Nightscout"
 
 
 class Canvas:
@@ -371,21 +394,45 @@ def draw_summary(canvas, type_, values, bands):
     type_.draw(canvas, HERO[0], HERO[1], "hero", f"{in_range * 100:.0f}%", INK)
     type_.draw(canvas, HERO[0], HERO[1] + 40, "body", "time in range 3.9-10.0", MUTED)
 
+    # Bands that did not happen stay on the list and step back out of the way.
+    # Removing them would lose the "no lows" that is worth reading; leaving them
+    # at full strength lets three zeroes outshout the two rows that describe the
+    # day, which on a good day is exactly what happened.
     x, baseline = LEGEND
     for name, share in parts:
+        # The swatch keeps its full strength whatever the row says: it is the
+        # key to the trace, and a dimmed orange is a different colour, not a
+        # quieter one. Only the words step back.
         canvas.dot(x + 7, baseline - 7, 7, COLOURS[name])
-        type_.draw(canvas, x + 28, baseline, "body", name, INK)
-        type_.right(canvas, CARD[2] - 24, baseline, "stat", f"{share * 100:.0f}%", INK)
+        ink = INK if share else MUTED
+        type_.draw(canvas, x + 28, baseline, "body", name, ink)
+        type_.right(canvas, CARD[2] - PAD, baseline, "stat", f"{share * 100:.0f}%", ink)
         baseline += LEGEND_ROW
 
+    _draw_split_bar(canvas, parts)
+
+
+def _draw_split_bar(canvas, parts):
+    """The same five figures as a length, which is easier to judge than a list.
+
+    Two pixels of card colour between segments, so the split is legible as
+    shape and not only as hue — the boundary between two adjacent bands is
+    exactly where colour vision fails. That gap and the fixed band order are
+    what stop the bar depending on hue alone; the numbers are already in the
+    legend directly above it, and printing them a third time inside the bar
+    only crowds it.
+    """
     left, top, right, bottom = BAR
+    span = right - left
     cursor = float(left)
     for name, share in parts:
         if share <= 0:
             continue
-        end = cursor + share * (right - left)
+        end = cursor + share * span
         canvas.rect(cursor, top, end, bottom, COLOURS[name])
         cursor = end
+        if cursor < right:
+            canvas.rect(cursor - 1, top, cursor + 1, bottom, PANEL)
     canvas.round_corners(left, top, right, bottom, (bottom - top) // 2, PANEL)
 
 
@@ -394,9 +441,14 @@ def draw_day(canvas, type_, readings, bands, day_start_ms):
     left, top, right, bottom = PLOT
     canvas.round_rect(left, top, right, bottom, 12, PANEL)
 
+    # The scale stops short of the frame at both ends. Without that gutter a
+    # reading at the ceiling is drawn on the border itself, and the label for a
+    # night spent against the floor has nowhere to go but on top of the trace.
+    floor, ceiling = bottom - PLOT_INSET, top + PLOT_INSET
+
     def y_for(mgdl):
         clamped = max(Y_MIN, min(Y_MAX, mgdl))
-        return bottom - (clamped - Y_MIN) / (Y_MAX - Y_MIN) * (bottom - top)
+        return floor - (clamped - Y_MIN) / (Y_MAX - Y_MIN) * (floor - ceiling)
 
     def x_for(minutes):
         return left + minutes / 1440 * (right - left)
@@ -411,7 +463,7 @@ def draw_day(canvas, type_, readings, bands, day_start_ms):
         if mmol * MMOL not in (70, 180):
             canvas.rect(left, y, right, y + 1, GRID)
         type_.right(canvas, left - 14, int(y) + 8, "tick", f"{mmol:.1f}", MUTED)
-    type_.draw(canvas, left, top - 15, "body", "mmol/L", FAINT)
+    type_.draw(canvas, left, top - 15, "body", "mmol/L", MUTED)
 
     # Every three hours, but only the six-hour marks are labelled and ruled.
     # The short ticks are enough to count 03:00 off without another line
@@ -507,20 +559,24 @@ def draw_tiles(canvas, type_, values):
         canvas.round_rect(left, top, left + width, bottom, 14, PANEL)
         # Label alone on the first line, unit trailing the value on the second.
         # Both on one line is how the widest pair — GMI and its unit — collided.
-        type_.draw(canvas, left + 20, top + 32, "body", label, MUTED)
-        type_.draw(canvas, left + 20, top + 78, "stat", value, INK)
-        type_.right(canvas, left + width - 20, top + 78, "body", unit, FAINT)
+        type_.draw(canvas, left + PAD, top + 32, "body", label, MUTED)
+        type_.draw(canvas, left + PAD, top + 78, "stat", value, INK)
+        type_.right(canvas, left + width - PAD, top + 78, "body", unit, MUTED)
 
 
-def render(readings, bands, day_start_ms, title="", subtitle="", heading=HEADING):
+def render(readings, bands, day_start_ms, title="", subtitle="", source=SOURCE):
     canvas = Canvas(WIDTH, HEIGHT, PAGE)
     type_ = Type()
     values = [v for _, v in readings]
 
-    type_.draw(canvas, MARGIN, 46, "body", heading, MUTED)
-    type_.draw(canvas, MARGIN, 104, "title", title, INK)
-    if subtitle:
-        type_.draw(canvas, MARGIN, 142, "body", subtitle, MUTED)
+    # The date is the heading; what it is a reading of belongs with the rest of
+    # the provenance, on one line under it. It spent a version as a kicker above
+    # the date, which is a label wearing a heading's position: it took the eye
+    # first and said the one thing that never changes.
+    type_.draw(canvas, MARGIN, 78, "title", title, INK)
+    meta = " · ".join(part for part in (source, subtitle) if part)
+    if meta:
+        type_.draw(canvas, MARGIN, 116, "body", meta, MUTED)
 
     draw_summary(canvas, type_, values, bands)
     draw_day(canvas, type_, readings, bands, day_start_ms)
