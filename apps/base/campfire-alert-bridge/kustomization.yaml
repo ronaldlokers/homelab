@@ -8,12 +8,7 @@ resources:
   - service.yaml
   - network-policies.yaml
 
-# Hash suffix left ON (unlike recovery-source-check, whose CronJob names the
-# ConfigMap): the suffix changes when the script changes, which rewrites the
-# Deployment's volume reference and rolls the pod. Without it an edited script
-# applies cleanly and the running process keeps serving the old code.
-configMapGenerator:
-  - name: campfire-alert-bridge-script
-    namespace: campfire
-    files:
-      - campfire-alert-bridge.py
+# No configMapGenerator: the code lives in ghcr.io/ronaldlokers/stringer and
+# arrives by image tag, which Renovate bumps like any other image here. A tag
+# change rolls the pod on its own, which is what the ConfigMap hash suffix used
+# to be for. See docs/campfire/migration-to-stringer.md.
