@@ -1,3 +1,6 @@
+# Staging only. Production runs this check inside the morning briefing, which
+# reports what drifted rather than only that a Job failed; staging has no
+# Campfire to brief, so the CronJob is still how it gets asked there.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: secret-refs-check

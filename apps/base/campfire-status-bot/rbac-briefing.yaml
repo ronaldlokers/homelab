@@ -9,9 +9,8 @@
 # "the tool list happens not to expose it".
 #
 # So the briefing gets its own. It reads the same kinds the responder does,
-# minus pod logs and events, which only `why` needs. Secrets are added by the
-# checks that need them, in their own files, so each grant is next to its
-# reason.
+# minus pod logs and events, which only `why` needs, plus whatever a check it
+# has absorbed needs — each such grant carries its reason below.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -26,6 +25,10 @@ rules:
   - apiGroups: [""]
     resources: [pods]
     verbs: [get, list]
+  # The workloads whose Secret references are checked.
+  - apiGroups: ["apps"]
+    resources: [deployments, statefulsets, daemonsets]
+    verbs: [list]
   - apiGroups: ["kustomize.toolkit.fluxcd.io"]
     resources: [kustomizations]
     verbs: [list]
@@ -41,6 +44,21 @@ rules:
   - apiGroups: ["longhorn.io"]
     resources: [volumes]
     verbs: [list]
+  # For the secret-reference check, which absorbed the standalone
+  # secret-refs-check CronJob. It needs `list` to know which Secrets exist, and
+  # `get` to compare a mirrored credential against its source in `database`.
+  #
+  # RBAC cannot say "names only" — `list` on secrets returns values — so the
+  # narrowing is done in the request instead: the cluster-wide list asks for
+  # PartialObjectMetadataList, and the API server drops every value server-side.
+  # Only names that exist both in `database` and elsewhere are then fetched in
+  # full, one at a time.
+  #
+  # This is why the briefing has its own ServiceAccount. The responder, which
+  # feeds pod logs to a model, does not get this rule.
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get, list]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
