@@ -187,6 +187,16 @@ new one has run in production for a week.
 
 - **Statistics drift during the port.** Mitigated by phase 2 being golden-tested
   against the current implementation rather than written fresh.
+- **Wall-clock minutes, on the two days that are not 24 hours long.** The Python
+  computes a reading's position in its day as `when - midnight`, which reads
+  like elapsed time and is not: Python ignores the offset when both datetimes
+  share a tzinfo, so it is wall clock. Hours therefore mean the same thing on
+  every day, which is what makes "the 08:00 hour ran out of range on 12 of 14
+  days" a comparison rather than a coincidence, and the hour that happens twice
+  lands in its slot twice. JavaScript has no equivalent shortcut and will
+  subtract instants, so the port has to take the local hour and minute from the
+  formatter rather than differencing timestamps. Getting this wrong shifts every
+  reading after a changeover by an hour and pushes some off the sheet entirely.
 - **Native binary on arm64 musl.** Prebuilt binaries exist, but this is the one
   assumption worth proving in phase 1 rather than discovering in phase 5.
 - **The loop gets slower.** Today: edit, merge, visible in a minute. After: edit,

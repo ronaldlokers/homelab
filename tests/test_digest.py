@@ -87,6 +87,39 @@ class SheetSelection(unittest.TestCase):
         self.assertTrue(module.sheet_for(datetime(2026, 8, 8, tzinfo=AMSTERDAM)))
 
 
+class WholeDay(unittest.TestCase):
+    """How many readings a whole day holds, on the two days it is not 288."""
+
+    def expected_for(self, iso):
+        module = digest(DIGEST_DATE=iso)
+        _, start, end = module.day_bounds()
+        return module.whole_day(start, end)
+
+    def test_an_ordinary_day_holds_288(self):
+        self.assertEqual(self.expected_for("2026-08-05"), 288)
+
+    def test_the_short_day_holds_276(self):
+        self.assertEqual(self.expected_for("2026-03-29"), 276)
+
+    def test_the_long_day_holds_300(self):
+        self.assertEqual(self.expected_for("2026-10-25"), 300)
+
+    def test_a_perfect_sensor_is_100_percent_on_every_day(self):
+        """The bug: a fixed 288 read a full sensor as 104% in October.
+
+        Nothing downstream broke, because the only consumer is a floor. But a
+        coverage figure over 100 is a figure that is wrong, and it was printed
+        on the days the statistics were withheld.
+        """
+        for iso in ("2026-08-05", "2026-03-29", "2026-10-25"):
+            with self.subTest(iso):
+                module = digest(DIGEST_DATE=iso)
+                _, start, end = module.day_bounds()
+                whole = module.whole_day(start, end)
+                readings = int((end - start) / 1000 // 300)
+                self.assertEqual(round(readings / whole * 100), 100)
+
+
 class SplitIntoDays(unittest.TestCase):
     def test_days_come_back_oldest_first(self):
         module = digest()
@@ -118,6 +151,33 @@ class SplitIntoDays(unittest.TestCase):
         ]
         days = module.split_into_days(kept, start)
         self.assertEqual(len(days), 13)
+
+    def test_minutes_are_wall_clock_so_hours_line_up_across_days(self):
+        """The subtlety worth a test: hours must mean the same thing every day.
+
+        `(when - midnight)` reads like elapsed time and is not — Python ignores
+        the offset when both datetimes share a tzinfo. On the day the clocks go
+        back that is the difference between a reading at 23:55 landing on
+        minute 1435 and on minute 1495, and a minute past 1439 falls off both
+        the counted row and the right-hand edge of the plot.
+
+        It also decides whether "the 08:00 hour" means 08:00 on every day or
+        drifts by an hour after each changeover.
+        """
+        module = digest()
+        start = datetime(2026, 10, 25, tzinfo=AMSTERDAM)
+        first = start.timestamp()
+        # A real sensor: one reading every five minutes of actual elapsed time,
+        # so a 25-hour day produces 300 of them rather than 288.
+        entries = [(int((first + i * 300) * 1000), 110) for i in range(300)]
+
+        days = module.split_into_days(entries, start, count=1)
+        minutes = [minute for minute, _ in days[0][1]]
+        self.assertEqual(len(minutes), 300, "no reading may be dropped")
+        self.assertLess(max(minutes), 1440, "a minute past 1439 falls off the sheet")
+        # The hour that happened twice lands in the same slot twice, which is
+        # the honest answer: it did happen twice.
+        self.assertEqual(len(minutes) - len(set(minutes)), 12)
 
     def test_the_spring_forward_day_is_short_but_kept(self):
         module = digest()
