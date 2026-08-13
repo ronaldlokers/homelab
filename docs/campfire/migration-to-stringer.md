@@ -288,3 +288,97 @@ new one has run in production for a week.
 homelab as Python ConfigMaps. The four non-campfire ConfigMap scripts
 (`gatus`, `netpol-check`, `secret-refs-check`, `recovery-source-check`) are not
 touched.
+
+---
+
+# Can `status-bot` move?
+
+Mostly yes, and the answer is more interesting than the first one I gave. It is
+not one thing: it is a pile of portable cluster inspection with a small,
+genuinely Campfire-shaped shell around it.
+
+## What it is made of
+
+| Part | Lines | Portable? |
+|---|---|---|
+| Cluster checks — flux, pods, backups, certs, volumes | 278 | yes |
+| Model triage — the `why` loop and its read-only tools | 255 | yes |
+| Rendering — status, why, briefing | 196 | yes |
+| The Campfire contract — reply-as-response, async post, `act` | 90 | no |
+| Server, handler, main, module scope | 432 | mixed |
+
+Roughly 730 of 1251 lines have nothing to do with Campfire. They read the
+Kubernetes API and format what they find.
+
+## What actually binds it
+
+Three things, and only the first is hard.
+
+**The reply is the HTTP response.** Campfire POSTs a mention to a callback URL
+and treats a 200 `text/html` body as the bot's reply. That is why this process
+holds no bot key and no credential of its own — a property worth keeping. Two
+consequences are load-bearing: a non-200 that still carries a Content-Type gets
+uploaded into the room as an *attachment*, so every answer is 200 including
+failures; and `ENDPOINT_TIMEOUT` is 7 seconds, which is why gathering runs
+against a deadline and reports what it has.
+
+**Identity is a Campfire user id.** `TRIAGE_USER_ID` decides who may run `why`,
+`reconcile` and `restart`. That is the platform's identity model, not ours.
+
+**Async replies post back.** `why` is far past 7 seconds, so it answers later by
+posting to `CAMPFIRE_BASE`.
+
+A `Round` is outbound only. None of the above is outbound.
+
+## The plan, if we want it
+
+Two phases, and they only make sense together — phase seven alone would leave
+the same checks written twice in two languages, which is worse than today.
+
+### 7. The briefing, and the checks under it
+
+`--briefing` is already a CronJob that runs the checks once and posts only if
+something is worth saying. That is a beat, and it is the same shape as
+`renovate`: no inbound, no timeout budget, no identity.
+
+Move the checks, the renderers and the model loop into `src/copy/cluster/`, and
+ship `beats/briefing.ts`. The Python keeps serving the interactive verbs
+meanwhile, still from its own copy — the duplication is real but lasts one
+phase, and the briefing is the half that can be verified by simply reading what
+lands in the room.
+
+*Exit:* the briefing posts from the image, and its output matches the Python's
+on the same cluster.
+
+### 8. The responder, and an inbound seam
+
+`Round` gains a sibling rather than a verb. Something like a `Desk`: it receives
+a question and answers it, and each transport decides what that means.
+
+  * Campfire: an HTTP server whose *response body* is the answer, with the 7s
+    deadline and the "always 200, even on failure" rule intact.
+  * Anything else: receive, then post the answer as a new message.
+
+That keeps the property worth keeping — the responder holds no credential on
+Campfire — while making the shape expressible elsewhere. It is the same move
+that let `alerts` come across: name the capability, let a transport that lacks
+it degrade honestly.
+
+Authorisation stays a Campfire concept and moves behind the seam: the desk says
+who asked, in its own terms, and the bot decides what that identity may do.
+
+`act()` does not change. It forwards to `campfire-kube-actor` over HTTP, which
+is already transport-agnostic and stays where it is.
+
+*Exit:* `@Kubernetes status` answers from the image, inside 7 seconds, with the
+Python deleted.
+
+## What still does not move
+
+`campfire-kube-actor` performs the writes and holds the write RBAC. It is an API
+the bot calls, not a bot: nothing about it posts to a room. `notify-check` is
+the same shape.
+
+The split between them is the point of the design — one process reads logs and
+calls a model, the other holds the RBAC — and it survives the move unchanged,
+because it was never about where the code lived.
