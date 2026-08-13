@@ -65,6 +65,9 @@ TIMEZONE = os.environ.get("DIGEST_TIMEZONE", "Europe/Amsterdam")
 # Empty on the CronJob. Set it on a one-off Job to report an older day — the
 # day a sensor was actually running, or one missed while something was broken.
 DIGEST_DATE = os.environ.get("DIGEST_DATE", "").strip()
+# Empty means the calendar decides: the fortnight sheet on Saturdays, the daily
+# one otherwise. Set to "day" or "fortnight" on a one-off Job to force either.
+DIGEST_SHEET = os.environ.get("DIGEST_SHEET", "").strip().lower()
 TIMEOUT = 20
 # See fetch_with_retry: the first connection from a new pod can be refused
 # while its NetworkPolicy is still being programmed.
@@ -75,6 +78,10 @@ MMOL = 18.0182  # mg/dL per mmol/L
 
 # One reading per five minutes.
 EXPECTED_READINGS = 288
+# How much history the chart draws behind the reported day. Fourteen is the
+# clinical convention for a stable time-in-range figure, and it is what the
+# sheet has room for at type large enough to read on a phone.
+HISTORY_DAYS = 14
 # Below this, report the coverage and withhold the statistics.
 MIN_UPTIME_PERCENT = float(os.environ.get("MIN_UPTIME_PERCENT", "70"))
 
@@ -124,10 +131,10 @@ def fetch(start_ms, end_ms):
         {
             "find[date][$gte]": start_ms,
             "find[date][$lt]": end_ms,
-            # A day is ~288; ask for well over so a dense uploader is not
-            # silently truncated into a low reading count, which would look
+            # A day is ~288, and the chart now wants a fortnight, so ~4000.
+            # Ask for well over: a dense uploader silently truncated would look
             # like poor sensor uptime rather than a capped query.
-            "count": 1000,
+            "count": 8000,
         }
     )
     request = urllib.request.Request(
@@ -168,6 +175,49 @@ def day_bounds():
         start = midnight - timedelta(days=1)
     end = start + timedelta(days=1)
     return start, int(start.timestamp() * 1000), int(end.timestamp() * 1000)
+
+
+def sheet_for(day):
+    """True for the fortnight sheet, False for the daily one.
+
+    Saturday gets the long look back, because a trend is worth sitting with and
+    Saturday is when there is time to. Every other morning asks the smaller
+    question — was yesterday unusual — which is the only one a single day can
+    honestly answer.
+
+    `day` is the day being reported, so the Saturday sheet arrives on Sunday
+    morning covering the fortnight that ended Saturday.
+    """
+    if DIGEST_SHEET in ("day", "fortnight"):
+        return DIGEST_SHEET == "fortnight"
+    return day.weekday() == 5
+
+
+def split_into_days(entries, day_start, count=HISTORY_DAYS):
+    """Cut a flat run of readings into local days, oldest first.
+
+    Bounded by local midnights rather than by fixed 24-hour blocks, so the two
+    days a year that are 23 or 25 hours long still come out as whole days. A
+    day the sensor sat out is dropped rather than drawn empty: a blank row
+    reads as a day at zero, which is a different and much worse claim.
+    """
+    local = day_start.tzinfo
+    buckets = {}
+    for stamp, value in entries:
+        when = datetime.fromtimestamp(stamp / 1000, local)
+        midnight = when.replace(hour=0, minute=0, second=0, microsecond=0)
+        minute = (when - midnight).total_seconds() / 60
+        buckets.setdefault(midnight.date(), []).append((minute, value))
+
+    days = []
+    for offset in range(count - 1, -1, -1):
+        date = (day_start - timedelta(days=offset)).date()
+        readings = sorted(buckets.get(date, []))
+        # Below a third of a day there is not enough to describe; a row built
+        # from a handful of readings claims a shape the sensor never measured.
+        if len(readings) >= EXPECTED_READINGS // 3:
+            days.append((date.strftime("%-d %b"), readings))
+    return days
 
 
 def render(day, readings):
@@ -255,8 +305,9 @@ def main():
         return 1
 
     day, start_ms, end_ms = day_bounds()
+    history_ms = int((day - timedelta(days=HISTORY_DAYS - 1)).timestamp() * 1000)
     try:
-        readings = fetch_with_retry(start_ms, end_ms)
+        entries = fetch_with_retry(history_ms, end_ms)
     except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
         # Say so in the room rather than failing quietly. A digest that simply
         # stops arriving is indistinguishable from a day nobody looked at.
@@ -265,9 +316,11 @@ def main():
             "<div><strong>🩺 could not read Nightscout</strong></div>"
             f"<pre>{html.escape(str(error))}</pre>"
         )
-        readings = []
+        entries, readings, days = [], [], []
     else:
-        log(f"{day.date()}: {len(readings)} readings")
+        readings = [(stamp, value) for stamp, value in entries if stamp >= start_ms]
+        days = split_into_days(entries, day)
+        log(f"{day.date()}: {len(readings)} readings, {len(days)} days of history")
         body = render(day, readings)
 
     log(f"posted, campfire returned {post(body)}")
@@ -275,20 +328,14 @@ def main():
     # The chart only when the statistics were shown. A picture of a partial day
     # makes the same false claim the withheld numbers would have, and a picture
     # of nothing is worse than no picture.
-    if len(readings) / EXPECTED_READINGS * 100 >= MIN_UPTIME_PERCENT:
+    if days and len(readings) / EXPECTED_READINGS * 100 >= MIN_UPTIME_PERCENT:
         try:
-            values = [v for _, v in readings]
-            png = chart.render(
-                readings,
-                BANDS,
-                start_ms,
-                title=day.strftime("%A %-d %B"),
-                # Just the coverage: the chart's metadata line has room for one
-                # more fact beside the source, and the reading count is in the
-                # message posted with it.
-                subtitle=f"{len(values) / EXPECTED_READINGS * 100:.0f}% sensor coverage",
+            weekly = sheet_for(day)
+            png = (chart.render_fortnight if weekly else chart.render_day)(days, BANDS)
+            log(
+                f"{'fortnight' if weekly else 'day'} chart {len(png)} bytes, "
+                f"campfire returned {post_image(png)}"
             )
-            log(f"chart {len(png)} bytes, campfire returned {post_image(png)}")
         except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
             # The numbers are already posted; a missing picture is not worth
             # failing the run over.

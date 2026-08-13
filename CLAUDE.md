@@ -405,3 +405,6 @@ See `docs/` dir for full docs:
 - **stack/**: Component-specific docs
 - **runbooks/**: Step-by-step operational procedures
 - **war-stories/**: Real-world troubleshooting experiences (highly recommended reading)
+- **campfire/**: What the campfire-namespace bots post and how it is designed
+  (`PRODUCT.md` for the surface, `DESIGN.md` for the visual system). Read both
+  before changing anything a bot draws or writes.

@@ -1,33 +1,38 @@
 #!/usr/bin/env python3
-"""Draw the glucose day as a PNG, with no dependencies at all.
+"""Draw a fortnight of glucose as a PNG, with no dependencies at all.
+
+DIRECTION CONTRACT
+THESIS: A morning report that leads with what the fortnight noticed, not with
+yesterday's score. It refuses the AGP one-pager, whose comparability across
+patients is a cost with no payer when there is exactly one reader.
+OWN-WORLD: The Vienna Method — Neurath and Arntz's pictorial statistics.
+Printed off-white stock, flat offset inks, a hard modular grid, geometric sans
+set lowercase, and quantities built from countable unit marks rather than
+smoothed into curves.
+STORY: The reader learns one true thing about the last two weeks in a sentence,
+sees the fourteen days that produced it, and leaves with the exact figures.
+FIRST VIEWPORT: A source line, a rule, then the finding set at 56px across two
+lines. Below it fourteen rows, newest first, each a run of marks whose length
+is that day's time in range. Then the typical day, then the remaining findings,
+then the figures on a ruled foot.
+FORM: Counted rows plus a headline finding; candidate 6 of the grounded list,
+seed key f091d619.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the
+finish review, the verdict, and DESIGN.md.
 
 matplotlib would be the obvious tool and is the wrong one here: it would mean
-building a wheel on arm64 or carrying a much larger image, for a chart whose
+building a wheel on arm64 or carrying a much larger image, for a sheet whose
 whole content is rectangles, a line and some text. `zlib` and `struct` are in
-the standard library and a PNG is not complicated — an IHDR, a zlib-compressed
-block of filtered RGB rows, and an IEND. So the CronJob keeps running on a
-stock `python:3.13-alpine` with nothing installed.
+the standard library, so the CronJob keeps running on a stock
+`python:3.13-alpine` with nothing installed.
 
-The type is real type, and still costs no dependency: `bake_font.py` rasterises
-Adwaita Sans and JetBrains Mono on a workstation and `glyphs.py` ships the
-resulting coverage bitmaps. Everything here draws by blending those bytes.
+The type is real type and still costs no dependency: `bake_font.py` rasterises
+URW Gothic and JetBrains Mono on a workstation, and `glyphs.py` ships the
+coverage bitmaps.
 
-Three things this is built around, all learned the hard way:
-
-*Everything is labelled.* The first version had no text, on the theory that the
-numbers were in the message the image is attached to. With nothing marking
-where 3.9 and 10.0 sit, the eye reads the plot background as the target range,
-and a day that was 100% in range looks like it has excursions. A chart that
-disagrees with its own caption is worse than no chart.
-
-*It is sized to the box it is shown in*, which a screenshot settled: Campfire
-caps an attachment on height, so a tall image is scaled down and shown narrow.
-The canvas is 1000x1200 because that is the box exactly.
-
-*It draws only what stays legible at that size.* Roughly 340 CSS pixels across
-is not enough for a five-row legend and three statistic tiles as well, and
-every number those carried is in the message posted directly above the picture.
-Type big enough to read beats a second copy of the text.
+Two constraints are load-bearing and neither is negotiable. Clinical colour
+meaning is binding — green reads in range, warm reads high, red reads low — and
+the figures stay exact. Everything else on the sheet was chosen.
 """
 
 import math
@@ -39,93 +44,67 @@ import glyphs
 
 # --- palette ---------------------------------------------------------------
 #
-# Dark, blue-grey rather than black: the image is looked at in a lit room in the
-# morning, and a black rectangle in the middle of the room's own dark chrome
-# reads as a hole. Cards a step lighter than the page do the grouping that
-# rules and boxes would otherwise have to.
+# Printed stock, not a screen. Campfire's own chrome is light, so a dark card
+# punches a hole in the message column; a printed ground sits in it. The inks
+# are flat and few, the way a statistical sheet is printed.
 
-PAGE = (15, 21, 35)
-PANEL = (26, 34, 53)
-NIGHT = (19, 26, 42)
-INK = (226, 232, 240)
-# Two text tones, not three. A third, fainter grey for units read at 2.2:1 on
-# the cards — below the 4.5:1 floor for text this size, and unreadable on a
-# phone in daylight, which is the whole use scene. Hierarchy comes from size
-# and weight instead, which costs nothing.
-MUTED = (128, 143, 170)
-GRID = (44, 57, 84)
-TARGET_FILL = (28, 54, 43)
-TARGET_EDGE = (46, 96, 71)
+GROUND = (232, 228, 218)
+PAPER = (222, 217, 205)
+INK = (26, 26, 24)
+MUTED = (110, 106, 96)
+RULE = (196, 190, 176)
+GRID = (210, 205, 193)
+TARGET_FILL = (206, 214, 196)
+BAND_FILL = (196, 204, 186)
 
-# The AGP convention — reds below, green in range, ambers above — re-stepped so
-# neighbouring bands differ in lightness as well as hue.
-#
-# The colours this replaces failed a colour-vision check badly: `low` and
-# `in range` were 2.2 ΔE apart under deuteranopia, which is to say identical to
-# roughly one man in twelve. On a chart about hypoglycaemia that is not a
-# styling nit. `high` and `very high` were 14.6 ΔE apart under *normal* vision,
-# too close for anyone.
-#
-# The ladder now runs pale-to-saturated on each side of the target, so severity
-# reads as intensity in either direction and survives every simulation:
-# adjacent pairs are ≥12 ΔE under protanopia, deuteranopia and tritanopia, and
-# every step clears 3:1 against the card it sits on. Checked with the dataviz
-# skill's validator, dark mode, surface #1A2235.
+# Reds below, green in range, ambers above — the one piece of the category's
+# vocabulary worth keeping. Stepped so neighbouring bands differ in lightness
+# as well as hue, because an earlier palette put `low` and `in range` 2.2 ΔE
+# apart under deuteranopia, which on a chart about hypoglycaemia is a defect.
 COLOURS = {
-    "very low": (244, 63, 94),
-    "low": (253, 164, 175),
-    "in range": (34, 165, 90),
-    "high": (253, 224, 71),
-    "very high": (249, 115, 22),
+    "very low": (150, 25, 30),
+    "low": (214, 122, 122),
+    "in range": (46, 125, 79),
+    "high": (232, 163, 61),
+    "very high": (209, 98, 42),
 }
+# Worst first, so a row reads outward from the trouble.
+SEVERITY = ("in range", "high", "very high", "low", "very low")
 
 # --- layout ----------------------------------------------------------------
 #
-# Sized to the box Campfire actually gives an attachment, which a screenshot
-# settled: it is capped on *height*, at about 339x400 CSS px, and 3x on a
-# phone makes that 1017x1200 device pixels. The old 800x1360 hit the height cap
-# first and was drawn at 706x1200 — downscaled twelve percent with a third of
-# the available width left empty. Portrait was the wrong instinct: past this
-# aspect ratio, taller only means smaller.
-#
-# 1000x1200 fills the box at 1:1. Nothing here is drawn smaller than it has to
-# be, and nothing is drawn that the message beside it already says.
+# Campfire caps an attachment on height, at about 339x400 CSS px, which is
+# 1017x1200 device pixels on a 3x phone. 1000x1200 fills that box at 1:1, so a
+# pixel drawn is a pixel shown — and 30px of type here is about 10 CSS px on
+# the phone, which is the floor. Everything is sized from that, not from how it
+# looks on a desktop.
 
 WIDTH, HEIGHT = 1000, 1200
 MARGIN = 56
-HERO = (MARGIN, 340)
-BAR = (MARGIN, 444, WIDTH - MARGIN, 486)
-ENCOURAGEMENT = 552
-CHIPS = (600, 678)
-CHIP_GAP = 16
-# The left edge is set so the widest y label starts exactly on the page margin:
-# the axis column is part of the page's left edge, not an indent from it.
-PLOT = (MARGIN, 766, WIDTH - MARGIN, 1110)
-# The axis label column, inside the card, and a matching breath on the right so
-# the trace does not run into the border.
-PLOT_GUTTER, PLOT_EDGE = 96, 20
-PLOT_INSET = 30
+SOURCE_BASELINE = 64
+HEADLINE = (150, 64)  # first baseline, line step
+ROWS = (250, 30, 22, 6)  # top, row height, mark, gap
+ROW_LABEL_X, ROW_MARKS_X = MARGIN, 176
+TYPICAL = (712, 730, 880)  # caption baseline, box top, box bottom
+FINDINGS = 918
+FINDING_STEP = 70
+FOOT = 1060
+
+# The daily sheet spends its middle on one chart instead of fourteen rows, so
+# the trace gets the room the rows had.
+AGAINST = (330, 350, 780)
+DAY_MARKS = 850
+DAY_FINDINGS = 920
 
 MMOL = 18.0182
-# Fixed vertical extent rather than one fitted to the data: a flat day should
-# look flat, not fill the frame. The ceiling is 14 mmol/L, the top of the "high"
-# band — above it the readings are rare and the space they reserve is stolen
-# from the part actually read, which is the four mmol either side of target.
-# Anything higher clamps to the top edge, still plainly orange, and the marker
-# on the day's peak still carries its true value.
 Y_MIN, Y_MAX = 40, 14.0 * MMOL
-# Gridlines and labels, in mmol/L. 3.9 and 10.0 are the target edges and are
-# the two that matter. The last is the ceiling itself: without it the top of
-# the frame is an unlabelled edge, and a trace pinned against it looks like a
-# reading rather than a clamp. The true value is still on the high marker.
-Y_TICKS = (3.9, 6.0, 10.0, Y_MAX / MMOL)
-# Shaded as night. Not an interval anyone chose — it is simply the part of the
-# day whose numbers were produced while asleep, and it reads differently.
-NIGHT_HOURS = (0, 6)
+Y_EDGES = (70, 180)
+# The consensus target. The findings hang off it rather than off a number
+# invented here.
+TARGET = 0.70
 
-# What the picture is of. Opened full screen the message it was attached to is
-# no longer on the page, and forwarded it never was, so the image has to say.
-SOURCE = "Blood glucose · Nightscout"
+SOURCE = "glucose, fourteen days  ·  nightscout"
+DAY_SOURCE = "glucose  ·  nightscout"
 
 
 class Canvas:
@@ -158,42 +137,8 @@ class Canvas:
             for x in range(left, right):
                 self.blend(x, y, colour, alpha)
 
-    def round_rect(self, left, top, right, bottom, radius, colour, alpha=1.0):
-        left, top, right, bottom = int(left), int(top), int(right), int(bottom)
-        # Fill the straight parts wholesale, then only the four corner squares
-        # need per-pixel coverage.
-        self.rect(left + radius, top, right - radius, bottom, colour, alpha)
-        self.rect(left, top + radius, left + radius, bottom - radius, colour, alpha)
-        self.rect(right - radius, top + radius, right, bottom - radius, colour, alpha)
-        for x, y in _corner_pixels(left, top, right, bottom, radius):
-            cover = _round_coverage(x, y, left, top, right, bottom, radius)
-            self.blend(x, y, colour, alpha * cover)
-
-    def round_corners(self, left, top, right, bottom, radius, backdrop):
-        """Paint `backdrop` back over the corners of an already-drawn block.
-
-        Rounding a run of butted-up rectangles this way keeps them one shape.
-        Filling each rectangle as its own rounded rect would round the joins in
-        the middle too, which is not a bar, it is five lozenges.
-        """
-        for x, y in _corner_pixels(left, top, right, bottom, radius):
-            cover = _round_coverage(x, y, left, top, right, bottom, radius)
-            self.blend(x, y, backdrop, 1 - cover)
-
-    def dot(self, cx, cy, radius, colour, alpha=1.0):
-        for y in range(int(cy - radius) - 1, int(cy + radius) + 2):
-            for x in range(int(cx - radius) - 1, int(cx + radius) + 2):
-                cover = min(1.0, max(0.0, radius + 0.5 - math.hypot(x - cx, y - cy)))
-                self.blend(x, y, colour, alpha * cover)
-
     def segment(self, x0, y0, x1, y1, colour, thickness):
-        """Anti-aliased line, by distance from the segment.
-
-        Cheaper and smoother than drawing a disc at every Bresenham step, which
-        is what this used to do: the discs overlapped into a rope with visibly
-        lumpy edges, and at 288 readings a day the lumps were the texture of the
-        whole trace.
-        """
+        """Anti-aliased line, by distance from the segment."""
         half = thickness / 2
         dx, dy = x1 - x0, y1 - y0
         length_sq = dx * dx + dy * dy or 1.0
@@ -204,13 +149,7 @@ class Canvas:
                 self.blend(x, y, colour, min(1.0, max(0.0, half + 0.5 - distance)))
 
     def png(self):
-        """Adaptive per-row filtering, which is most of the file size.
-
-        A PNG row may be encoded as a difference from the row above or the
-        pixel to the left, and the encoder picks per row. Flat cards and smooth
-        gradients compress several times better under Up/Sub than under the
-        None this used to emit, for about thirty lines of arithmetic.
-        """
+        """Adaptive per-row filtering, which is most of the file size."""
         stride = self.width * 3
         raw = bytearray()
         previous = bytes(stride)
@@ -219,8 +158,6 @@ class Canvas:
             best = None
             for kind in range(5):
                 candidate = _filter_row(kind, row, previous, 3)
-                # The standard heuristic: the encoding whose bytes are closest
-                # to zero on average is the one that compresses best.
                 score = sum(b if b < 128 else 256 - b for b in candidate)
                 if best is None or score < best[0]:
                     best = (score, kind, candidate)
@@ -245,47 +182,6 @@ class Canvas:
             + chunk(b"IDAT", zlib.compress(bytes(raw), 9))
             + chunk(b"IEND", b"")
         )
-
-
-def _coverage(x, y, cx, cy, radius):
-    """How much of one pixel falls inside a circle, sampled 3x3."""
-    hits = 0
-    for sy in (0.17, 0.5, 0.83):
-        for sx in (0.17, 0.5, 0.83):
-            if math.hypot(x + sx - cx, y + sy - cy) <= radius:
-                hits += 1
-    return hits / 9
-
-
-def _round_coverage(x, y, left, top, right, bottom, radius):
-    """How much of one pixel falls inside a rounded rectangle.
-
-    A pixel is only on an arc when it is past the radius in *both* axes; the
-    straight edges are simply inside. Getting that wrong eats the ends off a
-    bar and leaves the corner arc floating beside it.
-    """
-    corner_x = (
-        left + radius
-        if x < left + radius
-        else (right - radius - 1 if x > right - radius - 1 else None)
-    )
-    corner_y = (
-        top + radius
-        if y < top + radius
-        else (bottom - radius - 1 if y > bottom - radius - 1 else None)
-    )
-    if corner_x is None or corner_y is None:
-        return 1.0
-    return _coverage(x, y, corner_x, corner_y, radius)
-
-
-def _corner_pixels(left, top, right, bottom, radius):
-    """The four corner squares, which are the only pixels needing coverage."""
-    for x0, x1 in ((left, left + radius), (right - radius, right)):
-        for y0, y1 in ((top, top + radius), (bottom - radius, bottom)):
-            for y in range(y0, y1):
-                for x in range(x0, x1):
-                    yield x, y
 
 
 def _filter_row(kind, row, previous, bpp):
@@ -337,9 +233,8 @@ class Type:
         for character in string:
             glyph = table.get(character)
             if glyph is None:
-                # A character with no glyph advances a space rather than
-                # raising, so an unforeseen label degrades to a gap instead of
-                # failing the run at 07:00.
+                # An unforeseen character advances a space rather than raising,
+                # so a new label degrades to a gap instead of failing at 07:00.
                 pen += table.get(" ", [0, 0, 0, 0, 8])[4]
                 continue
             width, height, dx, dy, advance = glyph
@@ -357,21 +252,20 @@ class Type:
                         )
             pen += advance
 
-    def right(self, canvas, right, baseline, face, string, colour, alpha=1.0):
-        self.draw(
-            canvas, right - self.width(face, string), baseline, face, string, colour, alpha
-        )
+    def wrap(self, face, string, width):
+        words, line, lines = string.split(), "", []
+        for word in words:
+            trial = f"{line} {word}".strip()
+            if line and self.width(face, trial) > width:
+                lines.append(line)
+                line = word
+            else:
+                line = trial
+        lines.append(line)
+        return lines
 
-    def centre(self, canvas, centre, baseline, face, string, colour, alpha=1.0):
-        self.draw(
-            canvas,
-            centre - self.width(face, string) / 2,
-            baseline,
-            face,
-            string,
-            colour,
-            alpha,
-        )
+
+# --- the data, described ---------------------------------------------------
 
 
 def band_of(value, bands):
@@ -388,246 +282,463 @@ def shares(values, bands):
     ]
 
 
-def encouragement(values, bands):
-    """One line about how the day went, in the room's own voice.
-
-    Rules it is written to. It praises a good day and stays warm on a hard one.
-    It never instructs, never implies fault, and never says anything that could
-    be mistaken for medical advice — this is a review of a day already over, so
-    there is nothing left to act on and nothing to be told. A digest that
-    scolds is a digest that gets muted, and the whole point of it arriving
-    daily is that the trend only exists if it keeps arriving.
-
-    70% in range is the consensus target, so the ladder is hung off that rather
-    than off a number invented here.
-    """
-    in_range = dict(shares(values, bands))["in range"]
-    lows = sum(1 for v in values if v < 70) / len(values)
-    if in_range >= 0.95:
-        return "Outstanding! Almost the whole day in range."
-    if in_range >= 0.85:
-        return "Great day! Comfortably past the 70% target."
-    if in_range >= 0.70:
-        return "Target hit! That's the number that counts."
-    if lows >= 0.06:
-        return "A bumpy night, but you rode it out."
-    if in_range >= 0.50:
-        return "Not your day, and that's fine. One day is never a trend."
-    return "Some days just go like this. The average forgives it."
+def time_in_range(values):
+    return sum(1 for v in values if 70 <= v <= 180) / len(values)
 
 
-def draw_summary(canvas, type_, values, bands):
-    """Time in range as the headline, the split beneath it as a length.
-
-    The one number worth reading from across the room is time in range, so it
-    is the only thing set large. The bar is there because a proportion is
-    easier to judge as a length than as a percentage.
-
-    The five-row legend and the average/GMI/spread tiles that used to sit here
-    are gone. Campfire renders this image about 340 CSS pixels wide, which is
-    not enough for all of it at a legible size, and every number they carried
-    is already in the message posted directly above the picture. Type big
-    enough to read beats a second copy of the text.
-    """
-    parts = shares(values, bands)
-
-    in_range = dict(parts)["in range"]
-    type_.draw(canvas, HERO[0], HERO[1], "hero", f"{in_range * 100:.0f}%", INK)
-    type_.draw(canvas, HERO[0], HERO[1] + 56, "body", "time in range 3.9-10.0", MUTED)
-
-    _draw_split_bar(canvas, parts)
-    type_.draw(canvas, MARGIN, ENCOURAGEMENT, "body", encouragement(values, bands), INK)
-
-
-def _draw_split_bar(canvas, parts):
-    """Two pixels of page colour between segments, so the split is legible as
-    shape and not only as hue — the boundary between two adjacent bands is
-    exactly where colour vision fails. That gap and the fixed band order are
-    what stop the bar depending on hue alone.
-    """
-    left, top, right, bottom = BAR
-    span = right - left
-    cursor = float(left)
-    for name, share in parts:
-        if share <= 0:
+def hours_by_band(readings, bands):
+    """Twenty-four hours, each labelled by the band it mostly sat in."""
+    out = []
+    for hour in range(24):
+        window = [v for m, v in readings if hour * 60 <= m < (hour + 1) * 60]
+        if not window:
+            out.append(None)
             continue
-        end = cursor + share * span
-        canvas.rect(cursor, top, end, bottom, COLOURS[name])
-        cursor = end
-        if cursor < right:
-            canvas.rect(cursor - 1, top, cursor + 1, bottom, PANEL)
-    canvas.round_corners(left, top, right, bottom, (bottom - top) // 2, PANEL)
+        counts = {}
+        for value in window:
+            name = band_of(value, bands)
+            counts[name] = counts.get(name, 0) + 1
+        out.append(max(counts, key=counts.get))
+    return out
 
 
-def plot_area():
-    """The data rectangle inside the plot card.
+def findings(days, bands):
+    """What the fortnight says about itself, most consequential first.
 
-    The axis labels live in a column *inside* the card rather than beside it.
-    Outside, they pushed the card's left edge 52px further in than its right,
-    so the one element with an axis was the one element not on the page margin.
+    These are descriptions of the reader's own data and nothing else. They name
+    what happened and how often; they never say what to do about it. This is a
+    review of a day already over, posted into a chat room — advice about
+    insulin or food is not the job, and a digest that gives it is a medical
+    device wearing a chat message.
+
+    Ordered so the sheet's headline is the most consequential *true* thing, not
+    merely the first thing computed: a night below range outranks a habitual
+    bad hour, which outranks a week-on-week move, which outranks a streak.
     """
-    panel_left, top, panel_right, bottom = PLOT
-    return panel_left + PLOT_GUTTER, top, panel_right - PLOT_EDGE, bottom
+    out = []
+    labelled = [(label, [v for _, v in readings]) for label, readings in days]
 
-
-def draw_day(canvas, type_, readings, bands, day_start_ms):
-    """Glucose against time of day, with the target band shaded and labelled."""
-    canvas.round_rect(*PLOT, 12, PANEL)
-    left, top, right, bottom = plot_area()
-
-    # The scale stops short of the frame at both ends. Without that gutter a
-    # reading at the ceiling is drawn on the border itself, and the label for a
-    # night spent against the floor has nowhere to go but on top of the trace.
-    floor, ceiling = bottom - PLOT_INSET, top + PLOT_INSET
-
-    def y_for(mgdl):
-        clamped = max(Y_MIN, min(Y_MAX, mgdl))
-        return floor - (clamped - Y_MIN) / (Y_MAX - Y_MIN) * (floor - ceiling)
-
-    def x_for(minutes):
-        return left + minutes / 1440 * (right - left)
-
-    canvas.rect(x_for(NIGHT_HOURS[0] * 60), top, x_for(NIGHT_HOURS[1] * 60), bottom, NIGHT)
-    canvas.rect(left, y_for(180), right, y_for(70), TARGET_FILL)
-    for edge in (70, 180):
-        canvas.rect(left, y_for(edge) - 1, right, y_for(edge) + 1, TARGET_EDGE)
-
-    for mmol in Y_TICKS:
-        y = y_for(mmol * MMOL)
-        if mmol * MMOL not in (70, 180):
-            canvas.rect(left, y, right, y + 1, GRID)
-        type_.right(canvas, left - 16, int(y) + 11, "tick", f"{mmol:.1f}", MUTED)
-    type_.draw(canvas, MARGIN, top - 30, "body", "mmol/L", MUTED)
-
-    # Every three hours, but only the six-hour marks are labelled and ruled.
-    # The short ticks are enough to count 03:00 off without another line
-    # crossing the trace.
-    for hour in range(0, 25, 3):
-        x = x_for(hour * 60)
-        if hour % 6:
-            canvas.rect(x, bottom - 8, x + 1, bottom, GRID)
-            continue
-        canvas.rect(x, top, x + 1, bottom, GRID)
-        type_.centre(
-            canvas, min(max(x, left + 14), right - 14), bottom + 34, "tick", f"{hour:02d}", MUTED
+    lows = [label for label, values in labelled if min(values) < 70]
+    if lows:
+        out.append(
+            (
+                "below 3.9",
+                f"on {len(lows)} of {len(days)} days, most recently {lows[-1]}",
+            )
         )
 
-    points = []
-    for stamp, value in sorted(readings):
-        minutes = (stamp - day_start_ms) / 60000
-        if not 0 <= minutes <= 1440:
-            continue
-        points.append((x_for(minutes), y_for(value), value))
+    worst_hour, worst_count = None, 0
+    for hour in range(24):
+        count = sum(
+            1
+            for _, readings in days
+            if (hours_by_band(readings, bands)[hour] or "in range") != "in range"
+        )
+        if count > worst_count:
+            worst_hour, worst_count = hour, count
+    if worst_count >= max(3, len(days) // 3):
+        out.append(
+            (
+                f"{worst_hour:02d}:00",
+                f"out of range on {worst_count} of {len(days)} days, "
+                "more than any other hour",
+            )
+        )
 
-    # Twenty minutes, expressed in pixels, so the join rule survives a resize.
-    # Only readings adjacent in time are joined: a gap where the sensor dropped
-    # out should read as a gap, not as a straight line through values that were
-    # never measured.
-    max_gap = 20 / 1440 * (right - left)
+    if len(days) >= 8:
+        half = len(days) // 2
+        recent = statistics.fmean(time_in_range(v) for _, v in labelled[half:])
+        earlier = statistics.fmean(time_in_range(v) for _, v in labelled[:half])
+        change = (recent - earlier) * 100
+        if abs(change) >= 3:
+            out.append(
+                (
+                    "this week",
+                    f"{recent * 100:.0f}% in range, "
+                    f"{'up' if change > 0 else 'down'} {abs(change):.0f} points "
+                    "on the week before",
+                )
+            )
+
+    night = [v for _, readings in days for m, v in readings if m < 360]
+    daytime = [v for _, readings in days for m, v in readings if m >= 360]
+    if night and daytime:
+        out.append(
+            (
+                "nights",
+                f"{time_in_range(night) * 100:.0f}% in range, against "
+                f"{time_in_range(daytime) * 100:.0f}% by day",
+            )
+        )
+
+    streak = 0
+    for _, values in reversed(labelled):
+        if time_in_range(values) >= TARGET:
+            streak += 1
+        else:
+            break
+    if streak >= 2:
+        out.append(
+            ("streak", f"{streak} days running at or above the {TARGET:.0%} target")
+        )
+
+    # A fortnight with nothing notable in it still gets a sentence.
+    if not out:
+        overall = time_in_range([v for _, values in labelled for v in values])
+        out.append(("steady", f"{overall * 100:.0f}% in range across the fortnight"))
+    return out
+
+
+def modal_day(days, slots=48):
+    """The median day and the middle half around it, across the fortnight.
+
+    The one idea worth taking from the standard report: what the body typically
+    does at eight in the morning is a different question from what it did
+    yesterday, and only this can answer it.
+    """
+    out = []
+    span = 1440 / slots
+    for slot in range(slots):
+        window = sorted(
+            v
+            for _, readings in days
+            for m, v in readings
+            if slot * span <= m < (slot + 1) * span
+        )
+        if window:
+            out.append(
+                (
+                    (slot + 0.5) * span,
+                    window[len(window) // 4],
+                    window[len(window) // 2],
+                    window[3 * len(window) // 4],
+                )
+            )
+    return out
+
+
+# --- the sheet -------------------------------------------------------------
+
+
+def draw_rows(canvas, type_, days, bands):
+    """One row per day, newest first, hours sorted into bands.
+
+    Sorted rather than left in clock order on purpose: sorted, the length of
+    the green run *is* the time in range, and a length can be counted. Clock
+    order would make this a heatmap, where the eye estimates shading instead.
+    Time of day is not lost — it is what the findings and the typical day are
+    for.
+    """
+    top, row_h, mark, gap = ROWS
+    for index, (label, readings) in enumerate(reversed(days)):
+        y = top + index * row_h
+        newest = index == 0
+        ink = INK if newest else MUTED
+        type_.draw(canvas, ROW_LABEL_X, y + mark - 4, "small", label, ink)
+        hours = [h for h in hours_by_band(readings, bands) if h]
+        hours.sort(key=SEVERITY.index)
+        x = ROW_MARKS_X
+        for name in hours:
+            canvas.rect(x, y, x + mark, y + mark, COLOURS[name])
+            x += mark + gap
+        share = time_in_range([v for _, v in readings])
+        type_.draw(canvas, x + 16, y + mark - 4, "figure", f"{share * 100:.0f}%", ink)
+        if newest:
+            canvas.rect(MARGIN, y + mark + 6, WIDTH - MARGIN, y + mark + 7, RULE)
+    return top + len(days) * row_h
+
+
+def draw_typical_day(canvas, type_, days):
+    caption, top, bottom = TYPICAL
+    left, right = MARGIN, WIDTH - MARGIN
+    type_.draw(canvas, left, caption, "body", "a typical day, drawn from all fourteen", INK)
+    canvas.rect(left, top, right, bottom, PAPER)
+
+    def y_for(value):
+        clamped = max(Y_MIN, min(Y_MAX, value))
+        return bottom - 14 - (clamped - Y_MIN) / (Y_MAX - Y_MIN) * (bottom - top - 28)
+
+    canvas.rect(left, y_for(180), right, y_for(70), TARGET_FILL)
+    band = modal_day(days)
+    if not band:
+        return
+    step = (right - left) / len(band)
+    for minute, low, _, high in band:
+        x = left + minute / 1440 * (right - left)
+        canvas.rect(x, y_for(high), x + step + 1, y_for(low), BAND_FILL)
     previous = None
-    for x, y, value in points:
-        if previous and x - previous[0] <= max_gap:
-            canvas.segment(previous[0], previous[1], x, y, COLOURS[band_of(value, bands)], 2.4)
+    for minute, _, median, _ in band:
+        x = left + minute / 1440 * (right - left)
+        y = y_for(median)
+        if previous:
+            canvas.segment(previous[0], previous[1], x, y, COLOURS[band_of(median, BANDS_FALLBACK)], 3.4)
+        previous = (x, y)
+    for edge in Y_EDGES:
+        canvas.rect(left, y_for(edge), right, y_for(edge) + 1, RULE)
+        type_.draw(canvas, left + 10, int(y_for(edge)) - 10, "small", f"{edge / MMOL:.1f}", MUTED)
+    for hour in (6, 12, 18):
+        x = left + hour / 24 * (right - left)
+        canvas.rect(x, top, x + 1, bottom, GRID)
+        type_.draw(canvas, x + 10, bottom - 12, "small", f"{hour:02d}", MUTED)
+
+
+# Only used to colour the median line, which is a summary rather than a
+# reading; the caller's own bands drive everything that describes real data.
+BANDS_FALLBACK = (
+    ("very low", 0, 53),
+    ("low", 54, 69),
+    ("in range", 70, 180),
+    ("high", 181, 250),
+    ("very high", 251, 10_000),
+)
+
+
+def hour_means(readings):
+    """Mean mg/dL for each hour of a day, or None where the sensor sat out."""
+    out = []
+    for hour in range(24):
+        window = [v for m, v in readings if hour * 60 <= m < (hour + 1) * 60]
+        out.append(statistics.fmean(window) if window else None)
+    return out
+
+
+def outliers(days, bands):
+    """How yesterday departed from the days before it, biggest first.
+
+    Same rule as `findings`: these describe the reader's own data and never
+    instruct. "The 08:00 hour ran higher than on any of the last thirteen days"
+    is a fact; what to do about it is not this program's business.
+
+    A day that was simply ordinary says so. That is a real answer to "was
+    anything unusual", and the most common one — a sheet that manufactures a
+    finding every morning teaches the reader to ignore all of them.
+    """
+    label, today = days[-1]
+    history = days[:-1]
+    values = [v for _, v in today]
+    out = []
+
+    if len(history) < 3:
+        return [("first days", f"only {len(days)} days on record, so there is nothing to compare against yet")]
+
+    # A low is the one thing worth leading with whenever it happened.
+    if min(values) < 70:
+        clear = sum(1 for _, readings in history if min(v for _, v in readings) >= 70)
+        when = min(((m, v) for m, v in today if v < 70), key=lambda r: r[1])
+        out.append(
+            (
+                "below 3.9",
+                f"reached {when[1] / MMOL:.1f} at {int(when[0]) // 60:02d}:{int(when[0]) % 60:02d}, "
+                f"after {clear} of the last {len(history)} days stayed clear",
+            )
+        )
+
+    # The hour that departed furthest from its own normal, which is the whole
+    # point of holding history behind a single day.
+    today_hours = hour_means(today)
+    past_hours = [hour_means(readings) for _, readings in history]
+    worst = None
+    for hour in range(24):
+        mine = today_hours[hour]
+        theirs = [h[hour] for h in past_hours if h[hour] is not None]
+        if mine is None or len(theirs) < 3:
+            continue
+        spread = statistics.pstdev(theirs)
+        if spread < 6:  # a flat hour makes every deviation look enormous
+            continue
+        gap = (mine - statistics.fmean(theirs)) / spread
+        if worst is None or abs(gap) > abs(worst[1]):
+            worst = (hour, gap, mine - statistics.fmean(theirs))
+    if worst and abs(worst[1]) >= 1.5:
+        hour, _, delta = worst
+        out.append(
+            (
+                f"{hour:02d}:00",
+                f"ran {abs(delta) / MMOL:.1f} mmol {'above' if delta > 0 else 'below'} "
+                f"its usual, the day's biggest departure",
+            )
+        )
+
+    # Where the day placed among its neighbours.
+    mine = time_in_range(values)
+    beaten = sum(1 for _, readings in history if time_in_range([v for _, v in readings]) < mine)
+    if beaten == len(history):
+        out.append(("best in weeks", f"{mine * 100:.0f}% in range, the best of the last {len(days)} days"))
+    elif beaten == 0:
+        out.append(("hardest lately", f"{mine * 100:.0f}% in range, the lowest of the last {len(days)} days"))
+    else:
+        out.append(
+            ("in range", f"{mine * 100:.0f}%, better than {beaten} of the last {len(history)} days")
+        )
+
+    night = [v for m, v in today if m < 360]
+    past_night = [v for _, readings in history for m, v in readings if m < 360]
+    if night and past_night:
+        delta = statistics.fmean(night) - statistics.fmean(past_night)
+        if abs(delta) / MMOL >= 0.5:
+            out.append(
+                (
+                    "the night",
+                    f"{abs(delta) / MMOL:.1f} mmol {'higher' if delta > 0 else 'lower'} "
+                    "than your usual night",
+                )
+            )
+
+    if len(out) == 1 and out[0][0] == "in range":
+        out.insert(0, ("nothing unusual", "yesterday sat inside its normal spread all day"))
+    return out
+
+
+def draw_against_normal(canvas, type_, today, history, bands, caption=None):
+    """Yesterday's trace over the band its own history draws.
+
+    The shaded band is the middle half of the previous days at that time of
+    day; the line leaving it is the only thing the reader has to look for.
+    """
+    default_caption, top, bottom = AGAINST
+    caption = caption or default_caption
+    top = max(top, caption + 20)
+    left, right = MARGIN, WIDTH - MARGIN
+    type_.draw(
+        canvas, left, caption, "body",
+        f"yesterday, against the middle half of the last {len(history)} days", INK,
+    )
+    canvas.rect(left, top, right, bottom, PAPER)
+
+    def y_for(value):
+        clamped = max(Y_MIN, min(Y_MAX, value))
+        return bottom - 16 - (clamped - Y_MIN) / (Y_MAX - Y_MIN) * (bottom - top - 32)
+
+    canvas.rect(left, y_for(180), right, y_for(70), TARGET_FILL)
+    band = modal_day(history) if history else []
+    if band:
+        step = (right - left) / len(band)
+        for minute, low, _, high in band:
+            x = left + minute / 1440 * (right - left)
+            canvas.rect(x, y_for(high), x + step + 1, y_for(low), BAND_FILL)
+
+    previous = None
+    for minute, value in today:
+        x = left + minute / 1440 * (right - left)
+        y = y_for(value)
+        if previous and x - previous[0] <= 20 / 1440 * (right - left):
+            canvas.segment(previous[0], previous[1], x, y, COLOURS[band_of(value, bands)], 3.4)
         previous = (x, y)
 
-    _mark_extremes(canvas, type_, points, bands)
+    for edge in Y_EDGES:
+        canvas.rect(left, y_for(edge), right, y_for(edge) + 1, RULE)
+        _label_on_pad(canvas, type_, left + 10, int(y_for(edge)) - 10, f"{edge / MMOL:.1f}")
+    for hour in (6, 12, 18):
+        x = left + hour / 24 * (right - left)
+        canvas.rect(x, top, x + 1, bottom, GRID)
+        type_.draw(canvas, x + 10, bottom - 14, "small", f"{hour:02d}", MUTED)
 
 
-def _mark_extremes(canvas, type_, points, bands):
-    """Ring and label the day's lowest and highest reading.
+def _label_on_pad(canvas, type_, x, baseline, text):
+    """An axis label the trace can pass behind without eating it."""
+    width = type_.width("small", text)
+    canvas.rect(x - 6, baseline - 24, x + width + 6, baseline + 8, PAPER)
+    type_.draw(canvas, x, baseline, "small", text, MUTED)
 
-    These are the two numbers a glance actually wants and the two a shaded band
-    cannot give you. They were a line of text under the chart; on the curve
-    they also say *when*, which is the more useful half.
+
+def draw_day_marks(canvas, type_, today, bands):
+    """The day as counted hours, so both sheets speak the same language."""
+    top, mark, gap = DAY_MARKS, 26, 8
+    hours = [h for h in hours_by_band(today, bands) if h]
+    hours.sort(key=SEVERITY.index)
+    type_.draw(canvas, MARGIN, top - 14, "body", "the day, hour by hour", INK)
+    x = MARGIN
+    for name in hours:
+        canvas.rect(x, top, x + mark, top + mark, COLOURS[name])
+        x += mark + gap
+
+
+def draw_findings(canvas, type_, items, top):
+    """Each finding takes the height its own text needs.
+
+    These are computed sentences of unknowable length, so a fixed row height is
+    a collision waiting for the day the wording runs long — which it did, on
+    the second line of the first one written.
     """
-    left, top, right, bottom = plot_area()
-    lowest = min(points, key=lambda p: p[2])
-    highest = max(points, key=lambda p: p[2])
-
-    # A day that never moved has one extreme, not two. Marking it twice draws
-    # both labels on the same reading, where they overlap into nonsense — which
-    # is exactly what a flat day above the ceiling produced.
-    marks = [(highest, True)] if lowest[2] == highest[2] else [(lowest, False), (highest, True)]
-
-    placed = []
-    for (x, y, value), above in marks:
-        colour = COLOURS[band_of(value, bands)]
-        canvas.dot(x, y, 6, PAGE, 0.75)
-        canvas.dot(x, y, 4.5, colour)
-
-        label = f"{value / MMOL:.1f}"
-        half = type_.width("tick", label) / 2 + 12
-        # Below the low and above the high — never the other way round. The
-        # opposite side of an extreme is the side the trace arrived and left
-        # on, so a label flipped over there lands squarely on the curve. When
-        # the preferred side is out of frame the label goes *beside* the
-        # reading instead, level with it, on whichever side has more room.
-        if (y - 52 >= top + 4) if above else (y + 52 <= bottom - 4):
-            box = [y - 52, y - 12] if above else [y + 12, y + 52]
-            # The extreme is often at one end of the day — a night that ended
-            # low, a dinner still climbing — so the label slides along the axis
-            # to stay in frame while the marker stays on the reading.
-            centre = min(max(x, left + half + 4), right - half - 4)
-        else:
-            box = [y - 20, y + 20]
-            offset = half + 26
-            centre = x + offset if x < (left + right) / 2 else x - offset
-            centre = min(max(centre, left + half + 4), right - half - 4)
-
-        # A spike whose peak and trough are minutes apart puts the two labels
-        # on top of each other. Push the later one clear rather than dropping
-        # it: both numbers are only on the chart, not in the message.
-        for other_centre, other_half, other_box in placed:
-            overlaps_x = abs(centre - other_centre) < half + other_half
-            overlaps_y = box[0] < other_box[1] and other_box[0] < box[1]
-            if overlaps_x and overlaps_y:
-                shift = other_box[1] - box[0] + 8 if above else other_box[0] - box[1] - 8
-                box = [box[0] + shift, box[1] + shift]
-
-        placed.append((centre, half, box))
-        canvas.round_rect(centre - half, box[0], centre + half, box[1], 10, PAGE, 0.85)
-        type_.centre(canvas, centre, box[0] + 32, "tick", label, INK)
+    for key, text in items:
+        canvas.rect(MARGIN, top, WIDTH - MARGIN, top + 1, RULE)
+        type_.draw(canvas, MARGIN, top + 40, "body", key, COLOURS["in range"])
+        lines = type_.wrap("body", text, WIDTH - MARGIN - 250)
+        for index, line in enumerate(lines):
+            type_.draw(canvas, 250, top + 40 + index * 34, "body", line, INK)
+        top += FINDING_STEP + (len(lines) - 1) * 34
+    return top
 
 
-def draw_chips(canvas, type_, values):
-    """The three numbers that describe the day's shape rather than its extremes.
-
-    One line each, label and value side by side: at this size a stacked chip
-    would cost twice the height and buy nothing. Values are mono so the three
-    of them line up as a row of figures rather than three separate labels.
-    """
+def draw_foot(canvas, type_, values):
     mean = statistics.fmean(values)
-    chips = (
+    canvas.rect(MARGIN, FOOT, WIDTH - MARGIN, FOOT + 2, INK)
+    cells = (
+        ("time in range", f"{time_in_range(values) * 100:.0f}%"),
         ("average", f"{mean / MMOL:.1f}"),
         # Glucose Management Indicator, the standard estimate of HbA1c from
         # mean glucose. Defined on mg/dL, hence the unconverted mean.
-        ("GMI", f"{3.31 + 0.02392 * mean:.1f}%"),
+        ("gmi", f"{3.31 + 0.02392 * mean:.1f}%"),
         ("spread", f"{statistics.pstdev(values) / MMOL:.1f}"),
     )
-    top, bottom = CHIPS
-    width = (WIDTH - 2 * MARGIN - 2 * CHIP_GAP) / 3
-    for index, (label, value) in enumerate(chips):
-        left = MARGIN + index * (width + CHIP_GAP)
-        canvas.round_rect(left, top, left + width, bottom, 14, PANEL)
-        type_.draw(canvas, left + 22, top + 52, "body", label, MUTED)
-        type_.right(canvas, left + width - 22, top + 54, "stat", value, INK)
+    for index, (name, value) in enumerate(cells):
+        x = MARGIN + index * ((WIDTH - 2 * MARGIN) / 4)
+        type_.draw(canvas, x, FOOT + 40, "small", name, MUTED)
+        type_.draw(canvas, x, FOOT + 92, "stat", value, INK)
 
 
-def render(readings, bands, day_start_ms, title="", subtitle="", source=SOURCE):
-    canvas = Canvas(WIDTH, HEIGHT, PAGE)
+def _masthead(canvas, type_, source, items):
+    """Returns the baseline the sheet may start under.
+
+    The headline is a computed sentence, so its length is not knowable when the
+    layout is written. It takes as many lines as it needs, up to three, and
+    everything below flows from where it ended — clipping it at a fixed two
+    lines cut sentences mid-word.
+    """
+    type_.draw(canvas, MARGIN, SOURCE_BASELINE, "small", source, MUTED)
+    canvas.rect(MARGIN, SOURCE_BASELINE + 18, WIDTH - MARGIN, SOURCE_BASELINE + 20, INK)
+    key, text = items[0]
+    baseline, step = HEADLINE
+    lines = type_.wrap("headline", f"{key} {text}", WIDTH - 2 * MARGIN)[:3]
+    for index, line in enumerate(lines):
+        type_.draw(canvas, MARGIN, baseline + index * step, "headline", line, INK)
+    return baseline + (len(lines) - 1) * step
+
+
+def render_fortnight(days, bands, source=SOURCE):
+    """The Saturday sheet: fourteen days, and what they say together.
+
+    `days` is [(label, [(minute_of_day, mg/dL), ...]), ...], oldest first.
+    """
+    canvas = Canvas(WIDTH, HEIGHT, GROUND)
     type_ = Type()
-    values = [v for _, v in readings]
+    items = findings(days, bands)
 
-    # The date is the heading; what it is a reading of belongs with the rest of
-    # the provenance, on one line under it. It spent a version as a kicker above
-    # the date, which is a label wearing a heading's position: it took the eye
-    # first and said the one thing that never changes.
-    type_.draw(canvas, MARGIN, 92, "title", title, INK)
-    meta = " · ".join(part for part in (source, subtitle) if part)
-    if meta:
-        type_.draw(canvas, MARGIN, 148, "body", meta, MUTED)
+    _masthead(canvas, type_, source, items)
+    draw_rows(canvas, type_, days, bands)
+    draw_typical_day(canvas, type_, days)
+    draw_findings(canvas, type_, items[1:3], FINDINGS)
+    draw_foot(canvas, type_, [v for _, readings in days for _, v in readings])
+    return canvas.png()
 
-    draw_summary(canvas, type_, values, bands)
-    draw_chips(canvas, type_, values)
-    draw_day(canvas, type_, readings, bands, day_start_ms)
+
+def render_day(days, bands, source=DAY_SOURCE):
+    """Every other morning: yesterday, against what yesterday usually looks like.
+
+    The question a single day can honestly answer is not "how did it go" — the
+    message beside the picture already says that — but "was any of it unusual".
+    So the day is drawn on top of its own normal, and the sheet leads with the
+    largest departure from it.
+    """
+    canvas = Canvas(WIDTH, HEIGHT, GROUND)
+    type_ = Type()
+    label, today = days[-1]
+    history = days[:-1]
+    items = outliers(days, bands)
+
+    headline_bottom = _masthead(canvas, type_, f"{label}  ·  {source}", items)
+    draw_against_normal(canvas, type_, today, history, bands, headline_bottom + 52)
+    draw_day_marks(canvas, type_, today, bands)
+    draw_findings(canvas, type_, items[1:3], DAY_FINDINGS)
+    draw_foot(canvas, type_, [v for _, v in today])
     return canvas.png()
