@@ -667,20 +667,30 @@ def draw_day_marks(canvas, type_, today, bands):
         x += mark + gap
 
 
-def draw_findings(canvas, type_, items, top):
-    """Each finding takes the height its own text needs.
+def draw_findings(canvas, type_, items, top, floor=None):
+    """Each finding takes the height its own text needs, and stops at the foot.
 
     These are computed sentences of unknowable length, so a fixed row height is
-    a collision waiting for the day the wording runs long — which it did, on
-    the second line of the first one written.
+    a collision waiting for the day the wording runs long. Two collisions,
+    in fact: the first was a second line landing on the finding below it, and
+    the second — this one — was the block as a whole growing down into the
+    figures on the foot, which happens whenever the first finding wraps.
+
+    A finding that does not fit is dropped rather than drawn over the foot.
+    They arrive in order of consequence, so the one lost is the least
+    consequential, and one finding legible beats two on top of each other.
     """
+    floor = FOOT - 24 if floor is None else floor
     for key, text in items:
+        lines = type_.wrap("body", text, WIDTH - MARGIN - 250)
+        height = FINDING_STEP + (len(lines) - 1) * 34
+        if top + height > floor:
+            break
         canvas.rect(MARGIN, top, WIDTH - MARGIN, top + 1, RULE)
         type_.draw(canvas, MARGIN, top + 40, "body", key, COLOURS["in range"])
-        lines = type_.wrap("body", text, WIDTH - MARGIN - 250)
         for index, line in enumerate(lines):
             type_.draw(canvas, 250, top + 40 + index * 34, "body", line, INK)
-        top += FINDING_STEP + (len(lines) - 1) * 34
+        top += height
     return top
 
 
