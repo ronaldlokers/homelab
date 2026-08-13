@@ -559,17 +559,31 @@ def outliers(days, bands):
             )
         )
 
-    # Where the day placed among its neighbours.
+    # Where the day placed among its neighbours. Ties are counted separately
+    # from losses on purpose: a fortnight of identical days beats nothing, and
+    # counting only strictly-worse days called a flat 100% "the lowest of the
+    # last 14 days" — a true arithmetic and a false sentence.
     mine = time_in_range(values)
-    beaten = sum(1 for _, readings in history if time_in_range([v for _, v in readings]) < mine)
-    if beaten == len(history):
-        out.append(("best in weeks", f"{mine * 100:.0f}% in range, the best of the last {len(days)} days"))
-    elif beaten == 0:
-        out.append(("hardest lately", f"{mine * 100:.0f}% in range, the lowest of the last {len(days)} days"))
-    else:
+    others = [time_in_range([v for _, v in readings]) for _, readings in history]
+    worse = sum(1 for other in others if other < mine)
+    better = sum(1 for other in others if other > mine)
+    if better == 0 and worse:
         out.append(
-            ("in range", f"{mine * 100:.0f}%, better than {beaten} of the last {len(history)} days")
+            ("best in weeks", f"{mine * 100:.0f}% in range, the best of the last {len(days)} days")
         )
+    elif worse == 0 and better:
+        out.append(
+            (
+                "hardest lately",
+                f"{mine * 100:.0f}% in range, the lowest of the last {len(days)} days",
+            )
+        )
+    elif worse or better:
+        out.append(
+            ("in range", f"{mine * 100:.0f}%, better than {worse} of the last {len(history)} days")
+        )
+    else:
+        out.append(("in range", f"{mine * 100:.0f}%, the same as every day this fortnight"))
 
     night = [v for m, v in today if m < 360]
     past_night = [v for _, readings in history for m, v in readings if m < 360]

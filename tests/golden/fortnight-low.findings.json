@@ -1,0 +1,42 @@
+{
+  "findings": [
+    [
+      "below 3.9",
+      "on 1 of 14 days, most recently 5 Aug"
+    ],
+    [
+      "08:00",
+      "out of range on 12 of 14 days, more than any other hour"
+    ],
+    [
+      "this week",
+      "92% in range, up 9 points on the week before"
+    ],
+    [
+      "nights",
+      "97% in range, against 84% by day"
+    ],
+    [
+      "streak",
+      "14 days running at or above the 70% target"
+    ]
+  ],
+  "outliers": [
+    [
+      "below 3.9",
+      "reached 2.7 at 02:55, after 13 of the last 13 days stayed clear"
+    ],
+    [
+      "04:00",
+      "ran 3.4 mmol below its usual, the day's biggest departure"
+    ],
+    [
+      "in range",
+      "88%, better than 5 of the last 13 days"
+    ],
+    [
+      "the night",
+      "2.2 mmol lower than your usual night"
+    ]
+  ]
+}

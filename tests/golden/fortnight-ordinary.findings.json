@@ -1,0 +1,34 @@
+{
+  "findings": [
+    [
+      "08:00",
+      "out of range on 12 of 14 days, more than any other hour"
+    ],
+    [
+      "this week",
+      "94% in range, up 10 points on the week before"
+    ],
+    [
+      "nights",
+      "100% in range, against 84% by day"
+    ],
+    [
+      "streak",
+      "14 days running at or above the 70% target"
+    ]
+  ],
+  "outliers": [
+    [
+      "00:00",
+      "ran 1.6 mmol below its usual, the day's biggest departure"
+    ],
+    [
+      "best in weeks",
+      "100% in range, the best of the last 14 days"
+    ],
+    [
+      "the night",
+      "1.2 mmol lower than your usual night"
+    ]
+  ]
+}
