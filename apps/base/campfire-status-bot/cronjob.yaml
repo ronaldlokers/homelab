@@ -37,7 +37,8 @@ spec:
             component: morning-briefing
         spec:
           restartPolicy: Never
-          serviceAccountName: campfire-status-bot
+          # Its own, not the responder's: see rbac-briefing.yaml.
+          serviceAccountName: campfire-morning-briefing
           securityContext:
             runAsNonRoot: true
             # The image runs as `node` (uid 1000); 65534 has no home in it.

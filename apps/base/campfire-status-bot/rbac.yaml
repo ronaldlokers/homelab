@@ -11,9 +11,13 @@ metadata:
 # logs read back into the room. RBAC is what bounds that — no secrets, no exec,
 # nothing writable — and redact() strips credential-shaped text on the way out.
 #
-# Adding a check to campfire-status-bot.py means adding its kind here. The
-# script degrades to "not checked" on a 403 rather than failing, so a missing
-# rule shows up in the room instead of in a crash loop.
+# Adding a check means adding its kind here. The bot degrades to "not checked"
+# on a 403 rather than failing, so a missing rule shows up in the room instead
+# of in a crash loop.
+#
+# The morning briefing no longer uses this identity — it has its own, in
+# rbac-briefing.yaml, so that checks needing Secrets can be added there without
+# widening the token that reads pod logs into a model.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:

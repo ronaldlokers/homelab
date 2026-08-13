@@ -1,0 +1,56 @@
+# The briefing's own identity, separate from the responder's.
+#
+# They ran as one ServiceAccount, which was fine while they did the same thing.
+# It stops being fine the moment the briefing takes on checks that read
+# Secrets: the responder is the process that reads pod logs and feeds them to a
+# model, and what bounds an injected instruction arriving that way is that its
+# token cannot read a Secret, cannot exec and cannot write anything. Widening
+# that token to suit a nightly job would trade a hard boundary for a soft one —
+# "the tool list happens not to expose it".
+#
+# So the briefing gets its own. It reads the same kinds the responder does,
+# minus pod logs and events, which only `why` needs. Secrets are added by the
+# checks that need them, in their own files, so each grant is next to its
+# reason.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: campfire-morning-briefing
+  namespace: campfire
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: campfire-morning-briefing
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list]
+  - apiGroups: ["kustomize.toolkit.fluxcd.io"]
+    resources: [kustomizations]
+    verbs: [list]
+  - apiGroups: ["helm.toolkit.fluxcd.io"]
+    resources: [helmreleases]
+    verbs: [list]
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: [clusters]
+    verbs: [list]
+  - apiGroups: ["cert-manager.io"]
+    resources: [certificates]
+    verbs: [list]
+  - apiGroups: ["longhorn.io"]
+    resources: [volumes]
+    verbs: [list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: campfire-morning-briefing
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: campfire-morning-briefing
+subjects:
+  - kind: ServiceAccount
+    name: campfire-morning-briefing
+    namespace: campfire

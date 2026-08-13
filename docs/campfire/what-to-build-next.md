@@ -32,9 +32,24 @@ pods, which is exactly the shape it already has. Against it: the canonical
 Python goes too, so `--context=staging` local runs go with it, and the
 briefing's ServiceAccount inherits their RBAC.
 
-**Undecided.** The question worth answering first is whether running these by
-hand against a context is something you actually do, or something that was
-true once. If it is real, take A. If it is not, B is the better repository.
+**Decided: B, for two of the three.** Looking at what they need settled it in a
+way neither option anticipated.
+
+`secret-refs-check` and `recovery-source-check` read Secrets.
+`netpol-check` runs `kubectl exec` inside app pods to probe reachability. And
+the briefing shared a ServiceAccount with the responder — the process that
+reads pod logs and feeds them to a model, whose containment is precisely that
+its token cannot read a Secret, cannot exec and cannot write.
+
+So folding all three in would have traded a hard boundary for a soft one:
+"the tool list happens not to expose it".
+
+  * The briefing has its own ServiceAccount now, so a grant it needs is not a
+    grant the responder gets.
+  * The two Secret readers can move behind that identity. Both are pure reads.
+  * **`netpol-check` stays where it is.** `pods/exec` is write-shaped, and a
+    daily reporting job should not be able to run commands in arbitrary pods.
+    If its findings should be visible, that is option A for that one script.
 
 ## 2. Speedtest, as the press's second tenant
 
