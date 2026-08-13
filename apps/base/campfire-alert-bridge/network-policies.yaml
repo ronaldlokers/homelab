@@ -52,6 +52,36 @@ spec:
         - protocol: TCP
           port: 8080
 ---
+# The scheduled checks file findings at /check. Their own namespaces have no
+# policies at all, so only this half needs saying — and it names the two
+# namespaces rather than allowing the cluster, because "anything may post to
+# the bridge" is how a room ends up with something nobody scheduled.
+#
+# Staging's copies of these checks arrive the other way, through the LAN-only
+# ingress, and are already covered by allow-ingress-from-traefik.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-checks-to-bridge
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-alert-bridge
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: netpol-check
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: recovery-source-check
+      ports:
+        - protocol: TCP
+          port: 8080
+---
 # Gatus posts to Campfire directly rather than through the bridge: its `custom`
 # alerting provider templates its own body, so there is nothing for the bridge
 # to do. The egress side is in

@@ -1,6 +1,11 @@
-# Staging publishes to ntfy itself: it has no AlertmanagerConfig, so a failing
-# Job here would otherwise be silent. Production leaves this to the existing
-# KubeJobFailed alert.
+# Staging files its findings through production's bridge, the same crossing the
+# briefing and the Flux alerts already make: staging has no Campfire, holds no
+# bot key, and posts to the bridge that does.
+#
+# This replaced a shell wrapper that piped the output to ntfy on a non-zero
+# exit. That said "the check failed" and left the finding in the pod log; the
+# bridge gets the findings themselves, and says nothing when they have not
+# changed. A crashed Job still surfaces as KubeJobFailed.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -14,21 +19,11 @@ spec:
             - name: check
               args:
                 - |
-                  set -o pipefail
-                  python3 /opt/check/netpol-check.py --ingress-ip 10.0.40.52 2>&1 | tee /tmp/out.txt
-                  rc=$?
-                  if [ "$rc" != "0" ]; then
-                    curl -s -u "netpolcheck:$NTFY_PASSWORD" \
-                      -H "Title: staging NetworkPolicy check failed" \
-                      -H "Priority: high" -H "Tags: warning" \
-                      -d "$(tail -c 700 /tmp/out.txt)" \
-                      -o /dev/null -w 'ntfy responded %{http_code}\n' \
-                      https://ntfy.ronaldlokers.nl/homelab-gatus-staging
-                  fi
-                  exit $rc
+                  python3 /opt/check/netpol-check.py --ingress-ip 10.0.40.52
               env:
-                - name: NTFY_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: netpol-check-ntfy
-                      key: password
+                - name: CHECK_BRIDGE_URL
+                  value: "https://campfire-bridge.ronaldlokers.nl/check"
+                # Both clusters file into one room. Without this a staging
+                # failure reads as a production one.
+                - name: CLUSTER
+                  value: "staging"

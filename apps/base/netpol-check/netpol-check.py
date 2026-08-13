@@ -17,13 +17,46 @@ Usage:
     scripts/netpol-check.py --context production --expectations-only
 
 Exit code is non-zero if any check fails, so it can gate a change.
+
+With --report-to, findings are also filed with the campfire bridge, which
+decides whether they are worth a message. Running hourly, this check would
+otherwise report a standing failure to a garbage-collected pod log 24 times a
+day and to a room never.
 """
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
+import urllib.request
+
+# Findings, in the words the room gets rather than the columns the log gets.
+FINDINGS = []
+
+
+def finding(subject, text):
+    """Record a failure, and print it the way the terminal wants it."""
+    FINDINGS.append(f"{subject}: {text}")
+
+
+def file_findings(url, check, cluster, findings, timeout=15):
+    """File findings with the bridge, which decides whether to say them.
+
+    Every run reports, a clean one included: the bridge cannot tell a check
+    that found nothing from a check that did not run, and only a run saying
+    "nothing" can clear what an earlier run said.
+    """
+    body = json.dumps({
+        "check": check,
+        "cluster": cluster or "",
+        "findings": findings,
+    }).encode()
+    request = urllib.request.Request(
+        url, data=body, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return response.status
 
 # Ships python3, so the probe needs no network to start. An image that
 # installs its tools at runtime cannot probe an egress-denied pod: the
@@ -241,6 +274,12 @@ def main():
                     help="omit when running inside the cluster")
     ap.add_argument("--expectations-only", action="store_true",
                     help="skip the per-node enforcement canary")
+    ap.add_argument("--report-to", default=os.environ.get("CHECK_BRIDGE_URL"),
+                    help="bridge URL to file findings with; defaults to "
+                         "$CHECK_BRIDGE_URL, and nothing is filed without one")
+    ap.add_argument("--cluster", default=os.environ.get("CLUSTER"),
+                    help="which cluster the findings are about, for a room that "
+                         "serves more than one; defaults to $CLUSTER")
     args = ap.parse_args()
     ctx = args.context
     failed = False
@@ -252,10 +291,14 @@ def main():
                 print(f"  {node:<24} enforcing        ({detail})")
             elif enforcing is None:
                 failed = True
+                finding(node, f"the enforcement probe produced no verdict ({detail}); "
+                              f"this is not evidence either way")
                 print(f"  {node:<24} INCONCLUSIVE     ({detail})")
                 print(f"  {'':<24} the probe produced no verdict; this is not evidence either way")
             else:
                 failed = True
+                finding(node, f"not enforcing NetworkPolicy at all ({detail}); every "
+                              f"policy on this node is inert")
                 print(f"  {node:<24} NOT ENFORCING    ({detail})")
                 print(f"  {'':<24} every policy on this node is inert; results below mean nothing for it")
         print()
@@ -265,10 +308,22 @@ def main():
         mark = "ok  " if ok else ("skip" if ok is None else "FAIL")
         if ok is False:
             failed = True
+            finding(ns, f"{host}:{port} {verdict} — {why}")
         short = host if len(host) < 34 else host[:31] + "..."
         print(f"  {mark} {ns:<10} -> {short:<34}:{port:<5} {verdict}")
         if not ok:
             print(f"       {why}")
+
+    if args.report_to:
+        try:
+            status = file_findings(args.report_to, "netpol", args.cluster, FINDINGS)
+            print(f"\n  filed {len(FINDINGS)} finding(s) with the bridge ({status})")
+        except Exception as error:  # noqa: BLE001 — any failure to file is the same failure
+            # A finding nobody can see is the state this reporting exists to
+            # end, so a run that cannot file one fails even when the cluster is
+            # fine. The Job's failure is itself an alert.
+            failed = True
+            print(f"\n  FAILED to file findings with {args.report_to}: {error}")
 
     return 1 if failed else 0
 
