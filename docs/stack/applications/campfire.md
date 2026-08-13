@@ -587,6 +587,36 @@ in range" reads as good control. So:
 Not a hypothetical distinction: the first real run reported no readings,
 because there was no active sensor.
 
+### The chart
+
+A second message carries a PNG: time in range as a pie, and the day as a curve
+with the target band shaded and every point coloured by its band. Attachments
+go through the same bot route — `Messages::ByBotsController` permits
+`attachment` when the multipart form carries one and falls back to the raw body
+otherwise — so an attachment message has no text, which is why the numbers post
+first.
+
+**It is drawn by hand in `chart.py`, with no dependencies.** matplotlib would
+have meant building a wheel on arm64 or carrying a much larger image, for two
+charts whose entire content is coloured rectangles and a line. `zlib` and
+`struct` are standard library and a PNG is an IHDR, a compressed block of RGB
+rows, and an IEND. The CronJob still runs on stock `python:3.13-alpine`.
+
+It started with no text, on the theory that the numbers were already in the
+message. **That was wrong**, and the way it was wrong is worth keeping: with
+nothing marking where 3.9 and 10.0 sit, the eye reads the plot background as
+the target range, so a day that was genuinely 100% in range looked like it had
+excursions. A chart that contradicts its own caption is worse than no chart.
+
+So `font.py` carries a 5x7 bitmap font — uppercase, digits and a few symbols,
+one int per row — and everything is labelled: title, axes in mmol/L, six-hourly
+times, the day's low and high, and a legend giving every band its colour and
+share. Bands at 0% stay in the legend, because "no lows" is worth reading and a
+missing row only says the row is missing.
+
+The chart is only drawn when the statistics were shown. A picture of a partial
+day makes the same false claim the withheld numbers would have.
+
 ### Two things worth knowing
 
 - **Entries are stored in mg/dL** whatever `DISPLAY_UNITS` says. Everything is

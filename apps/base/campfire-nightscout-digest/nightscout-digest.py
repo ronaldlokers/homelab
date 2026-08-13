@@ -39,13 +39,17 @@ Env:
 import html
 import json
 import os
+import secrets
 import statistics
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
+import chart
 
 CAMPFIRE_URL = os.environ.get("CAMPFIRE_URL", "")
 NIGHTSCOUT_URL = os.environ.get(
@@ -56,6 +60,10 @@ NIGHTSCOUT_URL = os.environ.get(
 API_SECRET_SHA1 = os.environ.get("NIGHTSCOUT_API_SECRET_SHA1", "")
 TIMEZONE = os.environ.get("DIGEST_TIMEZONE", "Europe/Amsterdam")
 TIMEOUT = 20
+# See fetch_with_retry: the first connection from a new pod can be refused
+# while its NetworkPolicy is still being programmed.
+FETCH_ATTEMPTS = 3
+FETCH_RETRY_SECONDS = 5
 
 MMOL = 18.0182  # mg/dL per mmol/L
 
@@ -80,6 +88,31 @@ def log(message):
     print(message, flush=True)
 
 
+def fetch_with_retry(start_ms, end_ms):
+    """Retry before giving up, because the first attempt is the fragile one.
+
+    A freshly created pod can send its first packet before the CNI has finished
+    programming its NetworkPolicy, and k3s enforces with REJECT — so the
+    symptom is `connection refused` on attempt one and success moments later.
+    Observed twice while building this.
+
+    The graceful fallback below is what makes this necessary rather than
+    optional: catching the error and posting "could not read Nightscout" exits
+    zero, so the Job succeeds and `backoffLimit` never retries it. Without a
+    retry here, one unlucky moment at 07:00 costs the whole day's figures.
+    """
+    last = None
+    for attempt in range(FETCH_ATTEMPTS):
+        try:
+            return fetch(start_ms, end_ms)
+        except (urllib.error.URLError, TimeoutError, OSError) as error:
+            last = error
+            if attempt + 1 < FETCH_ATTEMPTS:
+                log(f"fetch attempt {attempt + 1} failed ({error}), retrying")
+                time.sleep(FETCH_RETRY_SECONDS)
+    raise last
+
+
 def fetch(start_ms, end_ms):
     query = urllib.parse.urlencode(
         {
@@ -98,10 +131,14 @@ def fetch(start_ms, end_ms):
     with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
         entries = json.load(response)
     # Treatments and calibrations share the endpoint; only sensor values count.
+    # Timestamps come along because the day graph needs them; every statistic
+    # uses the values alone.
     return [
-        e["sgv"]
+        (e["date"], e["sgv"])
         for e in entries
-        if e.get("type") == "sgv" and isinstance(e.get("sgv"), (int, float))
+        if e.get("type") == "sgv"
+        and isinstance(e.get("sgv"), (int, float))
+        and isinstance(e.get("date"), (int, float))
     ]
 
 
@@ -112,7 +149,8 @@ def yesterday_bounds():
     return start, int(start.timestamp() * 1000), int(midnight.timestamp() * 1000)
 
 
-def render(day, values):
+def render(day, readings):
+    values = [v for _, v in readings]
     date = day.strftime("%A %-d %B")
     uptime = len(values) / EXPECTED_READINGS * 100
 
@@ -162,6 +200,34 @@ def post(body):
         return response.status
 
 
+def post_image(png_bytes, filename="glucose.png"):
+    """Post the chart as an attachment.
+
+    The same bot route takes either: Messages::ByBotsController permits
+    `attachment` when the multipart form carries one and falls back to the raw
+    body otherwise. An attachment message has no text of its own, which is why
+    the numbers go in their own message first.
+    """
+    boundary = "----campfire" + secrets.token_hex(16)
+    body = b"".join(
+        [
+            f"--{boundary}\r\n".encode(),
+            f'Content-Disposition: form-data; name="attachment"; filename="{filename}"\r\n'.encode(),
+            b"Content-Type: image/png\r\n\r\n",
+            png_bytes,
+            f"\r\n--{boundary}--\r\n".encode(),
+        ]
+    )
+    request = urllib.request.Request(
+        CAMPFIRE_URL,
+        data=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+        return response.status
+
+
 def main():
     if not CAMPFIRE_URL or not API_SECRET_SHA1:
         log("CAMPFIRE_URL or NIGHTSCOUT_API_SECRET_SHA1 unset")
@@ -169,7 +235,7 @@ def main():
 
     day, start_ms, end_ms = yesterday_bounds()
     try:
-        values = fetch(start_ms, end_ms)
+        readings = fetch_with_retry(start_ms, end_ms)
     except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
         # Say so in the room rather than failing quietly. A digest that simply
         # stops arriving is indistinguishable from a day nobody looked at.
@@ -178,11 +244,32 @@ def main():
             "<div><strong>🩺 could not read Nightscout</strong></div>"
             f"<pre>{html.escape(str(error))}</pre>"
         )
+        readings = []
     else:
-        log(f"{day.date()}: {len(values)} readings")
-        body = render(day, values)
+        log(f"{day.date()}: {len(readings)} readings")
+        body = render(day, readings)
 
     log(f"posted, campfire returned {post(body)}")
+
+    # The chart only when the statistics were shown. A picture of a partial day
+    # makes the same false claim the withheld numbers would have, and a picture
+    # of nothing is worse than no picture.
+    if len(readings) / EXPECTED_READINGS * 100 >= MIN_UPTIME_PERCENT:
+        try:
+            values = [v for _, v in readings]
+            png = chart.render(
+                readings,
+                BANDS,
+                start_ms,
+                title=day.strftime("%A %-d %B"),
+                subtitle=f"{len(values)} readings   "
+                f"{len(values) / EXPECTED_READINGS * 100:.0f}% sensor coverage",
+            )
+            log(f"chart {len(png)} bytes, campfire returned {post_image(png)}")
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
+            # The numbers are already posted; a missing picture is not worth
+            # failing the run over.
+            log(f"chart failed: {error!r}")
     return 0
 
 
