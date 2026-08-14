@@ -6,6 +6,7 @@ resources:
   - campfire-almanac
   - campfire-alert-bridge
   - campfire-kube-actor
+  - campfire-fizzy-digest
   - campfire-morning-briefing
   - campfire-nightscout-digest
   - campfire-notify-check

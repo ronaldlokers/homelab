@@ -1,0 +1,60 @@
+# Monday morning: what the boards are holding, at the moment the week starts.
+#
+# The boards are where ideas live between sessions — git says what was done,
+# Fizzy says what is wanted — and nothing has ever read them back. A card asking
+# for a durable home for the Fizzy token sat in the inbox for days while the
+# token lived in a chat transcript. That is the failure this answers: a board
+# you have to remember to open is a board you stop opening.
+#
+# Quiet when there is nothing to say. Empty Next, nothing stalled, empty inbox:
+# no message.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: campfire-fizzy-digest
+  namespace: campfire
+spec:
+  # 08:00 Monday, not Sunday: Sunday's sheets are a record of the week that
+  # ended, and this is a list of what to do with the one starting.
+  schedule: "0 8 * * 1"
+  timeZone: "Europe/Amsterdam"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: campfire-fizzy-digest
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: digest
+              image: ghcr.io/ronaldlokers/stringer
+              args: ["fizzy"]
+              envFrom:
+                # Almanac's room, and the board token.
+                - secretRef:
+                    name: campfire-almanac
+                - secretRef:
+                    name: campfire-fizzy-digest
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 500m
+                  memory: 128Mi

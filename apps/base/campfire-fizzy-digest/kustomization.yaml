@@ -1,0 +1,7 @@
+# No `namespace:` here — the CronJob declares campfire and one NetworkPolicy
+# has to land in fizzy.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - cronjob.yaml
+  - network-policies.yaml
