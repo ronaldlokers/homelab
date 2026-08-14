@@ -19,6 +19,7 @@ resources:
   - campfire-security-watch
   - campfire-status-bot
   - campfire-storage-digest
+  - campfire-uptime-review
   - cloudflared
   - commafeed
   - fizzy

@@ -15,10 +15,10 @@ delete them.
 
 ## The grants
 
-Once per database, as the superuser. `commafeed` and `authentik` today:
+Once per database, as the superuser. `commafeed`, `authentik` and `gatus` today:
 
 ```bash
-for db in commafeed authentik; do
+for db in commafeed authentik gatus; do
   kubectl --context=production exec -n database postgres-cluster-4 -c postgres -- \
     psql -U postgres -d "$db" -c "
       GRANT CONNECT ON DATABASE \"$db\" TO bots;
@@ -52,9 +52,16 @@ kubectl --context=production exec -n database postgres-cluster-4 -c postgres -- 
 
 ## Checking it
 
+The role authenticates by password, so this has to go over TCP — `psql -U bots`
+on the pod's own socket is peer authentication and fails as `FATAL: Peer
+authentication failed`, which looks like a missing grant and is not one:
+
 ```bash
+PW=$(kubectl --context=production get secret pg-role-bots -n database \
+  -o jsonpath='{.data.password}' | base64 -d)
 kubectl --context=production exec -n database postgres-cluster-4 -c postgres -- \
-  psql -U bots -d commafeed -tAc "SELECT count(*) FROM feedentries;"
+  env PGPASSWORD="$PW" psql -U bots -h 127.0.0.1 -d commafeed \
+  -tAc "SELECT count(*) FROM feedentries;"
 ```
 
 A number is success. `permission denied` means the grants did not run against
@@ -65,6 +72,7 @@ And confirm it cannot write, which is the whole point:
 
 ```bash
 kubectl --context=production exec -n database postgres-cluster-4 -c postgres -- \
-  psql -U bots -d commafeed -tAc "DELETE FROM feedentries WHERE false;"
+  env PGPASSWORD="$PW" psql -U bots -h 127.0.0.1 -d commafeed \
+  -tAc "DELETE FROM feedentries WHERE false;"
 # ERROR:  permission denied for table feedentries
 ```
