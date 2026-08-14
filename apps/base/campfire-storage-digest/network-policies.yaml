@@ -1,0 +1,74 @@
+---
+# Prometheus, then the room. The ingress half into monitoring already exists —
+# allow-status-bot-to-prometheus admits the whole campfire namespace to any pod
+# labelled app.kubernetes.io/name: prometheus, which the long-term instance is.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-storage-digest-egress
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-storage-digest
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+    - to:
+        - podSelector:
+            matchLabels:
+              app: campfire
+      ports:
+        - protocol: TCP
+          port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-storage-digest-dns
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-storage-digest
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Campfire admits each poster by name. Missing this is what made the speedtest
+# digest look like Campfire being down, twice.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-storage-digest-ingress-to-campfire
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: campfire-storage-digest
+      ports:
+        - protocol: TCP
+          port: 80

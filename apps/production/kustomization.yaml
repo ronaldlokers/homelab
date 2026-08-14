@@ -15,6 +15,7 @@ resources:
   - campfire-renovate-digest
   - campfire-speedtest-digest
   - campfire-status-bot
+  - campfire-storage-digest
   - cloudflared
   - commafeed
   - fizzy
