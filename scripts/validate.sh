@@ -443,7 +443,7 @@ fi
 # ---------------------------------------------------------------------------
 
 echo "INFO - Checking the scheduled-script copies match"
-for name in netpol-check recovery-source-check; do
+for name in netpol-check recovery-source-check restore-drill; do
   if ! cmp -s "scripts/$name.py" "apps/base/$name/$name.py"; then
     printf "\nERROR - scripts/%s.py and apps/base/%s/%s.py differ\n" "$name" "$name" "$name"
     echo "  cp scripts/$name.py apps/base/$name/$name.py"

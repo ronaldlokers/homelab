@@ -1,0 +1,75 @@
+# Restore every backup into a throwaway cluster, weekly, and see what comes back.
+#
+# 05:00 on Sunday: three hours before Almanac files the week's sheets, so a
+# failed drill is already in the room by the time anyone reads them, and far
+# enough from the 02:00-03:30 backup window that the two never overlap.
+#
+# The runbook claims an RTO of 20-30 minutes and an RPO of near-zero, and
+# nothing has ever tested either. recovery-source-check proves the *pointer*
+# resolves to a prefix with a recent backup — a catalogue listing, not a
+# restore. This runs the restore.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: restore-drill
+  namespace: database
+spec:
+  schedule: "0 5 * * 0"
+  timeZone: "Europe/Amsterdam"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # No retry. Six restores that half-ran are worse than one clean failure:
+      # the scratch clusters are deleted on the way out of each drill, and a
+      # second attempt racing the first would fight over the same names.
+      backoffLimit: 0
+      # Twice the sum of the per-restore timeouts, so a wedged run is killed
+      # rather than left holding Longhorn volumes until next Sunday.
+      activeDeadlineSeconds: 5400
+      template:
+        metadata:
+          labels:
+            app: restore-drill
+        spec:
+          serviceAccountName: restore-drill
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: drill
+              # kubectl and python3 in one image, as the other checks use.
+              image: alpine/k8s:1.36.2
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  python3 /opt/check/restore-drill.py
+              env:
+                # Almanac's room, mirrored into this namespace by reflector —
+                # the credential itself lives once, in campfire.
+                - name: CAMPFIRE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: campfire-almanac
+                      key: CAMPFIRE_URL
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  memory: 512Mi
+              volumeMounts:
+                - name: script
+                  mountPath: /opt/check
+          volumes:
+            - name: script
+              configMap:
+                name: restore-drill-script

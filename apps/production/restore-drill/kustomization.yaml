@@ -1,0 +1,7 @@
+# Production only: staging's clusters back up to their own prefixes, and a drill
+# there would prove staging's backups rather than the ones that matter.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base/restore-drill
+  - almanac-mirror.yaml

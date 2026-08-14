@@ -1,0 +1,59 @@
+# What the drill may do, and — more to the point — what it may destroy.
+#
+# It runs in `database`, beside the clusters it restores, because a scratch
+# cluster has to reach the same object store and the same Secret. Everything
+# here is namespaced: nothing about this job concerns any other namespace.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: restore-drill
+  namespace: database
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: restore-drill
+  namespace: database
+rules:
+  # Read every cluster: the drill derives each scratch cluster's recovery
+  # config from the live one rather than carrying its own copy of a
+  # destinationPath that would rot the next time a prefix is rotated.
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: [clusters]
+    verbs: [get, list, create]
+  # Deletion is restricted by name, and that is the guard that matters.
+  #
+  # RBAC cannot limit `create` by name, so the drill could in principle create
+  # a cluster called anything. It cannot delete one: these three names are the
+  # only clusters this ServiceAccount may remove, so no bug, typo or injected
+  # argument can turn a rehearsal into the disaster.
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: [clusters]
+    verbs: [delete]
+    resourceNames: [drill-postgres, drill-immich, drill-nightscout]
+  # The PVCs CloudNativePG leaves behind when a Cluster is deleted, which are
+  # selected by the cnpg.io/cluster label rather than by name.
+  - apiGroups: [""]
+    resources: [persistentvolumeclaims]
+    verbs: [get, list, delete]
+  # Reading the restored database: which pods exist, and psql inside one.
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list]
+  - apiGroups: [""]
+    resources: [pods/exec]
+    verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: restore-drill
+  namespace: database
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: restore-drill
+subjects:
+  - kind: ServiceAccount
+    name: restore-drill
+    namespace: database
