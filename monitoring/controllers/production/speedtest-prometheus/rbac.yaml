@@ -1,13 +1,47 @@
-# The identity the speedtest-only instance runs as. prometheus-operator creates
-# the StatefulSet and its config; it does not create RBAC, and without any the
-# pod starts, finds the ServiceMonitor, and resolves no targets at all — which
-# reads as an empty database rather than a permission error.
+# The identity the long-term instance runs as, and what it may read.
 #
-# What it may read lives in the namespace it reads: see
-# apps/production/speedtest/prometheus-rbac.yaml. A Role written here would be
-# rewritten into monitoring by this tree's namespace transformer.
+# This began as a Role in the one namespace it scraped, with a comment
+# congratulating itself on being namespaced rather than cluster-wide. Then
+# Longhorn was added, and Gatus, and each time the selector was widened without
+# the permissions — so the instance kept running, kept reporting healthy, and
+# quietly scraped nothing new:
+#
+#   failed to list *v1.Pod: pods is forbidden ... in the namespace "gatus"
+#
+# Nothing surfaces that. The targets simply never appear, which looks exactly
+# like a selector that does not match.
+#
+# So: cluster-wide, and read-only on the three kinds service discovery needs.
+# The main instance has had exactly this since it was installed. Least
+# privilege that has to be extended by hand every time, and is not, is not
+# least privilege — it is a trap that fires silently.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: prometheus-speedtest
   namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus-speedtest
+rules:
+  - apiGroups: [""]
+    resources: [services, endpoints, pods]
+    verbs: [get, list, watch]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-speedtest
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-speedtest
+subjects:
+  - kind: ServiceAccount
+    name: prometheus-speedtest
+    namespace: monitoring

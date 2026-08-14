@@ -5,7 +5,6 @@ resources:
 - ../../base/speedtest
 - ingress.yaml
 - speedtest-env-secret.yaml
-- prometheus-rbac.yaml
 
 images:
 - name: lscr.io/linuxserver/speedtest-tracker
