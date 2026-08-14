@@ -27,6 +27,7 @@ resources:
   - tandoor
   - netpol-check
   - recovery-source-check
+  - restore-drill
 
 # One tag for every stringer workload in this cluster.
 #

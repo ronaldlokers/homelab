@@ -1,0 +1,19 @@
+# No `namespace:` here — the RBAC and CronJob declare `database`, and one of the
+# NetworkPolicies has to land in `campfire` instead.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - rbac.yaml
+  - cronjob.yaml
+  - network-policies.yaml
+
+# A copy of scripts/restore-drill.py: kustomize refuses to read files outside
+# its own directory. validate.sh fails if the two diverge.
+configMapGenerator:
+  - name: restore-drill-script
+    namespace: database
+    files:
+      - restore-drill.py
+
+generatorOptions:
+  disableNameSuffixHash: true
