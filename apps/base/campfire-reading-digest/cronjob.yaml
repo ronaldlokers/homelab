@@ -1,0 +1,66 @@
+# Which feeds publish more than you read. Sunday, with the other records.
+#
+# 08:20, after the connection sheet and the storage forecast: three messages in
+# one morning is a reading session, three in one minute is a wall.
+#
+# Not a nag. Linkding holds bookmarks and none of them unread — it is a store
+# rather than a queue — so this is only the feeds, and the question it puts is
+# which subscriptions have stopped earning their place.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: campfire-reading-digest
+  namespace: campfire
+spec:
+  schedule: "20 8 * * 0"
+  timeZone: "Europe/Amsterdam"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: campfire-reading-digest
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: digest
+              image: ghcr.io/ronaldlokers/stringer
+              args: ["reading"]
+              env:
+                # The read-only role, not commafeed's own — that one can drop
+                # the tables this counts.
+                - name: PGUSER
+                  valueFrom:
+                    secretKeyRef:
+                      name: pg-role-bots
+                      key: username
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: pg-role-bots
+                      key: password
+              envFrom:
+                - secretRef:
+                    name: campfire-almanac
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi

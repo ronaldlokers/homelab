@@ -1,0 +1,95 @@
+---
+# Postgres, then the room. Both halves of each hop: campfire denies egress, and
+# database and campfire both deny ingress.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-security-watch-egress
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-security-watch
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: database
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: campfire
+      ports:
+        - protocol: TCP
+          port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-security-watch-dns
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-security-watch
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-security-watch-ingress-to-campfire
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: campfire-security-watch
+      ports:
+        - protocol: TCP
+          port: 80
+---
+# The database's own half. allow-apps-ingress admits namespaces labelled
+# homelab.io/needs-database, and campfire is not one of them — it has no
+# database of its own, only two beats that read someone else's.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-security-watch-ingress
+  namespace: database
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: campfire
+          podSelector:
+            matchLabels:
+              app: campfire-security-watch
+      ports:
+        - protocol: TCP
+          port: 5432

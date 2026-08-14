@@ -1,0 +1,73 @@
+# authentik's events, hourly, and silent unless one of them matters.
+#
+# This cluster produces about thirty events a quarter and had one failed
+# sign-in in ninety days. A weekly digest of that would be a sentence saying
+# nothing — and the one message that mattered would arrive up to six days late.
+#
+# So: exception-only. It looks back 65 minutes rather than 60, because an event
+# landing in the seam between two runs would otherwise be seen by neither.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: campfire-security-watch
+  namespace: campfire
+spec:
+  schedule: "7 * * * *"
+  timeZone: "Europe/Amsterdam"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: campfire-security-watch
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: digest
+              image: ghcr.io/ronaldlokers/stringer
+              args: ["security"]
+              env:
+                # The read-only role. This one reads the security log; it has
+                # no business being able to edit it.
+                - name: PGUSER
+                  valueFrom:
+                    secretKeyRef:
+                      name: pg-role-bots
+                      key: username
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: pg-role-bots
+                      key: password
+                # It only ever speaks when something was unexpected, so it
+                # always mentions.
+                - name: CAMPFIRE_MENTION_SGID
+                  valueFrom:
+                    secretKeyRef:
+                      name: campfire-mention
+                      key: CAMPFIRE_MENTION_SGID
+              envFrom:
+                - secretRef:
+                    name: campfire-almanac
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
