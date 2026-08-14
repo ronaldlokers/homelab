@@ -1,0 +1,63 @@
+# What is growing, and how long the disks have left. Sunday, after the week's
+# connection sheet.
+#
+# 08:10 rather than 08:00: two attachments arriving in the same minute is one
+# thing to scroll past, and the speedtest sheet is the one worth reading first.
+#
+# It reads the 400-day instance, which is the only place with enough history to
+# fit a line. Pointed at the main Prometheus it would answer from ten days and
+# call that a forecast.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: campfire-storage-digest
+  namespace: campfire
+spec:
+  schedule: "10 8 * * 0"
+  timeZone: "Europe/Amsterdam"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: campfire-storage-digest
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: digest
+              image: ghcr.io/ronaldlokers/stringer
+              args: ["storage"]
+              env:
+                - name: PROMETHEUS_URL
+                  value: "http://prometheus-speedtest.monitoring.svc.cluster.local:9090"
+                # A node filling inside three months is worth interrupting for.
+                - name: CAMPFIRE_MENTION_SGID
+                  valueFrom:
+                    secretKeyRef:
+                      name: campfire-mention
+                      key: CAMPFIRE_MENTION_SGID
+              envFrom:
+                - secretRef:
+                    name: campfire-almanac
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
