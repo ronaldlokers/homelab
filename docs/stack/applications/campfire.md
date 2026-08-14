@@ -99,6 +99,30 @@ from a Safari tab.
 
 ## Bots
 
+Each has a name and one job. The workload names in this repository are
+unchanged and always will be — `campfire-status-bot` is the Deployment, Houston
+is who it talks as.
+
+| Bot | Job | Workload |
+|---|---|---|
+| **Houston** | answers the interactive verbs, files the morning briefing | `campfire-status-bot`, `campfire-morning-briefing` |
+| **Klaxon** | Alertmanager and Flux events, via the bridge | `campfire-alert-bridge` |
+| **Argus** | uptime, when a probe fails | Gatus, posting directly |
+| **Florence** | yesterday's glucose, into the closed `#Health` room | `campfire-nightscout-digest` |
+| **Foreman** | dependency updates left open | `campfire-renovate-digest` |
+| **Almanac** | statistics, whatever the subject | `campfire-speedtest-digest`, and the next one |
+
+**A rename is free.** `bot_key` is `"#{id}-#{bot_token}"`
+(`app/models/user/bot.rb`), so the URL survives a name change and only
+`reset_bot_key` invalidates it. Campfire also strips the mention from a webhook
+payload by the recipient user's own representation rather than by matching a
+string (`Webhook#without_recipient_mentions`), so `@Houston status` arrives at
+the status bot as `status` whatever the bot is called.
+
+**Rooms are not bots.** `#Alertmanager`, `#Flux`, `#Gatus` and `#Health` keep
+their names when the bot posting into them is renamed; the two are separate
+objects.
+
 Create a bot in account settings; it yields per-room URLs with the key already
 embedded:
 
@@ -260,7 +284,7 @@ build.
 
 ## Status bot
 
-`campfire-status-bot` (same namespace) answers `@Kubernetes status` in the room
+`campfire-status-bot` (same namespace) answers `@Houston status` in the room
 with anything failing in the cluster. It is the read direction of the same
 plumbing the alert bridge covers in the write direction.
 
@@ -397,8 +421,8 @@ refuses the connection, which is the behaviour being checked.
 ### `reconcile` and `restart` — the acting verbs
 
 ```
-@Kubernetes reconcile apps
-@Kubernetes restart immich/immich-server
+@Houston reconcile apps
+@Houston restart immich/immich-server
 ```
 
 Both are the things most often done by hand after reading a status, both are
@@ -477,7 +501,7 @@ reading it anyway. So a clean cluster gets no message. What does get a message:
 
 | Condition | Why it is worth waking up to |
 |---|---|
-| Any check reports a problem | Same checks as `@Kubernetes status` |
+| Any check reports a problem | Same checks as `@Houston status` |
 | A k3s node certificate is under 30 days | Nothing else watches these at all |
 | A Longhorn disk is over 80% used | Past this a replica rebuild has nowhere to go |
 | A pod has been unschedulable | The reason and the duration, not just "Pending" |
@@ -561,7 +585,7 @@ shorten `BRIEFING_WINDOW_HOURS` so a recent alert falls inside the window.
 posts yesterday's glucose statistics into `#Health`.
 
 **`#Health` is a closed room with two members**: one human and a dedicated
-**Health** bot. The Kubernetes bot is deliberately not one of them — it holds
+**Florence**, the health bot. Houston is deliberately not one of them — it holds
 an Anthropic API key, reads pod logs and can ask the actor to change the
 cluster, which is not an identity that should also publish health data. It was
 briefly a member while this was being built and was removed.

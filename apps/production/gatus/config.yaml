@@ -16,7 +16,7 @@ ui:
   title: "Homelab Status"
   header: "Homelab Status"
 
-# Alerts post into the Campfire #Gatus room as the Gatus bot, via the INTERNAL
+# Alerts post into the Campfire #Gatus room as Argus, via the INTERNAL
 # service — the external MetalLB VIP is not reliably reachable pod->VIP from
 # inside the cluster (the same reason the ntfy address it replaced was internal).
 #

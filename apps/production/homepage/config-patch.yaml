@@ -80,7 +80,7 @@ data:
         - Campfire:
             icon: mdi-campfire-#f97316
             href: https://campfire.ronaldlokers.nl
-            description: Chat — alerts, deploys and the Kubernetes bot
+            description: Chat — alerts, deploys and Houston
         - Fizzy:
             icon: mdi-view-column-#22c55e
             href: https://fizzy.ronaldlokers.nl
