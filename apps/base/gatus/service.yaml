@@ -2,6 +2,16 @@ apiVersion: v1
 kind: Service
 metadata:
   name: gatus
+  # The ServiceMonitor selects Services by *label*, and this had only a pod
+  # selector with the same name — so it never matched, and Gatus's metrics have
+  # never been scraped despite `metrics: true` and a ServiceMonitor existing
+  # since the app was deployed. The target was discovered and dropped by the
+  # keep rule on __meta_kubernetes_service_label_app, which is invisible unless
+  # you go looking at droppedTargets.
+  labels:
+    app: gatus
+    # For the 400-day instance, which selects ServiceMonitors by this name.
+    name: gatus
 spec:
   ports:
     - name: http

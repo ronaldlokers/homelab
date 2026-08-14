@@ -5,6 +5,9 @@ metadata:
   namespace: gatus
   labels:
     release: kube-prometheus-stack
+    # Selected by the long-term Prometheus too, which keeps 400 days: a month
+    # in review needs more history than the main instance's ten days.
+    name: gatus
 spec:
   selector:
     matchLabels:
