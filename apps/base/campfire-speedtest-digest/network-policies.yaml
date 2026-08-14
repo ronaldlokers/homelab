@@ -56,3 +56,31 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+---
+# The other half of the hop into Campfire, which the first version of this
+# directory was missing: the campfire pod denies ingress by default and admits
+# each poster by name, so egress alone gets a connection refused at the far end
+# — which reads exactly like Campfire being down.
+#
+# Every other bot ships both halves in its own directory
+# (allow-nightscout-digest-to-campfire, allow-renovate-digest-ingress-to-campfire,
+# and so on). This one now does too.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-speedtest-digest-ingress-to-campfire
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: campfire-speedtest-digest
+      ports:
+        - protocol: TCP
+          port: 80
