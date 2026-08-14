@@ -1,0 +1,72 @@
+# The month, counted. The 1st, after the boards and before anything else wants
+# reading.
+#
+# Monthly rather than weekly because a month is the unit uptime is spoken in,
+# and because the picture only becomes worth drawing once there are enough days
+# to see a pattern in.
+#
+# The window is thirty days, not the calendar month, and gatus forces that: it
+# merges hourly rows into daily buckets after 48 hours and deletes anything
+# past thirty days. A review posted on the 1st therefore cannot see the 1st of
+# the month before — so the sheet reports the window it found rather than the
+# one the schedule implies.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: campfire-uptime-review
+  namespace: campfire
+spec:
+  schedule: "0 8 1 * *"
+  timeZone: "Europe/Amsterdam"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: campfire-uptime-review
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: review
+              image: ghcr.io/ronaldlokers/stringer
+              args: ["uptime"]
+              env:
+                # The read-only role, not gatus's own — that one can delete the
+                # history this counts.
+                - name: PGUSER
+                  valueFrom:
+                    secretKeyRef:
+                      name: pg-role-bots
+                      key: username
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: pg-role-bots
+                      key: password
+              envFrom:
+                - secretRef:
+                    name: campfire-almanac
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  # The sheet is rasterised in-process, like every other one the
+                  # press prints.
+                  cpu: 500m
+                  memory: 384Mi

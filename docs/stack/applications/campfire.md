@@ -110,7 +110,12 @@ is who it talks as.
 | **Argus** | uptime, when a probe fails | Gatus, posting directly |
 | **Florence** | yesterday's glucose, into the closed `#Health` room | `campfire-nightscout-digest` |
 | **Foreman** | dependency updates left open | `campfire-renovate-digest` |
-| **Almanac** | statistics, whatever the subject | `campfire-speedtest-digest`, and the next one |
+| **Almanac** | statistics, whatever the subject | `campfire-speedtest-digest`, `campfire-storage-digest`, `campfire-reading-digest`, `campfire-fizzy-digest`, `campfire-uptime-review` |
+
+Argus and Almanac both cover uptime and do not overlap: Argus posts the minute
+a probe fails and says nothing afterwards, so an outage is something you were
+told about once. Almanac counts them — on the 1st, a sheet of the month behind
+it, which is the only place the question "was that normal?" gets an answer.
 
 **A rename is free.** `bot_key` is `"#{id}-#{bot_token}"`
 (`app/models/user/bot.rb`), so the URL survives a name change and only

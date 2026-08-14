@@ -1,0 +1,6 @@
+# Production only: gatus watches this cluster, and staging's own history is
+# both shorter-lived and less interesting than the one being reported on.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base/campfire-uptime-review
