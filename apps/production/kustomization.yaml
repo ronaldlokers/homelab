@@ -53,4 +53,4 @@ resources:
 # cannot be proposed.
 images:
   - name: ghcr.io/ronaldlokers/stringer
-    newTag: v0.14.0
+    newTag: v0.15.0
