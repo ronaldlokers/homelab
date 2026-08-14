@@ -1,0 +1,6 @@
+# Production only: Fizzy runs here and nowhere else.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base/campfire-fizzy-digest
+  - campfire-fizzy-digest-secret.yaml
