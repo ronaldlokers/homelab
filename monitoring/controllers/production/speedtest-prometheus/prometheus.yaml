@@ -42,6 +42,11 @@ spec:
   # would quietly make this a second copy of the main instance, at 1.24 GB a
   # day.
   #
+  # Gatus joined for the month in review: its Postgres keeps about eighteen
+  # days of hourly rollups, which is not a month, and its metrics were not being
+  # scraped at all until the Service was given the label its own ServiceMonitor
+  # selects on.
+  #
   # Longhorn joined for the storage forecast: 39 volume series and 3 per node,
   # carrying `pvc` and `pvc_namespace` labels, so a trend can name the workload
   # that is growing rather than a UUID. A fortnight of history cannot see slow
@@ -50,12 +55,12 @@ spec:
     matchExpressions:
       - key: kubernetes.io/metadata.name
         operator: In
-        values: [speedtest, longhorn-system]
+        values: [speedtest, longhorn-system, gatus]
   serviceMonitorSelector:
     matchExpressions:
       - key: name
         operator: In
-        values: [speedtest, longhorn-prometheus-servicemonitor]
+        values: [speedtest, longhorn-prometheus-servicemonitor, gatus]
   # Nothing else is wanted. Left unset these default to the same "everything"
   # the main instance uses.
   podMonitorSelector:
