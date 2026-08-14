@@ -1,0 +1,5 @@
+# Production only: the databases it reads are here.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base/campfire-security-watch

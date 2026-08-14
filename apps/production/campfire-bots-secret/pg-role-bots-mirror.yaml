@@ -1,0 +1,15 @@
+# The mirror, not the source. Reflector fills in the payload from
+# database/pg-role-bots; nothing here carries the password, so there is no
+# second copy to drift (#268).
+#
+# One mirror for both beats that read a database. Each overlay declaring its own
+# would be two resources with one name in a single kustomize build, which fails
+# loudly — and would have been two things to keep in step if it did not.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pg-role-bots
+  namespace: campfire
+  annotations:
+    reflector.v1.k8s.emberstack.com/reflects: database/pg-role-bots
+type: Opaque
