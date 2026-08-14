@@ -3,12 +3,14 @@ kind: Kustomization
 resources:
   - authentik
   - campfire
+  - campfire-almanac
   - campfire-alert-bridge
   - campfire-kube-actor
   - campfire-morning-briefing
   - campfire-nightscout-digest
   - campfire-notify-check
   - campfire-renovate-digest
+  - campfire-speedtest-digest
   - campfire-status-bot
   - cloudflared
   - commafeed
@@ -43,4 +45,4 @@ resources:
 # cannot be proposed.
 images:
   - name: ghcr.io/ronaldlokers/stringer
-    newTag: v0.9.0
+    newTag: v0.10.0

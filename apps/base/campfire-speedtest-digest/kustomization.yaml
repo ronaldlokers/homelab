@@ -1,0 +1,10 @@
+# No `namespace:` here on purpose — each resource declares its own, matching
+# the other campfire workloads.
+#
+# Ingress into monitoring is NOT here. It lives with the other cross-namespace
+# rules in infrastructure/configs/production.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - cronjob.yaml
+  - network-policies.yaml

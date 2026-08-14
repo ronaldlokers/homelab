@@ -1,0 +1,7 @@
+# The bot's credential, on its own rather than inside one beat's directory:
+# every sheet posts as Almanac, so the next beat adds a CronJob and reuses this
+# instead of a second copy of one key.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - campfire-almanac-secret.yaml
