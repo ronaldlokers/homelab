@@ -41,9 +41,18 @@ alerting:
     headers:
       Content-Type: "text/html; charset=utf-8"
     body: "<strong>[ALERT_TRIGGERED_OR_RESOLVED] [ENDPOINT_NAME]</strong><ul><li>group: <code>[ENDPOINT_GROUP]</code></li><li>url: <code>[ENDPOINT_URL]</code></li></ul><pre>[RESULT_ERRORS]</pre>"
+    # The mention rides on the placeholder, which is the only part of this body
+    # that differs between a failure and a recovery — Gatus has one template for
+    # both. So TRIGGERED carries the attachment and RESOLVED does not, and the
+    # #Gatus room can be set to notify on mentions only: a service going down
+    # reaches a phone, and its recovery waits until you look.
+    #
+    # ${CAMPFIRE_MENTION} is the whole attachment element, injected from the
+    # gatus-alerting Secret. It cannot be built here: Gatus substitutes
+    # environment variables and does not concatenate.
     placeholders:
       ALERT_TRIGGERED_OR_RESOLVED:
-        TRIGGERED: "🚨 DOWN:"
+        TRIGGERED: "🚨 DOWN:${CAMPFIRE_MENTION}"
         RESOLVED: "✅ RECOVERED:"
     default-alert:
       failure-threshold: 3
