@@ -1,0 +1,58 @@
+---
+# Campfire denies egress by default, so this half has to be said out loud.
+#
+# The ingress half is already there and needs nothing new:
+# infrastructure/configs/production/allow-status-bot-to-prometheus.yaml admits
+# the whole campfire namespace to any pod labelled
+# `app.kubernetes.io/name: prometheus` on 9090, and prometheus-operator puts
+# that label on every instance it builds — including the speedtest one. Adding
+# a second rule saying the same thing would be a second thing to keep in step.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-speedtest-digest-egress
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-speedtest-digest
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+    # The room it posts into.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: campfire
+      ports:
+        - protocol: TCP
+          port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-speedtest-digest-dns
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-speedtest-digest
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

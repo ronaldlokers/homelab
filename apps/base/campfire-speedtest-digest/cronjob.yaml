@@ -1,0 +1,81 @@
+# Sunday morning, covering the seven days that ended Saturday.
+#
+# 08:00 rather than 07:00: the briefing and the glucose digest already file at
+# 07:00, and three attachments landing in the same minute is a wall to scroll
+# past rather than three things read.
+#
+# Unlike the briefing, this posts every Sunday whether or not anything went
+# wrong. It is a record, and the figure that makes it worth opening — what
+# arrived against what is paid for — varies every week even when nothing
+# breaks. A weekly sheet that only appears on bad weeks is one whose silence
+# says "fine", which is the briefing's job and not this one's.
+#
+# To re-draw an older week, set DIGEST_DATE (the last day of the week wanted)
+# on a one-off Job. Deliberately absent here, so the scheduled run always means
+# the week that just ended:
+#
+#   kubectl create job --from=cronjob/campfire-speedtest-digest speedtest-manual \
+#     -n campfire --dry-run=client -o yaml |
+#     kubectl set env --local -f - DIGEST_DATE=2026-08-02 -o yaml |
+#     kubectl apply -f -
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: campfire-speedtest-digest
+  namespace: campfire
+spec:
+  schedule: "0 8 * * 0"
+  timeZone: "Europe/Amsterdam"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: campfire-speedtest-digest
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            # The image runs as `node` (uid 1000); 65534 has no home in it.
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: digest
+              # Untagged on purpose: the tag lives once, in the cluster
+              # overlay's `images:` block.
+              image: ghcr.io/ronaldlokers/stringer
+              args: ["speedtest"]
+              env:
+                # The 400-day instance, not the default one. Both answer the
+                # same metric names, so pointed at the main Prometheus this
+                # looks right and quietly reports whatever fits in ten days —
+                # which for a seven-day sheet is almost everything, until the
+                # week it is not.
+                - name: PROMETHEUS_URL
+                  value: "http://prometheus-speedtest.monitoring.svc.cluster.local:9090"
+              envFrom:
+                # Almanac, the bot every sheet posts as. Shared on purpose:
+                # a per-beat copy of one room URL is two things to rotate.
+                - secretRef:
+                    name: campfire-almanac
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  # Rasterising the sheet is a second or two of real work and
+                  # the only thing this pod does; throttling it buys nothing
+                  # when nothing is waiting on a Sunday morning.
+                  cpu: 1000m
+                  memory: 256Mi

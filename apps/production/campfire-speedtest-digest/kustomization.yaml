@@ -1,0 +1,6 @@
+# Production only: staging has no Campfire, no speedtest tracker, and no
+# 400-day Prometheus to read.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base/campfire-speedtest-digest
