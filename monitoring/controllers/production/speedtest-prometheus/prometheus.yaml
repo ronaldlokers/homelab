@@ -1,5 +1,9 @@
-# A second Prometheus, for one question: what did the connection actually
-# deliver, over months rather than days.
+# A second Prometheus, for the questions that need months rather than days.
+#
+# It began as the speedtest instance and keeps that name, because renaming a
+# Prometheus means a new StatefulSet, a new PVC, and losing the eight months of
+# history backfilled into this one. The name is now the smaller truth about it;
+# what it is for is long-term series that the main instance cannot keep.
 #
 # The main instance keeps 10 days. That is not meanness — it ingests 13k
 # samples a second across 366k series, which is 1.24 GB of blocks a day, and
@@ -34,14 +38,24 @@ spec:
   retentionSize: 1500MB
   walCompression: true
 
-  # Only speedtest, and only from its own namespace. An empty selector here
-  # would quietly make this a second copy of the main instance.
+  # Named ServiceMonitors in named namespaces, never an empty selector — that
+  # would quietly make this a second copy of the main instance, at 1.24 GB a
+  # day.
+  #
+  # Longhorn joined for the storage forecast: 39 volume series and 3 per node,
+  # carrying `pvc` and `pvc_namespace` labels, so a trend can name the workload
+  # that is growing rather than a UUID. A fortnight of history cannot see slow
+  # growth, and slow growth is the kind that surprises you.
   serviceMonitorNamespaceSelector:
-    matchLabels:
-      kubernetes.io/metadata.name: speedtest
+    matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: In
+        values: [speedtest, longhorn-system]
   serviceMonitorSelector:
-    matchLabels:
-      name: speedtest
+    matchExpressions:
+      - key: name
+        operator: In
+        values: [speedtest, longhorn-prometheus-servicemonitor]
   # Nothing else is wanted. Left unset these default to the same "everything"
   # the main instance uses.
   podMonitorSelector:

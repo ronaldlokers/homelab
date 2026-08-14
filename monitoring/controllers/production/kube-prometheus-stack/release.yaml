@@ -197,11 +197,11 @@ spec:
           url: http://loki-gateway.monitoring.svc.cluster.local:80
           isDefault: false
           editable: false
-        # The speedtest-only instance, which keeps 400 days where the default
-        # datasource keeps 10. Same metric names in both, so a panel pointed at
-        # the wrong one looks right and simply stops a week and a half ago —
-        # which is why the name says how long it keeps rather than what it holds.
-        - name: Prometheus (speedtest, 400d)
+        # The long-term instance: speedtest and Longhorn, kept for 400 days
+        # where the default datasource keeps 10. Same metric names in both, so
+        # a panel pointed at the wrong one looks right and simply stops a week
+        # and a half ago — which is why the name says how long it keeps.
+        - name: Prometheus (long-term, 400d)
           type: prometheus
           uid: prometheus-speedtest
           access: proxy
