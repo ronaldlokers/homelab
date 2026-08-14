@@ -408,3 +408,34 @@ export SOPS_AGE_KEY_FILE=/workspaces/homelab/staging-age.key  # or production-ag
 sops --encrypt /tmp/secret-decrypted.yaml > path/to/secret.yaml
 rm /tmp/secret-decrypted.yaml
 ```
+
+### A File That No Longer Decrypts
+
+`validate.sh` decrypts every SOPS file when an age key is present, and fails
+when one no longer round-trips. Four had rotted unnoticed before that check
+existed (#497), in two ways — both of them "the file was edited after it was
+encrypted":
+
+| Symptom | Cause |
+|---|---|
+| `MAC mismatch` | The MAC covers *every* value in the tree, encrypted or not. Adding an annotation by hand after encryption invalidates it while every value still decrypts. |
+| `cipher: message authentication failed` | A multi-document file whose later documents were encrypted separately and appended, each with its own data key. Decrypting the file as a whole tries one key against another's values. |
+
+The cluster keeps working throughout: it holds the decrypted Secret and never
+reads the file again. What breaks is editing or rotating it.
+
+Recovering one:
+
+1. Decrypt what is there. `sops --decrypt --ignore-mac` for a MAC mismatch; for
+   the multi-document case, split on `---` and decrypt each document
+   separately, then join the plaintext back together.
+2. **Check the recovered values against the live Secret** before trusting them:
+   ```bash
+   kubectl --context=production get secret -n <ns> <name> \
+     -o jsonpath='{.data.<key>}' | base64 -d | sha256sum
+   ```
+   Each value's own GCM tag is verified during decryption, so a value that
+   decrypts is authentic — but the comparison also proves the file is the one
+   the cluster is running.
+3. Re-encrypt the whole file with the environment's key, then confirm a plain
+   `sops --decrypt` succeeds with no flags.
