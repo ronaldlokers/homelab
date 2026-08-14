@@ -8,6 +8,7 @@ resources:
   - campfire-kube-actor
   - campfire-fizzy-digest
   - campfire-memories
+  - campfire-mention
   - campfire-morning-briefing
   - campfire-nightscout-digest
   - campfire-notify-check
