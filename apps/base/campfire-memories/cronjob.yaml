@@ -1,0 +1,58 @@
+# Photographs taken on this date in earlier years, at nine in the morning.
+#
+# 09:00 rather than with the rest: the briefing, the glucose digest and the
+# Sunday sheets are all before 08:30, and this is the one message that is not
+# work. It should not arrive in the same handful of minutes as a list of what
+# is wrong with the cluster.
+#
+# Silent on a day with no photographs. An occasion that arrives every morning
+# stops being one.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: campfire-memories
+  namespace: campfire
+spec:
+  schedule: "0 9 * * *"
+  timeZone: "Europe/Amsterdam"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: campfire-memories
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: memories
+              image: ghcr.io/ronaldlokers/stringer
+              args: ["memories"]
+              envFrom:
+                - secretRef:
+                    name: campfire-almanac
+                - secretRef:
+                    name: campfire-memories
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  # Nine JPEGs decoded and composited into a 1000x1200 PNG.
+                  # Measured at ~1.4MB out and a second or two of work.
+                  cpu: 1000m
+                  memory: 512Mi

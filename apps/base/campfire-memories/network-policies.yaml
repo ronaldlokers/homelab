@@ -1,0 +1,97 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-memories-egress
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-memories
+  policyTypes:
+    - Egress
+  egress:
+    # Immich's API: searching the day, then fetching thumbnails.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: immich
+      ports:
+        - protocol: TCP
+          port: 2283
+    - to:
+        - podSelector:
+            matchLabels:
+              app: campfire
+      ports:
+        - protocol: TCP
+          port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-memories-dns
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-memories
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-memories-ingress-to-campfire
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: campfire-memories
+      ports:
+        - protocol: TCP
+          port: 80
+---
+# Immich's own half.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-memories-ingress
+  namespace: immich
+spec:
+  # `name: server`, not `immich-server` — the chart labels the pod by its role
+  # within the release. Checked against the running pod rather than guessed.
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: server
+      app.kubernetes.io/instance: immich
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: campfire
+          podSelector:
+            matchLabels:
+              app: campfire-memories
+      ports:
+        - protocol: TCP
+          port: 2283
