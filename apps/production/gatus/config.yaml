@@ -50,9 +50,15 @@ alerting:
     # ${CAMPFIRE_MENTION} is the whole attachment element, injected from the
     # gatus-alerting Secret. It cannot be built here: Gatus substitutes
     # environment variables and does not concatenate.
+    #
+    # Single-quoted, and that is not a style choice. Gatus expands ${...} in the
+    # raw file *before* parsing it as YAML, so the attachment's own
+    # sgid="..." quotes end a double-quoted scalar and the config dies with
+    # `yaml: line 54: did not find expected key`. In single quotes the double
+    # quotes are ordinary characters.
     placeholders:
       ALERT_TRIGGERED_OR_RESOLVED:
-        TRIGGERED: "🚨 DOWN:${CAMPFIRE_MENTION}"
+        TRIGGERED: '🚨 DOWN:${CAMPFIRE_MENTION}'
         RESOLVED: "✅ RECOVERED:"
     default-alert:
       failure-threshold: 3
