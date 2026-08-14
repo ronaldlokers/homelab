@@ -27,6 +27,15 @@ spec:
   # credential valid everywhere.
   managed:
     roles:
+      # Read-only, for the beats that read a database rather than an API. The
+      # role is created here; its SELECT grants are applied once by hand — see
+      # docs/runbooks/read-only-role-for-bots.md — because CloudNativePG
+      # creates roles and does not grant privileges.
+      - name: bots
+        ensure: present
+        login: true
+        passwordSecret:
+          name: pg-role-bots
       - name: commafeed
         ensure: present
         login: true
