@@ -1,0 +1,6 @@
+# No `namespace:` — the CronJob declares campfire and one policy lands in immich.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - cronjob.yaml
+  - network-policies.yaml
