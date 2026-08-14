@@ -75,7 +75,7 @@ def kubectl(ctx, *args, check=True, timeout=180, stdin=None):
 
 
 def clusters(ctx):
-    """The live clusters, and where each one recovers from."""
+    """The live clusters, where each recovers from, and what it runs."""
     out = kubectl(ctx, "get", "cluster", "-n", "database", "-o", "json")
     for item in json.loads(out)["items"]:
         name = item["metadata"]["name"]
@@ -88,14 +88,23 @@ def clusters(ctx):
             # this is the branch that has to learn the other spelling.
             print(f"  skip {name}: no barmanObjectStore on its recovery source")
             continue
-        yield name, store
+        yield name, store, spec.get("imageName"), spec.get("postgresql")
 
 
-def drill_manifest(name, store, target_time=None):
+def drill_manifest(name, store, image=None, postgresql=None, target_time=None):
     """A scratch cluster that restores and archives nothing.
 
     Note what is absent: `backup`. See this file's docstring — with it, the
     drill would write into the prefix it restored from.
+
+    The image is inherited from the source cluster, and that is not a detail.
+    The first run of this drill left it unset, so the operator used its own
+    default — PostgreSQL 18 against a data directory written by 17 — and the
+    restore died with "database files are incompatible with server" after
+    downloading a perfectly good backup. Nightscout runs a DocumentDB image
+    besides. A restore into the wrong image is exactly the mistake a hurried
+    human makes at 3am, which is the argument for the drill inheriting rather
+    than being told.
     """
     spec = {
         "instances": 1,
@@ -106,6 +115,12 @@ def drill_manifest(name, store, target_time=None):
         "bootstrap": {"recovery": {"source": "origin"}},
         "externalClusters": [{"name": "origin", "barmanObjectStore": store}],
     }
+    if image:
+        spec["imageName"] = image
+    if postgresql:
+        # shared_preload_libraries and friends: a cluster that needs an
+        # extension preloaded needs it preloaded to be restored, too.
+        spec["postgresql"] = postgresql
     if target_time:
         spec["bootstrap"]["recovery"]["recoveryTarget"] = {
             "targetTime": target_time.strftime("%Y-%m-%d %H:%M:%S%z"),
@@ -138,6 +153,31 @@ def destroy(ctx, name):
     kubectl(ctx, "delete", "pvc", "-n", "database",
             "-l", f"cnpg.io/cluster={name}", "--ignore-not-found",
             check=False, timeout=300)
+
+
+def why_stuck(ctx, name):
+    """What the restore was complaining about, before the evidence is deleted.
+
+    The first failure of this drill reported only "never reached a healthy
+    state", and the cluster was already gone by the time anyone read it. The
+    answer was in the recovery pod's log — a FATAL two lines long — so the
+    weekly record now carries it and nobody has to reproduce the failure to
+    find out what it was.
+    """
+    pods = kubectl(ctx, "get", "pods", "-n", "database",
+                   "-l", f"cnpg.io/cluster={name}",
+                   "-o", "jsonpath={.items[*].metadata.name}", check=False)
+    for pod in pods.split():
+        log = kubectl(ctx, "logs", "-n", "database", pod, "--all-containers",
+                      "--tail=200", check=False, timeout=60)
+        for line in reversed(log.splitlines()):
+            if "FATAL" in line or "DETAIL" in line:
+                # These are JSON log lines; the readable part is the message.
+                try:
+                    return json.loads(line).get("msg", line)[:300]
+                except json.JSONDecodeError:
+                    return line[:300]
+    return "no FATAL in the recovery pod's log"
 
 
 def wait_ready(ctx, name, deadline):
@@ -176,7 +216,7 @@ def newest_row(ctx, name, database, table, column):
     return stamp if stamp.tzinfo else stamp.replace(tzinfo=timezone.utc)
 
 
-def drill(ctx, source, store, findings):
+def drill(ctx, source, store, image, postgresql, findings):
     """Both restores for one cluster. Returns True if everything held."""
     database, table, column = TARGETS.get(source, (None, None, None))
     if not database:
@@ -190,10 +230,10 @@ def drill(ctx, source, store, findings):
     # --- 1. the latest the backups can give us -----------------------------
     destroy(ctx, name)
     started = datetime.now(timezone.utc)
-    create(ctx, drill_manifest(name, store))
+    create(ctx, drill_manifest(name, store, image, postgresql))
     if not wait_ready(ctx, name, started + READY_TIMEOUT):
         findings.append(f"{source}: restore never reached a healthy state within "
-                        f"{int(READY_TIMEOUT.total_seconds() / 60)}m")
+                        f"{int(READY_TIMEOUT.total_seconds() / 60)}m — {why_stuck(ctx, name)}")
         destroy(ctx, name)
         return False
 
@@ -225,10 +265,10 @@ def drill(ctx, source, store, findings):
     # --- 2. and a point in time we choose ----------------------------------
     target = datetime.now(timezone.utc) - PITR_BACK
     started = datetime.now(timezone.utc)
-    create(ctx, drill_manifest(name, store, target_time=target))
+    create(ctx, drill_manifest(name, store, image, postgresql, target_time=target))
     if not wait_ready(ctx, name, started + READY_TIMEOUT):
-        findings.append(f"{source}: point-in-time restore to "
-                        f"{target:%H:%M} never reached a healthy state")
+        findings.append(f"{source}: point-in-time restore to {target:%H:%M} never "
+                        f"reached a healthy state — {why_stuck(ctx, name)}")
         destroy(ctx, name)
         return False
 
@@ -280,13 +320,13 @@ def main():
     lines = []
     failed = False
 
-    for source, store in clusters(ctx):
+    for source, store, image, postgresql in clusters(ctx):
         if args.only and source != args.only:
             continue
         before = len(findings)
         started = datetime.now(timezone.utc)
         try:
-            drill(ctx, source, store, findings)
+            drill(ctx, source, store, image, postgresql, findings)
         except Exception as error:  # noqa: BLE001 — one cluster failing is a finding
             findings.append(f"{source}: the drill itself failed ({error})")
         took = int((datetime.now(timezone.utc) - started).total_seconds())
