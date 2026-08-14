@@ -1,0 +1,36 @@
+# What the speedtest-only Prometheus is allowed to read here.
+#
+# It lives in this overlay rather than beside the instance it serves, because
+# monitoring/controllers/production sets `namespace: monitoring` on everything
+# it builds — a Role written there for this namespace renders into monitoring
+# instead, and the instance starts healthy with zero targets. Caught in the
+# render; it would have looked like an empty database rather than an error.
+#
+# Namespaced on purpose. The main Prometheus reads the whole cluster because it
+# scrapes the whole cluster; this one scrapes one Service.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-speedtest
+rules:
+  - apiGroups: [""]
+    resources: [services, endpoints, pods]
+    verbs: [get, list, watch]
+  # The operator generates EndpointSlice discovery, as it does for the main one.
+  - apiGroups: ["discovery.k8s.io"]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-speedtest
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-speedtest
+subjects:
+  # The ServiceAccount stays with the instance, in monitoring.
+  - kind: ServiceAccount
+    name: prometheus-speedtest
+    namespace: monitoring
