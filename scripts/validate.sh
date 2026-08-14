@@ -389,6 +389,53 @@ PY
 
 
 # ---------------------------------------------------------------------------
+# Every SOPS-encrypted file must still decrypt.
+#
+# The check above proves Flux would decrypt these; this proves there is still
+# something to decrypt. Four files had rotted before anyone ran `sops -d` on
+# them by hand (#497): two with a MAC over values that had since been edited by
+# hand, two multi-document files where later documents were encrypted separately
+# and appended, so decrypting the file as a whole tried one data key against
+# another's values. Every Kustomization was Ready throughout, because a cluster
+# holds the decrypted Secret and never reads the file again — the rot is
+# invisible until a rotation or an edit, which is the worst moment to find it.
+#
+# Only runs where a key exists. CI has none by design, so there it says so and
+# moves on rather than passing silently.
+# ---------------------------------------------------------------------------
+
+sops_key_file="${SOPS_AGE_KEY_FILE:-$HOME/.config/sops/age/keys.txt}"
+if [[ -z "${SOPS_AGE_KEY:-}" && ! -f "$sops_key_file" ]]; then
+  echo "INFO - Skipping the decrypt check: no age key on this machine"
+else
+  echo "INFO - Checking SOPS files still decrypt"
+  rotted=()
+  while IFS= read -r -d '' file; do
+    grep -qE '^sops:' "$file" || continue
+    # Plaintext to /dev/null, the complaint to a variable: a validation run
+    # should never put a decrypted secret on a terminal or in a CI log.
+    if ! why=$(sops --decrypt "$file" 2>&1 >/dev/null); then
+      rotted+=("${file#./}|$(head -n1 <<<"$why" | cut -c1-140)")
+    fi
+  done < <(find . -path ./.git -prune -o -type f -name '*.yaml' -not -name '.sops.yaml' -print0)
+
+  if ((${#rotted[@]})); then
+    printf "\nERROR - %d SOPS file(s) no longer decrypt:\n" "${#rotted[@]}"
+    for entry in "${rotted[@]}"; do
+      echo "  ${entry%%|*}"
+      echo "    ${entry#*|}"
+    done
+    echo
+    echo "  The cluster is probably fine — it holds the decrypted Secret already."
+    echo "  The file is not: it cannot be edited or rotated as it stands."
+    echo "  Recover with 'sops --decrypt --ignore-mac', or per document for a"
+    echo "  multi-document file, check the values against the live Secret, then"
+    echo "  re-encrypt the whole file. See #497."
+    exit 1
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 # The CronJob copy of netpol-check.py must match the canonical one. Kustomize
 # will not read files outside its own directory, so the script is duplicated
 # into the overlay; without this the two drift and the scheduled check stops
