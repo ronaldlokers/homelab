@@ -52,6 +52,13 @@ spec:
               image: ghcr.io/ronaldlokers/stringer
               args: ["briefing"]
               env:
+                # Mentioned only on a briefing that carries problems; a quiet
+                # morning still posts and still does not interrupt.
+                - name: CAMPFIRE_MENTION_SGID
+                  valueFrom:
+                    secretKeyRef:
+                      name: campfire-mention
+                      key: CAMPFIRE_MENTION_SGID
                 # The full bot URL, room and bot key included. The webhook path
                 # the interactive verbs reply on does not exist here: nobody
                 # asked anything, so there is no payload to reply to.

@@ -55,6 +55,13 @@ spec:
                 secretKeyRef:
                   name: campfire-morning-briefing
                   key: CAMPFIRE_URL
+            # Who to wake, for firing alerts, Flux errors and check findings.
+            # Not for resolutions, routine reconciliations or a clear.
+            - name: CAMPFIRE_MENTION_SGID
+              valueFrom:
+                secretKeyRef:
+                  name: campfire-mention
+                  key: CAMPFIRE_MENTION_SGID
             - name: CAMPFIRE_FLUX_URL
               valueFrom:
                 secretKeyRef:
