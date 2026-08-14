@@ -1,0 +1,21 @@
+# How Grafana and the speedtest beat reach it. No Ingress: nothing outside the
+# cluster asks this instance anything, and the main Prometheus already has the
+# hostname a person would type.
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-speedtest
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/instance: speedtest
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: prometheus
+    prometheus: speedtest
+  ports:
+    - name: http-web
+      port: 9090
+      targetPort: 9090
+      protocol: TCP

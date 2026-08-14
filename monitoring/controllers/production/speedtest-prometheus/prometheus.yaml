@@ -1,0 +1,94 @@
+# A second Prometheus, for one question: what did the connection actually
+# deliver, over months rather than days.
+#
+# The main instance keeps 10 days. That is not meanness — it ingests 13k
+# samples a second across 366k series, which is 1.24 GB of blocks a day, and
+# Longhorn keeps three replicas of every one of them. Raising it to 90 days
+# would be a 112 GB volume and 336 GB of cluster storage, two thirds of a
+# node's NVMe, to keep six months of kubelet cadvisor metrics nobody will read.
+#
+# Speedtest is 21 series and one real result an hour. Kept for 400 days that is
+# tens of megabytes. So it gets its own instance instead, and the main one
+# keeps its 10 days.
+#
+# It selects only the speedtest ServiceMonitor. The main instance still scrapes
+# that ServiceMonitor too — its selector is empty by design — which is fine:
+# they are separate databases, and nothing here changes what the main one does.
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: speedtest
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/instance: speedtest
+spec:
+  replicas: 1
+  serviceAccountName: prometheus-speedtest
+
+  # The whole reason this exists.
+  retention: 400d
+  # 400 days of 21 series is small; the size cap is a floor under a mistake,
+  # not the policy. Below the PVC so a full disk is Prometheus dropping old
+  # blocks rather than Longhorn refusing writes.
+  retentionSize: 1500MB
+  walCompression: true
+
+  # Only speedtest, and only from its own namespace. An empty selector here
+  # would quietly make this a second copy of the main instance.
+  serviceMonitorNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: speedtest
+  serviceMonitorSelector:
+    matchLabels:
+      name: speedtest
+  # Nothing else is wanted. Left unset these default to the same "everything"
+  # the main instance uses.
+  podMonitorSelector:
+    matchLabels:
+      nothing: matches-this
+  probeSelector:
+    matchLabels:
+      nothing: matches-this
+  ruleSelector:
+    matchLabels:
+      nothing: matches-this
+  scrapeConfigSelector:
+    matchLabels:
+      nothing: matches-this
+
+  # The ServiceMonitor asks for 60s and a ServiceMonitor's own interval wins,
+  # so this is the floor rather than the setting. Left deliberately: a second
+  # ServiceMonitor at a coarser interval would produce the same series twice in
+  # the main instance, which is a duplicate-sample error rather than a saving.
+  scrapeInterval: 60s
+
+  # Matches the main instance, so a dashboard or a query moved between the two
+  # does not lose the label it groups by.
+  externalLabels:
+    cluster: production
+
+  resources:
+    requests:
+      cpu: 25m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+  # Without this the TSDB is an emptyDir and 400 days means "until the next
+  # restart" — the mistake the main instance's storageSpec comment records.
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: longhorn
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
+
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 2000
+    seccompProfile:
+      type: RuntimeDefault

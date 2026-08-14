@@ -1,0 +1,13 @@
+# The identity the speedtest-only instance runs as. prometheus-operator creates
+# the StatefulSet and its config; it does not create RBAC, and without any the
+# pod starts, finds the ServiceMonitor, and resolves no targets at all — which
+# reads as an empty database rather than a permission error.
+#
+# What it may read lives in the namespace it reads: see
+# apps/production/speedtest/prometheus-rbac.yaml. A Role written here would be
+# rewritten into monitoring by this tree's namespace transformer.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus-speedtest
+  namespace: monitoring
