@@ -49,21 +49,46 @@ conversation rather than answer one.
 ## Step 2 — open a direct message and find the two ids
 
 Start a direct message with `@squirrel`, then read the ids out of Campfire's
-database. Campfire stores them in SQLite on its own PVC, and the image has no
-`sqlite3` binary, so this goes through Rails:
+database. It lives in SQLite at `/rails/storage/db/production.sqlite3`, and the
+image ships no `sqlite3` binary — so copy it out and query it locally. Take the
+`-wal` and `-shm` files too, or a room created in the last few minutes will be
+missing:
 
 ```bash
-kubectl --context=production exec -n campfire deploy/campfire -- \
-  bin/rails runner '
-    room = Rooms::Direct.joins(:users).where(users: { name: "squirrel" }).first
-    puts "CAMPFIRE_CONVERSATION_ID=#{room&.id}"
-    puts room ? room.users.reject { |u| u.role == "bot" }.map { |u| "CAMPFIRE_SENDER_ID=#{u.id}  # #{u.name}" } : "no direct room with squirrel yet"
-  '
+POD=$(kubectl --context=production get pod -n campfire -l app=campfire \
+        -o jsonpath='{.items[0].metadata.name}')
+for f in production.sqlite3 production.sqlite3-shm production.sqlite3-wal; do
+  kubectl --context=production cp -c campfire \
+    "campfire/$POD:/rails/storage/db/$f" "/tmp/$f"
+done
+
+sqlite3 -header /tmp/production.sqlite3 "
+  select r.id as conversation_id, r.type, u.id as sender_id, u.name
+  from rooms r
+  join memberships m on m.room_id = r.id
+  join users u on u.id = m.user_id
+  where r.type = 'Rooms::Direct'
+    and r.id in (select room_id from memberships m2
+                 join users u2 on u2.id = m2.user_id
+                 where u2.role = 'bot' and trim(lower(u2.name)) = 'squirrel')
+  order by r.id, u.id;"
+
+shred -u /tmp/production.sqlite3*
 ```
 
-Put both values in `apps/production/squirrel/deployment-postgres-patch.yaml`,
-replacing the `REPLACE_ME_` placeholders, and commit. Flux applies within about
-a minute.
+**Match on `rooms.type`, not on the room's name.** There is a `Rooms::Closed`
+room also called "Squirrel" with the same two members; it is indistinguishable
+from the direct one by name, and choosing it is the mistake this page exists to
+prevent.
+
+Also note the bot's name is `Squirrel ` — capital S, trailing space — which is
+why the query trims and lowercases. An exact match on `"squirrel"` finds
+nothing and looks like "no direct room exists yet".
+
+Put the non-bot user's id in `CAMPFIRE_SENDER_ID` and the room's id in
+`CAMPFIRE_CONVERSATION_ID` in
+`apps/production/squirrel/deployment-postgres-patch.yaml`, and commit. Flux
+applies within about a minute.
 
 ### The obligation no code can check
 
