@@ -1,0 +1,18 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: squirrel
+  namespace: database
+spec:
+  cluster:
+    name: postgres-cluster
+  name: squirrel
+  # Owned by its own role, not the shared `app` one. Ownership matters beyond
+  # tidiness: a database's owner holds CONNECT implicitly, so revoking PUBLIC's
+  # CONNECT achieves nothing while `app` still owns the database.
+  #
+  # Squirrel also creates its own schema — migrations are embedded in the
+  # binary and applied at boot — so the role must own the database from the
+  # start rather than have objects transferred afterwards, as linkding's were
+  # in #246.
+  owner: squirrel

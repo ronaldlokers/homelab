@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: squirrel
+  namespace: campfire
+spec:
+  # One replica, and unlike the other campfire workloads this is not a
+  # preference. The spool is ReadWriteOnce and it *is* the durability
+  # guarantee: a second replica could not mount it, and two processes draining
+  # one directory would race to delete files the other had already inserted.
+  replicas: 1
+  strategy:
+    # Recreate, not the default RollingUpdate. Rolling starts the new pod
+    # before the old one releases the RWO volume, so the replacement sits
+    # Pending on a multi-attach error until the rollout times out. Every other
+    # bot here is stateless and never had to say this.
+    type: Recreate
+  selector:
+    matchLabels:
+      app: squirrel
+  template:
+    metadata:
+      labels:
+        app: squirrel
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # 65532 is distroless's `nonroot`, which is what the image runs as.
+        runAsUser: 65532
+        runAsGroup: 65532
+        # Longhorn hands over a root-owned filesystem. Without fsGroup the
+        # nonroot user cannot write the spool, /healthz answers 503 forever,
+        # and the pod never goes ready — so it never receives a webhook, and
+        # Campfire does not retry the ones it missed. The failure is total and
+        # completely silent from the room's side.
+        fsGroup: 65532
+      containers:
+        - name: squirrel
+          image: ghcr.io/ronaldlokers/squirrel
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SPOOL_DIR
+              value: /var/spool/squirrel
+            # Seeds the `people` row every boot. Identities bind to it, so that
+            # a second transport later resolves to the same person rather than
+            # to a second one.
+            - name: OWNER_HANDLE
+              value: ronald
+            # No CAMPFIRE_BOT_KEY, deliberately. Replies travel back inside the
+            # webhook's own HTTP response, so this pod holds no Campfire
+            # credential at all — there is nothing here to leak or rotate. The
+            # binary's Send() is nil without a key, which is how "this bot
+            # cannot start a conversation" is stated in the type rather than
+            # discovered at the moment it is needed. A key arrives with the
+            # scheduler, not before.
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 24Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          # Both probes hit /healthz, which checks that the spool is writable
+          # and deliberately does NOT check Postgres.
+          #
+          # A readiness probe that failed during a database outage would pull
+          # this pod out of its Service. Campfire's delivery would then fail,
+          # and Campfire never retries — converting a survivable outage into
+          # permanent data loss. The whole point of the spool is that the
+          # database can be down and captures still land.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          volumeMounts:
+            - name: spool
+              mountPath: /var/spool/squirrel
+      volumes:
+        - name: spool
+          persistentVolumeClaim:
+            claimName: squirrel-spool
