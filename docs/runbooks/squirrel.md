@@ -104,7 +104,45 @@ the fact that outside direct rooms Campfire only fires the webhook on an
 explicit `@squirrel` mention. Anything from another conversation is answered
 with total silence and logged at warn with its conversation id.
 
-## Step 3 — confirm it is working
+## Step 3 — revoke PUBLIC's CONNECT
+
+**This does not happen by itself, and it was missed the first time.**
+
+CloudNativePG's `Database` CR creates the database and sets its owner. It does
+not revoke `PUBLIC`'s implicit `CONNECT`, and there is no declarative field for
+it — the same reason the `bots` role's SELECT grants are applied by hand. A new
+database therefore arrives on PostgreSQL's defaults, with every role in the
+cluster able to connect to it. That is the state #219 removed everywhere else.
+
+```bash
+P=$(kubectl --context=production get pod -n database \
+      -l cnpg.io/cluster=postgres-cluster,role=primary \
+      -o jsonpath='{.items[0].metadata.name}')
+
+kubectl --context=production exec -n database "$P" -c postgres -- \
+  psql -U postgres -c "REVOKE CONNECT ON DATABASE squirrel FROM PUBLIC;"
+```
+
+No matching `GRANT` is needed: the owner holds `CONNECT` implicitly, which is
+also why revoking from `PUBLIC` does not lock Squirrel out of its own database.
+
+Verify against a database that already has it — the ACLs should be identical in
+shape, `=T/<owner>` meaning PUBLIC keeps TEMP and loses CONNECT:
+
+```bash
+kubectl --context=production exec -n database "$P" -c postgres -- psql -U postgres -t -c \
+  "select datname, array_to_string(datacl,' | ') from pg_database
+   where datname in ('squirrel','linkding');"
+```
+
+`PostgreSQLDatabaseNotIsolated` fires within a few minutes if this is skipped,
+which is how it was caught. Read
+[revoke-that-only-broke-things-four-hours-later.md](../war-stories/revoke-that-only-broke-things-four-hours-later.md)
+before revoking on any database other than an app's own — on `postgres` this
+same command once removed `streaming_replica`'s only grant and broke replica
+rejoin for four hours with every signal green.
+
+## Step 4 — confirm it is working
 
 ```bash
 # Ready, and the spool is writable

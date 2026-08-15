@@ -99,6 +99,12 @@ A **runbook** is an action-oriented guide for handling specific incidents. Unlik
   - **Time to Fix**: ~10 minutes per database, one app at a time
   - **Warning**: `REASSIGN OWNED` is the obvious command and hands away every database. Order of steps is load-bearing
 
+- [**Stand Up a New App Database**](postgres-new-app-database.md)
+  - **Symptoms**: not an incident — a planned addition; or `PostgreSQLDatabaseNotIsolated` firing minutes after one
+  - **Severity**: Medium (an isolation gap, not an outage)
+  - **Time to Fix**: ~10 minutes, six declarative steps and one that is not
+  - **Warning**: CloudNativePG reports `applied: true` with `PUBLIC` still able to connect. The revoke is manual and nothing upstream of it says so
+
 - [**PostgreSQL Replica NetworkPolicy Dataplane Sync**](postgres-replica-networkpolicy-dataplane-sync.md)
   - **Symptoms**: Reprovisioned CNPG replica crash-loops with "connection refused" to the K8s API despite correct-looking NetworkPolicy config
   - **Severity**: High
