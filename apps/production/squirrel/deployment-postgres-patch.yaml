@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: squirrel
+  namespace: campfire
+spec:
+  template:
+    spec:
+      containers:
+        - name: squirrel
+          env:
+            - name: POSTGRES_SERVER
+              value: "postgres-cluster-rw.database.svc.cluster.local"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: "squirrel"
+            # Taken from the Secret so the role name and its password can never
+            # drift apart (#219). pg-role-squirrel is mirrored into this
+            # namespace from `database` by reflector, so this is the same
+            # object CloudNativePG reconciles the role against rather than a
+            # copy that can drift (#268).
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pg-role-squirrel
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pg-role-squirrel
+                  key: password
+            # The one setting no code can check. Squirrel accepts messages from
+            # exactly one conversation and one sender, and in Campfire that
+            # conversation must be a DIRECT room — but the webhook payload
+            # carries no room-type field, so nothing in the binary can verify
+            # it. Point this at a group room and it will happily capture from
+            # it. See docs/runbooks/squirrel.md.
+            #
+            # Room 9 is Rooms::Direct, Ronald (1) and Squirrel (9). Verified
+            # against Campfire's own `rooms.type`, not inferred from the name:
+            # room 10 is a Rooms::Closed room ALSO called "Squirrel" with the
+            # same two members, and choosing it would have looked identical
+            # from every angle except this one.
+            - name: CAMPFIRE_CONVERSATION_ID
+              value: "9"
+            - name: CAMPFIRE_SENDER_ID
+              value: "1"

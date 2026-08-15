@@ -79,6 +79,17 @@ spec:
         login: true
         passwordSecret:
           name: pg-role-authentik
+      # Production only, like speedtest: Squirrel lives in the campfire
+      # namespace and campfire does not run on staging. It is also the first
+      # consumer that creates its own schema — migrations are embedded in the
+      # binary and applied at boot — so it must own its database from the
+      # start rather than have objects transferred afterwards, as linkding's
+      # were in #246.
+      - name: squirrel
+        ensure: present
+        login: true
+        passwordSecret:
+          name: pg-role-squirrel
 
   priorityClassName: homelab-database
   postgresUID: 999

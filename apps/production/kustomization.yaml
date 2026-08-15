@@ -32,6 +32,7 @@ resources:
   - ntfy
   - pgadmin
   - speedtest
+  - squirrel
   - tandoor
   - netpol-check
   - recovery-source-check

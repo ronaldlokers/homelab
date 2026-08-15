@@ -45,6 +45,14 @@ A **runbook** is an action-oriented guide for handling specific incidents. Unlik
   - **Note**: Whether the release contains migrations decides whether rollback
     is a re-pin or a restore. Check before upgrading.
 
+- [**Bring Squirrel Up**](squirrel.md)
+  - **Symptoms**: First deploy; or no 🐿️ in the room; or captures landing on the
+    spool but never reaching Postgres
+  - **Severity**: Planned change with two manual steps
+  - **Time to Fix**: 15 minutes, most of it in Campfire's admin UI
+  - **Note**: `CAMPFIRE_CONVERSATION_ID` must name a *direct* room. The webhook
+    payload carries no room-type field, so nothing in the code can verify it.
+
 - [**Restore a SQLite App from a Longhorn Backup**](sqlite-app-restore-from-longhorn-backup.md)
   - **Symptoms**: Lost or corrupt state for Campfire, Fizzy or linkding — or a drill
   - **Severity**: Varies

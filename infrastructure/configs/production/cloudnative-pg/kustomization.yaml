@@ -18,6 +18,7 @@ resources:
   - linkding-database.yaml
   - mealie-database.yaml
   - speedtest-database.yaml
+  - squirrel-database.yaml
   - tandoor-database.yaml
 
 # Let reflector mirror each role credential into the namespace that uses it, so
@@ -103,3 +104,18 @@ patches:
           reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "tandoor"
           reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
           reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "tandoor"
+  # Mirrored into `campfire`, not a namespace of its own: Squirrel is a bot and
+  # lives with the other bots, so the Campfire hop stays in-namespace.
+  - target:
+      kind: Secret
+      name: pg-role-squirrel
+    patch: |-
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: pg-role-squirrel
+        annotations:
+          reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+          reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "campfire"
+          reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
+          reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "campfire"

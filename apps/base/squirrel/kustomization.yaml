@@ -1,0 +1,18 @@
+# No `namespace:` here on purpose — each resource declares its own, matching
+# campfire-status-bot and campfire-kube-actor. Squirrel lives in the campfire
+# namespace so the hop from Campfire stays in-cluster and in-namespace, which
+# is what lets the NetworkPolicy be the whole authentication story.
+#
+# One policy in network-policies.yaml lands in `database` rather than
+# `campfire`, which is the other reason a blanket namespace here would be
+# wrong.
+#
+# No namespace.yaml: the campfire namespace already exists, owned by
+# apps/base/campfire.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+  - network-policies.yaml

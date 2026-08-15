@@ -1,0 +1,40 @@
+# The spool is where the promise lives.
+#
+# Every capture is written here and fsynced — file, then the directory — before
+# the room is told it landed. Only then does a background loop move it into
+# Postgres. That ordering is the whole design: Campfire does not retry a failed
+# webhook, so a message dropped at the door is gone, and the acknowledgement
+# must not run ahead of durability.
+#
+# In steady state this directory is empty; files exist only between arriving
+# and being drained, which is normally under a second. It grows during a
+# Postgres outage and drains when the database returns. What persists
+# indefinitely is quarantine/, holding captures that could not be inserted for
+# a reason retrying will not fix — those are irreplaceable, which is why the
+# backup labels are here and not merely inherited.
+#
+# This is the first stateful workload in the campfire namespace. Every other
+# bot is a stateless report-filer that can be rescheduled freely; this one
+# cannot, and the Deployment says Recreate for that reason.
+#
+# storageClassName is deliberately omitted and set per overlay: production
+# annotates BOTH local-path and longhorn as default, so an unqualified claim
+# binds non-deterministically. Same reasoning as linkding and commafeed.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: squirrel-spool
+  namespace: campfire
+  labels:
+    recurring-job.longhorn.io/backup-daily: enabled
+    recurring-job.longhorn.io/snapshot-daily: enabled
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # A capture is a few hundred bytes of JSON. 1Gi is enough for roughly a
+      # million undrained ones, which is far more outage than the cluster will
+      # survive anyway — the figure is chosen to match linkding and commafeed
+      # rather than from a real estimate. Longhorn volumes expand in place.
+      storage: 1Gi

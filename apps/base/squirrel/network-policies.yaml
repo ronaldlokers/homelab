@@ -1,0 +1,126 @@
+---
+# Campfire is the only thing allowed to reach Squirrel, and this rule is the
+# only authentication the webhook has: Campfire signs nothing and sends no
+# shared secret, so "who can open a socket to port 8080" is the whole control.
+#
+# The campfire namespace default-denies both directions, so the same hop has to
+# be said twice — ingress here, egress below. Same-namespace is not the same as
+# allowed.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-campfire-to-squirrel
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: squirrel
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: campfire
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# The egress half. campfire's allow-internet-egress excludes 10.0.0.0/8, which
+# the pod CIDR sits inside, so without this the webhook never leaves Campfire
+# and the room gets "Failed to respond within 7 seconds" with nothing in
+# Squirrel's log to explain it — because nothing ever arrived.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-campfire-egress-to-squirrel
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: squirrel
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Squirrel reaches Postgres, and nothing else. There is no rule back to
+# Campfire on port 80: every reply travels inside the webhook's own HTTP
+# response, so unlike the digests this workload never initiates a message. When
+# the scheduler arrives and it does, that rule and a bot key arrive together.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-squirrel-egress
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: squirrel
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: database
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-squirrel-dns
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: squirrel
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# The database's own half. allow-apps-ingress admits namespaces labelled
+# homelab.io/needs-database, and campfire is not one of them — it has no
+# database of its own, only workloads that use someone else's.
+#
+# Worth knowing how this fails if it is missing: the drain defers rather than
+# errors, so captures keep landing on disk and the room keeps getting its
+# squirrel. Nothing reaches Postgres and nothing tells you, until the spool
+# directory is the only place a week of thoughts exists.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-squirrel-ingress
+  namespace: database
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: campfire
+          podSelector:
+            matchLabels:
+              app: squirrel
+      ports:
+        - protocol: TCP
+          port: 5432
