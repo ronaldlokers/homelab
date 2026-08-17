@@ -175,6 +175,35 @@ the old key, which is the same quiet failure.
 To rotate: change it in Campfire's bot admin, run the `sops` command above,
 commit, and let Flux apply it. The webhook URL does not change.
 
+## The forked Campfire
+
+**Buttons need a fork; everything else does not.** From v0.3.0 Squirrel puts a
+button on each due chore in the digest, and a correction button on a chore it
+just defined. Interactive bot actions and `PATCH` on a bot's own message are in
+`ronaldlokers/once-campfire@feat/bot-message-actions` and not upstream.
+
+**Squirrel runs fine without it, on purpose.** A message carrying buttons is
+sent as JSON; an upstream Campfire rejects that with a 4xx and the transport
+retries the same text as plain text, logging:
+
+```
+campfire: message with actions was rejected, retrying as plain text
+```
+
+Seeing that line every morning is the expected signal that Campfire is upstream.
+It is not a fault to chase. What you lose is the buttons — every number still
+works, so `done 2`, a bare `2`, `stop 3`, `?` and `nvm` are untouched, and both
+halves of the receipt still land.
+
+**The standing cost is rebasing.** Upstream ships security fixes and each one
+now arrives through the fork. Check `ronaldlokers/once-campfire` against upstream
+`main` whenever a `security/*` branch appears there.
+
+**Rolling back** is repointing `apps/production/campfire/kustomization.yaml` at
+`ghcr.io/basecamp/once-campfire` and its digest. Squirrel needs no change and no
+rollback of its own — it degrades as described above. Taps simply stop arriving,
+so nothing resolves against a prompt whose buttons no longer render.
+
 ## Step 5 — confirm it is working
 
 ```bash
