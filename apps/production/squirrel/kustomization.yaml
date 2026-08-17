@@ -2,15 +2,18 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../../base/squirrel/
+  - squirrel-campfire-secret.yaml
 
 patches:
   - path: deployment-postgres-patch.yaml
 
-  # Opt in to Reloader: roll this workload when the mounted Secret changes.
+  # Opt in to Reloader: roll this workload when a mounted Secret changes.
   # Without it a pg-role-squirrel rotation applies cleanly and the pod keeps
   # authenticating with the old password, because env is injected only at pod
   # creation. The failure is quiet — the drain defers, captures pile up on the
-  # spool, and the room never notices.
+  # spool, and the room never notices. The same now goes for a bot-key
+  # rotation, where the quiet failure is every receipt and every digest
+  # stopping while captures carry on landing.
   - target:
       kind: Deployment
       name: squirrel
@@ -39,4 +42,4 @@ patches:
 # image is actually pushed, so a release whose build failed cannot be proposed.
 images:
   - name: ghcr.io/ronaldlokers/squirrel
-    newTag: v0.1.0
+    newTag: v0.2.0
