@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: searxng
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - searxng.ronaldlokers.nl
+  rules:
+    - host: searxng.ronaldlokers.nl
+      http:
+        paths:
+          - backend:
+              service:
+                name: searxng
+                port:
+                  number: 8080
+            path: /
+            pathType: Prefix

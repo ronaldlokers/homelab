@@ -100,6 +100,16 @@
         "https://grafana.github.io/helm-charts"
       ],
       "allowedVersions": "<7.0.0"
+    },
+    {
+      "description": "SearXNG has no releases: it ships a rolling image tagged <year>.<month>.<day>-<commit sha>, e.g. 2026.8.17-374939b88. Renovate's default docker versioning reads that as semver, where the trailing sha is a prerelease suffix and every tag therefore looks unstable — so it proposes nothing at all. The regex versioning below names the date parts and treats the sha as build metadata, which orders the tags correctly by date.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "docker.io/searxng/searxng"
+      ],
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-(?<build>[a-f0-9]+)$"
     }
   ]
 }
