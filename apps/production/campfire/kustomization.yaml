@@ -19,10 +19,24 @@ resources:
 # Renovate proposes each move as a PR.
 #
 # Back to a release when one includes #239: set newTag and drop the digest.
+# A fork, and squirrel's buttons are the only reason. `feat/bot-message-actions`
+# adds interactive actions on bot messages and PATCH on a bot's own message;
+# neither is upstream. Built by pushing a tag on the fork — the publish workflow
+# triggers on `v*` and reads itself from the pushed ref, so the branch never has
+# to be merged to the fork's main and rebasing on upstream stays clean.
+#
+# Rolling back is putting the two lines below back. Squirrel needs no rollback
+# of its own: a message with buttons is sent as JSON, upstream rejects it, and
+# the transport retries the same text as plain text. See
+# docs/runbooks/squirrel.md.
+#
+# The standing cost is rebasing — upstream's security fixes now arrive through
+# the fork.
 images:
   - name: ghcr.io/basecamp/once-campfire
-    newTag: main
-    digest: sha256:956fdaaa8e202e9a3c0fb54539203a950179d2d2abae753a5231a4c74276a91f
+    newName: ghcr.io/ronaldlokers/once-campfire
+    newTag: v0.0.0-actions
+    digest: sha256:3a0912ae4f783340418373f24462eeedebd8438da16eef8311b55b743819c8ad
 
 patches:
   # Opt in to Reloader: roll this workload when a mounted ConfigMap or Secret
