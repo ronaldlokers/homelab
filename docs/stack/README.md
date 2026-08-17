@@ -20,6 +20,7 @@ This document provides detailed information about all components running in the 
   - [Nightscout](./applications/nightscout.md)
   - [ntfy](./applications/ntfy.md)
   - [pgAdmin](./applications/pgadmin.md)
+  - [SearXNG](./applications/searxng.md)
   - [Speedtest](./applications/speedtest.md)
 - Monitoring
   - [kube-prometheus-stack](./monitoring/kube-prometheus-stack.md)
@@ -46,6 +47,7 @@ This document provides detailed information about all components running in the 
 | Campfire | ❌ | ✅ | Group chat, bots, and a mirror of alerts |
 | Fizzy | ❌ | ✅ | Kanban board |
 | pgAdmin | ❌ | ✅ | PostgreSQL administration |
+| SearXNG | ✅ | ✅ | Metasearch engine |
 | Speedtest | ❌ | ✅ | Network speed test |
 | kube-prometheus-stack | ✅ | ✅ | Monitoring and observability |
 | Loki + Alloy | ✅ | ✅ | Log aggregation and querying |

@@ -1,0 +1,16 @@
+# SearXNG builds every absolute link it emits — opensearch.xml, the PWA
+# manifest, RSS URLs — from base_url. Left unset it guesses from the request
+# headers, which is why adding the browser as a search engine from a reverse
+# proxied instance otherwise points at the wrong host.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: searxng
+spec:
+  template:
+    spec:
+      containers:
+        - name: searxng
+          env:
+            - name: SEARXNG_BASE_URL
+              value: https://searxng.staging.ronaldlokers.nl/

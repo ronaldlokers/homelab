@@ -46,16 +46,26 @@ data:
         expanded: true
         cpu: true
         memory: true
+    # Both boxes point at the self-hosted SearXNG, which is what replaced the
+    # Kagi subscription these used to spend queries on.
+    #
+    # The production hostname on purpose, in base, for both clusters: the search
+    # is issued by the browser rather than by this pod, and any browser that can
+    # load a staging dashboard is on the LAN and can resolve the production
+    # instance too. Splitting it per overlay would duplicate the whole widget
+    # block to change one hostname that nothing in-cluster ever contacts.
+    #
+    # No suggestionUrl: SearXNG's /autocompleter sends no CORS headers, so a
+    # cross-origin fetch from homepage is rejected by the browser and the box
+    # would just stop suggesting, silently.
     - quicklaunch:
         provider: custom
-        url: https://kagi.com/search?q=
+        url: https://searxng.ronaldlokers.nl/search?q=
         target: _blank
-        suggestionUrl: https://kagi.com/api/autosuggest?q=
     - search:
         provider: custom
-        url: https://kagi.com/search?q=
+        url: https://searxng.ronaldlokers.nl/search?q=
         target: _blank
-        suggestionUrl: https://kagi.com/api/autosuggest?q=
   docker.yaml: ""
   custom.css: ""
   custom.js: ""

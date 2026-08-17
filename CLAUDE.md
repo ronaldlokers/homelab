@@ -241,7 +241,8 @@ All resources follow **base/overlay pattern**:
 5. **Nightscout** - CGM remote monitoring (uses FerretDB for MongoDB compatibility)
 6. **ntfy** - Notification service, web push + iOS support (production only)
 7. **pgAdmin** - PostgreSQL administration
-8. **Speedtest Tracker** - Internet speed history with Grafana integration (production only)
+8. **SearXNG** - Metasearch engine, LAN-only, replaces the Kagi subscription
+9. **Speedtest Tracker** - Internet speed history with Grafana integration (production only)
 
 ### PostgreSQL Architecture
 

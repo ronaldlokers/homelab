@@ -41,6 +41,13 @@ endpoints:
     conditions:
       - "[STATUS] == 200"
       - "[CERTIFICATE_EXPIRATION] > 240h"
+  - name: searxng
+    group: homelab
+    url: "https://searxng.staging.ronaldlokers.nl/healthz"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[CERTIFICATE_EXPIRATION] > 240h"
   - name: lokilabs-healthz
     group: external
     url: "https://lokilabs.nl/api/healthz"

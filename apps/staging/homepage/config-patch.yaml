@@ -10,6 +10,12 @@ data:
             href: https://linkding.staging.ronaldlokers.nl
             description: Bookmark manager
 
+    - Search:
+        - SearXNG:
+            icon: searxng.png
+            href: https://searxng.staging.ronaldlokers.nl
+            description: Metasearch
+
     - Media:
         - Commafeed:
             icon: commafeed.png

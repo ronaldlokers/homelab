@@ -151,6 +151,18 @@ endpoints:
       - "[CERTIFICATE_EXPIRATION] > 336h"
     alerts:
       - type: custom
+  # /healthz rather than /, because the search page renders fine while every
+  # engine behind it is returning CAPTCHAs — and a 200 on the shell is the only
+  # thing a root check would prove either way.
+  - name: searxng
+    group: homelab
+    url: "https://searxng.ronaldlokers.nl/healthz"
+    interval: 60s
+    conditions:
+      - "[STATUS] < 400"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+    alerts:
+      - type: custom
   - name: nightscout
     group: homelab
     url: "https://nightscout.ronaldlokers.nl"

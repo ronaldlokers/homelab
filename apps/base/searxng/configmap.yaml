@@ -1,0 +1,57 @@
+# SearXNG's own settings file, mounted over /etc/searxng/settings.yml.
+#
+# The container entrypoint writes a template there on first boot when the file
+# is absent, generating a random secret_key each time. That is exactly the wrong
+# behaviour for a GitOps deployment on an ephemeral filesystem: every restart
+# would invalidate the cookie signing key and log the preferences back out. The
+# file is supplied here instead, and the key comes from a SOPS secret.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: searxng-settings
+data:
+  settings.yml: |
+    # Inherit upstream's settings.yml — the full engine catalogue and its
+    # per-engine tuning — and merge only the keys below over it.
+    #
+    # Copying the whole file instead is what makes a SearXNG instance rot:
+    # engines are scrapers, they break upstream continuously, and a frozen copy
+    # keeps the broken definitions forever while upstream has long since fixed
+    # them.
+    use_default_settings: true
+
+    general:
+      instance_name: "SearXNG"
+      # /stats carries per-engine error counts, which is the only way to notice
+      # that (say) google has started answering CAPTCHAs rather than results.
+      # That is the expected failure mode of a self-hosted metasearch instance,
+      # so the page is worth having.
+      enable_metrics: true
+
+    server:
+      # secret_key and base_url are not set here. Both are read from the
+      # environment — SEARXNG_SECRET from a SOPS secret, SEARXNG_BASE_URL from
+      # the cluster overlay, since the hostname differs per environment.
+      #
+      # No limiter, and no valkey to back one. The limiter exists to keep
+      # scrapers off public instances; this one resolves to a private address
+      # and is reachable from the LAN only, so it would cost a second workload
+      # to rate-limit an audience of one.
+      limiter: false
+      public_instance: false
+      # Fetch result thumbnails through the instance rather than letting the
+      # browser hit the origin, which would otherwise hand every image host a
+      # referer and an IP per search.
+      image_proxy: true
+
+    search:
+      # Favicons resolve via DuckDuckGo and are cached in /var/cache/searxng.
+      # Upstream leaves this off because a public instance would proxy the
+      # lookups for everyone.
+      favicon_resolver: "duckduckgo"
+
+    ui:
+      # Puts the query in the tab title, which is what makes browser history
+      # searchable after the fact.
+      query_in_title: true
+      infinite_scroll: true

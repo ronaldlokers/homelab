@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: searxng
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: searxng
+  template:
+    metadata:
+      labels:
+        app: searxng
+    spec:
+      securityContext:
+        # 977 is the searxng user baked into the image (see container/
+        # dist.dockerfile upstream, which COPYs everything --chown=977:977).
+        # Naming it here is what makes the two emptyDirs writable without
+        # running the process as root.
+        runAsUser: 977
+        runAsGroup: 977
+        fsGroup: 977
+      containers:
+        - name: searxng
+          image: docker.io/searxng/searxng:2026.8.17-374939b88
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # The entrypoint chowns its two volume paths when running as root
+            # and warns on every boot when it cannot. It never can here — the
+            # pod runs as 977 — and fsGroup has already made both writable, so
+            # the check is noise rather than signal.
+            - name: FORCE_OWNERSHIP
+              value: "false"
+            # Granian defaults to one worker per CPU. On a 4-core CM5 that is
+            # four interpreters holding four copies of the engine catalogue to
+            # serve a single user's searches.
+            - name: GRANIAN_WORKERS
+              value: "1"
+            - name: SEARXNG_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: searxng-secret
+                  key: SEARXNG_SECRET
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            # The entrypoint insists both of these are directories and exits 127
+            # otherwise, so settings.yml is mounted into an emptyDir rather than
+            # over /etc/searxng itself.
+            - name: config
+              mountPath: /etc/searxng
+            - name: settings
+              mountPath: /etc/searxng/settings.yml
+              subPath: settings.yml
+              readOnly: true
+            - name: cache
+              mountPath: /var/cache/searxng
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+      volumes:
+        - name: config
+          emptyDir: {}
+        - name: settings
+          configMap:
+            name: searxng-settings
+        # Favicon cache only. Losing it on restart costs a few lookups, which
+        # is not worth a PVC and a Longhorn replica set.
+        - name: cache
+          emptyDir: {}

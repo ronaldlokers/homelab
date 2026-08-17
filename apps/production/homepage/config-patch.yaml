@@ -26,6 +26,15 @@ data:
             href: https://linkding.ronaldlokers.nl
             description: Bookmark manager
 
+    # No widget: homepage ships none for SearXNG, and its /stats page is HTML
+    # rather than an API. A plain link needs no NetworkPolicy, since the browser
+    # navigates rather than this pod.
+    - Search:
+        - SearXNG:
+            icon: searxng.png
+            href: https://searxng.ronaldlokers.nl
+            description: Metasearch — the search box above uses it
+
     - Media:
         - Commafeed:
             icon: commafeed.png

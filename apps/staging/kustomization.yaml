@@ -8,6 +8,7 @@ resources:
   - homepage
   - nightscout
   - pgadmin
+  - searxng
   - commafeed
   # Immich is deliberately not deployed to staging.
   #
