@@ -66,6 +66,46 @@ spec:
                 secretKeyRef:
                   name: squirrel-campfire
                   key: CAMPFIRE_BOT_KEY
+            # Stated rather than left to the binary's default, which happens
+            # to agree with it today. The evening hour is load-bearing twice —
+            # it is the clock trigger for the daily nudge and the slot the
+            # capture list is sent in, and on a quiet day the two share one
+            # message precisely because they are the same instant. A default
+            # that drifted in a later release would move both at once.
+            - name: EVENING_AT
+              value: "19:00"
+            # Named DIGEST_TZ, not EVENING_TZ: the daily digest it belonged to
+            # is gone, but v0.4.0 renamed only DIGEST_AT. Nothing outside the
+            # binary reads it, so the rename is free whenever that file is next
+            # opened. Until then the pairing reads odder than it is.
+            - name: DIGEST_TZ
+              value: "Europe/Amsterdam"
+            # The presence route, which Home Assistant calls when I get home.
+            # It is the only path on this pod reachable from outside the
+            # namespace, so it is stated rather than defaulted: the Ingress in
+            # apps/production/squirrel routes exactly this path and nothing
+            # else, and the two have to agree or the hop 404s.
+            - name: PRESENCE_PATH
+              value: /hooks/home
+            # You have a coat on. The nudge is deliberately not sent at the
+            # moment of arrival, and the same window debounces the several
+            # pings a phone flapping between wifi and cellular produces.
+            - name: PRESENCE_DELAY
+              value: 2m
+            # optional: true is what makes the ordering safe. Without the
+            # secret the binary refuses to mount the route at all and logs a
+            # warning — subtle.ConstantTimeCompare("", "") returns 1, so an
+            # empty secret would otherwise authenticate every caller,
+            # including one sending no header. A missing Secret therefore
+            # costs the presence trigger and nothing else: captures, the nudge
+            # that rides back on a message, and the 19:00 fallback all carry
+            # on. That is also why this rolls out before the Secret exists.
+            - name: PRESENCE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: squirrel-presence
+                  key: PRESENCE_SECRET
+                  optional: true
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

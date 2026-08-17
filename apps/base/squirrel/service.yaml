@@ -1,10 +1,17 @@
-# ClusterIP only, and deliberately no Ingress. Campfire is the sole caller and
-# it lives in this namespace, so nothing has to leave the cluster. That matters
-# because Campfire webhooks carry no signature and no shared secret: the
-# callback URL is the whole authentication story, and the NetworkPolicy beside
-# this file is what makes that acceptable.
+# ClusterIP only. Campfire is the sole in-cluster caller and it lives in this
+# namespace, so its hop never leaves the cluster. That matters because Campfire
+# webhooks carry no signature and no shared secret: the callback URL is the
+# whole authentication story, and the NetworkPolicy beside this file is what
+# makes that acceptable.
 #
 # Same reasoning as campfire-status-bot, which wrote it down first.
+#
+# This file used to say "and deliberately no Ingress". That stopped being true
+# in v0.4.0: Home Assistant reports arrivals from off-cluster on the LAN, so
+# apps/production/squirrel/ingress.yaml exposes exactly one path, /hooks/home,
+# behind the LAN-only ipAllowList middleware. The paragraph above still governs
+# the Campfire webhook, which is why that Ingress routes a single path with
+# pathType Exact rather than the whole Service.
 apiVersion: v1
 kind: Service
 metadata:
