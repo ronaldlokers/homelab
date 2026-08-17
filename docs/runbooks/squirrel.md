@@ -5,8 +5,9 @@ it stores the raw text, and answers with a 🐿️. The code lives in
 [ronaldlokers/squirrel](https://github.com/ronaldlokers/squirrel); this
 repository owns its manifests.
 
-Two of the steps below cannot be done from Git, and one of them is a setting no
-code can verify. That is why this page exists.
+Three of the steps below cannot be done from Git, one of them is a setting no
+code can verify, and one is a credential that must never be written down
+outside SOPS. That is why this page exists.
 
 ## What it needs that nothing else here needs
 
@@ -40,11 +41,11 @@ its webhook URL to:
 http://squirrel.campfire.svc.cluster.local:8080/transports/campfire
 ```
 
-Do **not** give the bot key to this cluster. Squirrel holds no Campfire
-credential: every reply travels back inside the webhook's own HTTP response, so
-there is nothing here to leak or rotate. A bot key arrives only when the
-scheduler does, because that is the first thing that needs to *start* a
-conversation rather than answer one.
+Keep the bot key — you need it in [step 4](#step-4--the-bot-key). Until phase 2
+this cluster deliberately held no Campfire credential, because every reply
+travelled back inside the webhook's own HTTP response. The daily digest is the
+first thing that has to *start* a conversation rather than answer one, so the
+key arrived with it.
 
 ## Step 2 — open a direct message and find the two ids
 
@@ -142,7 +143,39 @@ before revoking on any database other than an app's own — on `postgres` this
 same command once removed `streaming_replica`'s only grant and broke replica
 rejoin for four hours with every signal green.
 
-## Step 4 — confirm it is working
+## Step 4 — the bot key
+
+**The one credential in this namespace.** It can post as `@squirrel` into any
+room the bot can reach, and it is the same value that appears in the webhook
+URL Campfire calls — which is why an inbound payload's `room.path` is treated
+as secret too, and why the code strips URLs out of every outbound error before
+logging it.
+
+It lives in one SOPS file. Put the real key in:
+
+```bash
+sops apps/production/squirrel/squirrel-campfire-secret.yaml
+```
+
+Replace `REPLACE_ME_WITH_THE_REAL_BOT_KEY` under `stringData` and save. Never
+write it anywhere else — not a plaintext manifest, not a commit message, not a
+shell command that lands in history.
+
+It pairs with `CAMPFIRE_BASE_URL` in `apps/base/squirrel/deployment.yaml`, and
+the two fail asymmetrically. **A key with no URL is rejected at boot, loudly. A
+URL with no key is not:** `Send` stays nil, the pod goes ready, captures keep
+landing, and every reply, every digest and every 🐿️ receipt silently stops —
+the receipt too, because the boost is built from that same base URL. If the
+room goes quiet but `items` is still filling, check this first.
+
+`reloader.stakater.com/auto` is set on the Deployment, so a rotation rolls the
+pod. Without it the rotation would apply cleanly and the pod would keep using
+the old key, which is the same quiet failure.
+
+To rotate: change it in Campfire's bot admin, run the `sops` command above,
+commit, and let Flux apply it. The webhook URL does not change.
+
+## Step 5 — confirm it is working
 
 ```bash
 # Ready, and the spool is writable
@@ -188,6 +221,21 @@ its squirrel. Check `allow-squirrel-egress` and `allow-squirrel-ingress` (the
 latter lives in the `database` namespace), and look for `db.unavailable` in the
 logs. The spool directory is your backlog; nothing is lost, but it will not
 drain itself if the policy is missing.
+
+**Captures land, but the room has gone quiet — no receipts, no digest.**
+Nothing is lost; `items` is still filling. This is the outbound half failing on
+its own, and it has three causes worth checking in order. The bot key, missing
+or wrong — see [step 4](#step-4--the-bot-key), and note that a URL with no key
+boots perfectly happily. The NetworkPolicy pair for the hop *back* to Campfire,
+`allow-squirrel-egress` and `allow-squirrel-to-campfire`, which is newer than
+the inbound pair and easier to forget. Or Campfire itself being down, in which
+case the log carries `campfire: send failed` with the URL stripped out.
+
+**A digest never arrived, and the log says nothing.** If nothing was due and
+nothing was captured, that is correct — a daily "nothing to report" is exactly
+what the design refuses to send. Otherwise check the pod's clock and
+`DIGEST_TZ`: the send is a wall-clock time in Europe/Amsterdam, and a day the
+process slept through is skipped rather than sent late.
 
 **The pod will not start after a node change.** ReadWriteOnce plus `Recreate`
 means the old pod must fully terminate before the new one attaches. If it is

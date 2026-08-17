@@ -48,13 +48,24 @@ spec:
             # to a second one.
             - name: OWNER_HANDLE
               value: ronald
-            # No CAMPFIRE_BOT_KEY, deliberately. Replies travel back inside the
-            # webhook's own HTTP response, so this pod holds no Campfire
-            # credential at all — there is nothing here to leak or rotate. The
-            # binary's Send() is nil without a key, which is how "this bot
-            # cannot start a conversation" is stated in the type rather than
-            # discovered at the moment it is needed. A key arrives with the
-            # scheduler, not before.
+            # The scheduler has arrived, so the key has too. This pod now holds
+            # a credential that can post as @squirrel into any room it can
+            # reach — the most sensitive thing in this namespace. See
+            # docs/runbooks/squirrel.md for where it came from and how to
+            # rotate it.
+            #
+            # Both of these are needed together and the binary only checks one
+            # direction: a key without a URL is rejected at boot, a URL without
+            # a key is not. Setting the URL alone leaves Send nil, so the
+            # digest and every reply go missing — and the 🐿️ receipt goes with
+            # them, because the boost is built from the same base URL.
+            - name: CAMPFIRE_BASE_URL
+              value: "http://campfire.campfire.svc.cluster.local"
+            - name: CAMPFIRE_BOT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: squirrel-campfire
+                  key: CAMPFIRE_BOT_KEY
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

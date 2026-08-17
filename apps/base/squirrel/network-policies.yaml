@@ -50,10 +50,11 @@ spec:
         - protocol: TCP
           port: 8080
 ---
-# Squirrel reaches Postgres, and nothing else. There is no rule back to
-# Campfire on port 80: every reply travels inside the webhook's own HTTP
-# response, so unlike the digests this workload never initiates a message. When
-# the scheduler arrives and it does, that rule and a bot key arrive together.
+# Squirrel reaches Postgres and Campfire, and nothing else. The Campfire hop
+# is new with the scheduler: the daily digest and the 🐿️ boost are the only
+# two things this workload ever initiates, and both are outbound HTTP to
+# Campfire on port 80. Replies to a webhook still travel inside that webhook's
+# own HTTP response and need no rule at all.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -73,6 +74,41 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: campfire
+      ports:
+        - protocol: TCP
+          port: 80
+---
+# Campfire's ingress half. The namespace default-denies both directions, so
+# the hop has to be said from both ends — and this is the end that is easy to
+# forget, because the egress rule above looks like the whole story.
+#
+# Worth knowing how it fails if it is missing: the capture still lands and the
+# room still gets its receipt is the one thing that is NOT true here — the
+# boost goes out over this same hop. Captures stay durable regardless, but
+# every receipt and every digest silently stops.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-squirrel-to-campfire
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: squirrel
+      ports:
+        - protocol: TCP
+          port: 80
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
