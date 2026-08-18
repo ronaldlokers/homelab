@@ -138,5 +138,5 @@ back in the tokens.
   reliability work available, and the largest.
 - **Immich on this day.** The only idea on the table that is purely a pleasure.
   Needs a round that carries real images, which the press does not cover.
-- **Mealie and Tandoor.** Two recipe managers in one cluster is its own
-  question.
+- ~~**Mealie and Tandoor.** Two recipe managers in one cluster is its own
+  question.~~ Settled in #538: mealie is gone, tandoor stays.

@@ -98,7 +98,7 @@ Worth registering one anyway. Fizzy supports WebAuthn
 cookie-expiry-bound, so a passkey removes the email round trip entirely — and
 keeps working if the Proton token is ever revoked.
 
-There is no OIDC support, so unlike linkding, mealie and immich this does not
+There is no OIDC support, so unlike linkding and immich this does not
 sit behind authentik.
 
 ## Not multi-tenant

@@ -157,9 +157,9 @@ spec:
           # this is the surface used to diagnose an authentik outage.
           auto_login: false
         auth:
-          # Keep the local login form. See above — this is deliberately not
-          # the same choice as mealie, because grafana is where you look when
-          # authentik is the thing that is broken.
+          # Keep the local login form. See above — this is deliberately not the
+          # same choice as the other SSO apps, because grafana is where you look
+          # when authentik is the thing that is broken.
           disable_login_form: false
       ingress:
         enabled: true

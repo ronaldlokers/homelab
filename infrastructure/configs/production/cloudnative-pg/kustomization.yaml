@@ -16,7 +16,6 @@ resources:
   - commafeed-database.yaml
   - gatus-database.yaml
   - linkding-database.yaml
-  - mealie-database.yaml
   - speedtest-database.yaml
   - squirrel-database.yaml
   - tandoor-database.yaml

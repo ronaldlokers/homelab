@@ -79,20 +79,13 @@ FORBIDDEN_PROBES = [
 # does produces a permanent failure that teaches people to ignore the output.
 EXPECTATIONS = [
     (
-        "*", "mealie", "mealie", "postgres-cluster-rw.database.svc.cluster.local", 5432,
-        True, "mealie stores everything in postgres; without this it does not start",
-    ),
-    (
         "*", "tandoor", "tandoor", "postgres-cluster-rw.database.svc.cluster.local", 5432,
-        True, "same for tandoor",
-    ),
-    (
-        "*", "mealie", "mealie", "INGRESS", 443,
-        True, "server-side half of the OIDC login: discovery and token exchange",
+        True, "tandoor stores everything in postgres; without this it does not start",
     ),
     (
         "staging", "tandoor", "tandoor", "INGRESS", 443,
-        True, "same for tandoor, via allauth -- staging only, tandoor has no authentik client in production",
+        True, "server-side half of the OIDC login via allauth: discovery and token "
+        "exchange -- staging only, tandoor has no authentik client in production",
     ),
 ]
 

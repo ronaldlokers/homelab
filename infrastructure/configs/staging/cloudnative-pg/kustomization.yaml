@@ -15,7 +15,6 @@ resources:
   - authentik-database.yaml
   - commafeed-database.yaml
   - linkding-database.yaml
-  - mealie-database.yaml
   - tandoor-database.yaml
 
 # Let reflector mirror each role credential into the namespace that uses it, so

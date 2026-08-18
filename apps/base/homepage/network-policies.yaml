@@ -48,30 +48,6 @@ spec:
         - protocol: TCP
           port: 8443
 ---
-# mealie's API, for the recipe-statistics widget.
-#
-# Port 9000, which the app-namespace rule does not carry: it allows 80, 443,
-# 2283, 3000, 3003, 8006 and 8080. mealie's Service is 9000 -> 9000, so the
-# connection was refused with the ingress rule on mealie's side already in
-# place — the far end permitted it and this end never sent it.
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-homepage-to-mealie
-  namespace: homepage
-spec:
-  podSelector: {}
-  policyTypes:
-    - Egress
-  egress:
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: mealie
-      ports:
-        - protocol: TCP
-          port: 9000
----
 # authentik's API, for the authentik widget's user and login counts.
 #
 # Port 9000, not the 80 the Service advertises: egress is evaluated after DNAT
