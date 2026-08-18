@@ -46,20 +46,6 @@ spec:
         login: true
         passwordSecret:
           name: pg-role-linkding
-      # Mealie was removed in #538. The entry stays, flipped to absent, because a
-      # role that simply vanishes from this list stops being managed rather than
-      # being dropped — CloudNativePG issues DROP ROLE for absent and nothing at
-      # all for a name it no longer sees.
-      #
-      # It could not go in #538: the role owned the mealie database, and
-      # DROP ROLE fails while it owns anything. That database is gone now, and
-      # `pg_database join pg_roles` confirms the role owns nothing.
-      #
-      # No passwordSecret — a role being dropped needs no password, and keeping
-      # the reference would make the drop depend on a Secret that is itself on the
-      # way out. The entry and the Secret both go once the role is gone.
-      - name: mealie
-        ensure: absent
       - name: tandoor
         ensure: present
         login: true
