@@ -369,6 +369,87 @@ that any `prompt_lines` row written by v0.5.0 pointing at an item has a null
 simply finds nothing, so a stale `done 1` says it has no such line rather than
 resolving to the wrong chore.
 
+## The screen
+
+**New in v0.6.0.** The pile has a web screen at
+<https://squirrel.ronaldlokers.nl/pile>: one note at a time, the four
+transitions, undo, and search across every state. It reads and triages, and it
+will never capture — there is no box to type a thought into and no route that
+creates one, permanently. Two capture surfaces means two places to look for a
+thought, which is the problem this bot exists to solve.
+
+Everything it does is an ordinary form POST answered with a 303, so it works
+with JavaScript switched off. The stamp, the moment the card holds still, and
+one key per action (`d` done, `k` keep, `x` drop, `c` chore, `/` search) are
+layered on top of that.
+
+### What authenticates it
+
+Squirrel writes no authentication code and holds no session. Four things have
+to line up:
+
+1. `WEB_IDENTITY: ronald` in `apps/base/squirrel/deployment.yaml`. Empty leaves
+   the screen **unmounted** — `/pile` is a plain 404, not an open route — and
+   logs `no web identity configured; the pile screen is not mounted`.
+2. The `authentik-forward-auth` Middleware in
+   `infrastructure/configs/production/`, which calls authentik's *embedded*
+   outpost and copies `X-Authentik-Username` onto the request.
+3. `apps/production/squirrel/ingress-pile.yaml`, the screen's own router:
+   `https-redirect → local-network-only → authentik-forward-auth`, in that
+   order. The LAN check stays the outer layer.
+4. `apps/production/squirrel/ingress-outpost.yaml`, which routes
+   `/outpost.goauthentik.io/` **on squirrel's hostname** to `authentik-server`.
+   Without it the login redirect has nowhere to come back to.
+
+The provider itself is declared in the `squirrel.yaml` key of the
+`authentik-blueprints` Secret: a proxy provider in `forward_single` mode, plus
+the application, plus the embedded outpost being told to serve it. That last
+entry replaces the outpost's provider list rather than appending to it — a
+second proxy provider must be added to the same entry or it will remove this
+one.
+
+The identity comparison is exact: no trimming, no case folding. It matches the
+authentik **username**, not the e-mail and not the display name.
+
+### When the screen is wrong
+
+- **404 on /pile** — `WEB_IDENTITY` is empty, or the pod predates v0.6.0. The
+  routes are never registered, so there is nothing to authenticate.
+- **403 with an empty body** — the request reached squirrel with a username
+  that is not `WEB_IDENTITY`. `kubectl logs` shows `refused the pile` with the
+  identity it saw.
+- **503 saying it cannot reach its memory** — Postgres is down, or the pod has
+  not finished its first connection. The routes go live at `Listen`; the owner
+  is only known once the database answers, and the screen says so rather than
+  pretending. Captures are unaffected — that is the whole point of the spool.
+- **Redirect loop, or a 404 on /outpost.goauthentik.io/...** — the outpost
+  Ingress is missing, or the blueprint did not apply. Check authentik's logs
+  for a blueprint error, and that the embedded outpost lists the provider.
+- **403 on a form submission that worked a moment ago** — squirrel refuses a
+  write whose `Origin` does not match its own host. If a middleware ever
+  rewrites `Host`, every button on the screen breaks this way and the log says
+  `refused a cross-site write`.
+
+### After changing an asset
+
+`internal/web/static/` is embedded in the binary and served with a year-long
+cache and no fingerprint in the filename, so a new image does not repaint a
+browser that already has the old stylesheet. One hard reload (**Ctrl-Shift-R**)
+fixes it.
+
+### Rolling back to v0.5.0
+
+Repoint `newTag` and let Flux apply it. `WEB_IDENTITY` is ignored by v0.5.0, so
+the screen's routes simply stop existing and `/pile` 404s behind a working
+forward-auth. Nothing else changes: the chat commands, the evening message and
+the presence nudge are untouched, and there is no schema change to undo — the
+screen reads the same tables `!notes` does.
+
+The Ingresses, the middleware and the blueprint can all stay. If you want them
+gone as well, remove `ingress-pile.yaml` and `ingress-outpost.yaml` first, then
+the middleware — an Ingress naming a middleware that no longer exists fails the
+router rather than the request, which takes the presence webhook down with it.
+
 ## Step 5 — confirm it is working
 
 ```bash

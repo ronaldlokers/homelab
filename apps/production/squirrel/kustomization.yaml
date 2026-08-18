@@ -6,6 +6,12 @@ resources:
   # The Ingress is production-only because it carries a hostname. Staging has
   # no Home Assistant to report arrivals to it.
   - ingress.yaml
+  # The screen's own router, so the presence webhook keeps a chain without
+  # authentik in it — see the comment at the top of the file.
+  - ingress-pile.yaml
+  # In the authentik namespace, because an Ingress backend is namespace-local.
+  # It is the way back from the login redirect.
+  - ingress-outpost.yaml
   # The shared secret Home Assistant sends. Separate from squirrel-campfire so
   # the two rotate independently — see the comments in the file. The Deployment
   # reads PRESENCE_SECRET with optional: true, so losing this Secret costs the
@@ -50,4 +56,4 @@ patches:
 # image is actually pushed, so a release whose build failed cannot be proposed.
 images:
   - name: ghcr.io/ronaldlokers/squirrel
-    newTag: v0.5.0
+    newTag: v0.6.0

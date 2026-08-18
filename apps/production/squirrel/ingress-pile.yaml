@@ -1,0 +1,53 @@
+# The screen, and why it is a second Ingress rather than a second path on the
+# first one.
+#
+# Traefik's middleware chain is set per router, and an Ingress is one router.
+# The presence webhook must NOT go through authentik: Home Assistant is a
+# machine holding a shared secret, not a browser holding a session, and a
+# forward-auth in front of it would answer its POST with a login page forever.
+# So /hooks/home keeps its own object and its own chain, and the screen gets
+# this one.
+#
+# Order in the chain is the whole point:
+#
+#   https-redirect        — before anything reads a header off a plaintext hop
+#   local-network-only    — the LAN check stays the outer layer, so a request
+#                           from outside is refused before it can reach a login
+#                           flow at all
+#   authentik-forward-auth — then, and only then, who is this
+#
+# The ipAllowList first is not belt-and-braces. The identity arrives as a plain
+# header that squirrel trusts completely, and what makes that safe is that
+# nothing but Traefik can open a socket to the pod (campfire's
+# allow-ingress-from-traefik is the entire ingress rule). Putting authentik in
+# front of the LAN check would widen the surface to the internet for the sake
+# of a login page that nobody outside can use anyway — and *.ronaldlokers.nl
+# resolves to a private address, so they could not reach it regardless.
+#
+# `pathType: Prefix` on /pile is deliberate and is as wide as this gets. It
+# covers /pile, /pile/act, /pile/chore and /pile/static/. It does not cover
+# /transports/campfire, which has no authentication of its own and whose
+# NetworkPolicy is its only control, and it does not cover /healthz.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: squirrel-pile
+  namespace: campfire
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd,kube-system-local-network-only@kubernetescrd,kube-system-authentik-forward-auth@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: squirrel.ronaldlokers.nl
+      http:
+        paths:
+          - path: /pile
+            pathType: Prefix
+            backend:
+              service:
+                name: squirrel
+                port:
+                  number: 8080
+  tls:
+    - hosts:
+        - squirrel.ronaldlokers.nl
