@@ -67,8 +67,35 @@ spec:
     #
     # No auth on the API entrypoint, but 8080 is ClusterIP-only with no
     # Ingress.
+    # Access logging, off by default in this chart. Turned on because a silent
+    # ingress makes a silent app impossible to debug: squirrel's presence
+    # webhook answers 204 and logs nothing, so "did Home Assistant's call even
+    # arrive" had no answer short of querying production Postgres. That
+    # question belongs here, once, for every app — not in each app's handler.
+    #
+    # Passed as arguments rather than chart values for the same reason
+    # api.insecure is: the chart accepts and silently drops keys it does not
+    # know, so a `logs.access` block that the pinned chart version happens not
+    # to support would look applied and do nothing. A flag either works or
+    # fails the pod loudly.
+    #
+    # headers.defaultmode=drop keeps request and response headers out of the
+    # log entirely. Squirrel's presence route authenticates on
+    # X-Squirrel-Token, and a near-miss credential in a log store is worse than
+    # no log at all. Nothing here needs header values.
+    #
+    # Two things this does log that are worth knowing: the request path, and
+    # the client IP. Campfire's bot API carries its key as a path segment, so
+    # if a bot URL is ever fetched over campfire.ronaldlokers.nl rather than
+    # the in-cluster Service, that key lands in this log. Nothing does that
+    # today — Squirrel talks to Campfire over campfire.campfire.svc — but it
+    # is one browser paste away, and the mitigation is to rotate the key
+    # rather than to grep the log.
     additionalArguments:
       - "--api.insecure=true"
+      - "--accesslog=true"
+      - "--accesslog.format=json"
+      - "--accesslog.fields.headers.defaultmode=drop"
     ports:
       traefik:
         expose:
