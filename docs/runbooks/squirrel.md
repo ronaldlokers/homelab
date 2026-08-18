@@ -317,6 +317,58 @@ says, which is **08:00 by default**: v0.3.1 does not know the name
 `EVENING_AT`, so the 19:00 set here stops applying. Set `DIGEST_AT` explicitly
 if a morning digest is not what you want.
 
+## The pile
+
+**New in v0.5.0.** Notes stopped being write-only: they have a lifecycle now,
+and a way to be found. Typing a thought is unchanged and still the default.
+
+```
+!notes                    the pile, newest first
+!find boiler              search everything, across every state
+!chores                   what is due (same as ?)
+!chore 1 every 2 weeks    turn note 1 into a recurring chore
+!help                     the vocabulary
+
+done 1 · keep 1 · drop 1  clear line 1
+```
+
+**The one thing that feels different in the room:** `done <n>` now means
+whichever kind of thing line n was. List the pile and type `done 1` and you
+clear a note, not a chore. That is the design — a numbered surface owns its own
+numbering — but it is the change most likely to surprise you.
+
+`keep` is the state worth knowing about. A serial number or a link is not a
+task and will never be `done`; `keep` takes it out of the pile while leaving it
+findable by `!find`. Without it, reference notes would sit in triage forever.
+
+**Commands are not notes.** The drain stores every inbound message, so `!notes`
+and `?` land in `items` like anything else — they are filtered out of both the
+pile and the evening list by the same test, so neither surface shows them.
+
+**Nothing counts the pile.** No badge, no total, no "N to review". A capped
+list says there is more, never how much. That is deliberate and load-bearing:
+a number growing beside an implied zero is the accumulating mechanism this
+project bans everywhere else.
+
+### Two migrations
+
+v0.5.0 applies `0008_item_state.sql` and `0009_prompt_line_items.sql` at boot,
+before serving. Both are additive:
+
+- 0008 adds `items.state` (defaulting every existing row to `open`, which is
+  true — nothing had ever been triaged) and `items.state_at`.
+- 0009 makes `prompt_lines.chore_id` nullable and adds `item_id`, so a numbered
+  line can name a note. A check constraint requires exactly one of the two.
+
+**Rolling back to v0.4.1 is safe and needs no schema change.** The columns stay;
+v0.4.1 does not read them. What you lose is the pile: `!notes` and the rest
+become unknown text and are filed as notes, which is the correct failure — a
+command it does not understand is still a thought it keeps. The one wrinkle is
+that any `prompt_lines` row written by v0.5.0 pointing at an item has a null
+`chore_id`, and v0.4.1's `ChoreAtPosition` joins `chores` on it — the join
+simply finds nothing, so a stale `done 1` says it has no such line rather than
+resolving to the wrong chore.
+
 ## Step 5 — confirm it is working
 
 ```bash
