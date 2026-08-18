@@ -463,6 +463,22 @@ the login, which reads as authentik being broken.
   rewrites `Host`, every button on the screen breaks this way and the log says
   `refused a cross-site write`.
 
+### The chores screen
+
+**New in v0.8.0.** `/pile/chores` shows what comes back: what each chore is,
+how often, and when it was last done, with `DID IT`, `HOW OFTEN` and `STOP
+ASKING`. Before this a chore was invisible unless it nudged you — the one
+moment you are least able to decide you never want it again.
+
+`STOP ASKING` and chat's `!retire` are the same write, and changing the
+interval is the same upsert-by-name the chat command makes, so the two surfaces
+cannot drift apart. `!undo` in chat reverses the last note triaged on either
+surface.
+
+Nothing here says how many chores there are, how many are due, or how late
+anything is. `3 days ago` is a fact about a chore; `2 days overdue` would be a
+fact about you.
+
 ### The keyboard, and the phone
 
 **New in v0.7.0.** `d` `k` `x` are the three ways out, `c` then `1`-`4` makes a
