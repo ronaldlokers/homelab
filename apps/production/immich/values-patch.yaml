@@ -47,20 +47,16 @@ spec:
           annotations:
             traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd
             nginx.ingress.kubernetes.io/proxy-body-size: "0"
+          # LAN and tailnet only. The name resolves to the VIP via the wildcard A
+          # record and is not published through Cloudflare Tunnel, so uploads are
+          # not subject to the tunnel's 100MB body limit.
+          #
+          # immich.private.ronaldlokers.nl was a second host here until #536,
+          # added when immich.ronaldlokers.nl was still proxied and needed a
+          # bypass for large videos. The tunnel publishes ntfy alone now, so both
+          # names took the same path and one of them was noise.
           hosts:
             - host: immich.ronaldlokers.nl
-              paths:
-                - path: /
-                  pathType: Prefix
-                  service:
-                    identifier: main
-                    port: 2283
-            # Private-only host under the *.private.ronaldlokers.nl zone: resolves
-            # to the VIP (private DNS wildcard), never proxied through Cloudflare
-            # Tunnel, so it's reachable over LAN/tailnet with no 100MB upload cap.
-            # Point the Immich app here for uploading large videos; keep
-            # immich.ronaldlokers.nl (public via the tunnel) for sharing/viewing.
-            - host: immich.private.ronaldlokers.nl
               paths:
                 - path: /
                   pathType: Prefix
@@ -70,7 +66,6 @@ spec:
           tls:
             - hosts:
                 - immich.ronaldlokers.nl
-                - immich.private.ronaldlokers.nl
     machine-learning:
       persistence:
         cache:
