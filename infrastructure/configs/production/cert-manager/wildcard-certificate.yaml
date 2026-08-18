@@ -8,10 +8,15 @@ spec:
   issuerRef:
     name: letsencrypt-production
     kind: ClusterIssuer
+  # One wildcard is enough: every name under it resolves to the VIP and is only
+  # reachable over LAN or tailnet. Traefik's default TLSStore serves this cert
+  # for all of them with no per-namespace work.
+  #
+  # A second SAN, *.private.ronaldlokers.nl, was dropped in #536. It existed so
+  # immich had an unproxied hostname for large uploads while
+  # immich.ronaldlokers.nl went through Cloudflare Tunnel and its 100MB body
+  # limit. The tunnel now publishes ntfy alone and refuses everything else at
+  # the edge, so both names pointed at the same private path and the split had
+  # nothing left to separate.
   dnsNames:
     - "*.ronaldlokers.nl"
-    # Second wildcard for internal-only hosts (e.g. immich.private.ronaldlokers.nl).
-    # Names under *.private.ronaldlokers.nl resolve to the VIP (private DNS
-    # wildcard) and are never exposed publicly. Sharing one cert means Traefik's
-    # default TLSStore serves valid TLS for these hosts with no per-namespace work.
-    - "*.private.ronaldlokers.nl"

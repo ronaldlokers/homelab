@@ -9,15 +9,6 @@ resource "cloudflare_dns_record" "wildcard" {
   proxied = false
 }
 
-resource "cloudflare_dns_record" "wildcard_private" {
-  zone_id = var.zone_id
-  name    = "*.private.ronaldlokers.nl"
-  type    = "A"
-  content = "10.0.40.100"
-  ttl     = 1
-  proxied = false
-}
-
 resource "cloudflare_dns_record" "wildcard_staging" {
   zone_id = var.zone_id
   name    = "*.staging.ronaldlokers.nl"
@@ -50,10 +41,6 @@ resource "cloudflare_dns_record" "ntfy" {
 import {
   to = cloudflare_dns_record.wildcard
   id = "${var.zone_id}/487060c232d131b2b8f062d105f40f34"
-}
-import {
-  to = cloudflare_dns_record.wildcard_private
-  id = "${var.zone_id}/636f5d1380220366f861d71f2427b6ee"
 }
 import {
   to = cloudflare_dns_record.wildcard_staging
