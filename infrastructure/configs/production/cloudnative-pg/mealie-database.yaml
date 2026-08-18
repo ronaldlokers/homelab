@@ -7,6 +7,14 @@ spec:
   cluster:
     name: postgres-cluster
   name: mealie
+  # Mealie is being removed. The default policy is retain, which would leave the
+  # database behind as an orphan when this object is pruned — data still on disk,
+  # nothing in git describing it. delete makes CloudNativePG issue DROP DATABASE
+  # at that point instead.
+  #
+  # This lands one merge ahead of the removal on purpose: the policy has to be
+  # applied before the object is deleted, or the reclaim never sees it.
+  databaseReclaimPolicy: delete
   # Was `app`, the role shared by every application. Ownership matters beyond
   # tidiness: a database's owner holds CONNECT implicitly, so revoking PUBLIC's
   # CONNECT achieves nothing while `app` still owns the database.
