@@ -27,19 +27,6 @@ resources:
 patches:
   - target:
       kind: Secret
-      name: pg-role-mealie
-    patch: |-
-      apiVersion: v1
-      kind: Secret
-      metadata:
-        name: pg-role-mealie
-        annotations:
-          reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
-          reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "mealie"
-          reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
-          reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "mealie"
-  - target:
-      kind: Secret
       name: pg-role-commafeed
     patch: |-
       apiVersion: v1

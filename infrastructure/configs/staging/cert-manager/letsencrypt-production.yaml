@@ -7,7 +7,8 @@
 #
 #   SSL: CERTIFICATE_VERIFY_FAILED — unable to get local issuer certificate
 #
-# That is Mealie failing to fetch authentik's OIDC discovery document. Every
+# That is Mealie — since removed in #538 — failing to fetch authentik's OIDC
+# discovery document. Every
 # server-to-server integration hits the same wall, so staging could not
 # rehearse SSO at all — which is precisely what staging exists to do.
 #
