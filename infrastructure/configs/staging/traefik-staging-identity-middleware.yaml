@@ -1,0 +1,25 @@
+# Staging has no Authentik outpost in front of it, and the pile refuses to
+# render without an identity — so this puts one there.
+#
+# It is a lie, and a deliberate one: the header this sets is exactly what the
+# production forward-auth would have proved. That means **the staging pile has
+# no authentication at all**, only the same reachability every other staging
+# service has. It is acceptable there and nowhere else, because the notes in
+# that database are ones somebody seeded on purpose.
+#
+# The alternative was a second Authentik proxy provider, outpost route and
+# middleware in staging, to protect data that is fake by definition. The point
+# of the staging pile is to stop experiments touching real notes; making it a
+# faithful copy of the auth stack costs more than it protects.
+#
+# customRequestHeaders overwrites rather than appends, so a caller cannot
+# arrive with their own X-Authentik-Username and be believed.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: staging-identity
+  namespace: kube-system
+spec:
+  headers:
+    customRequestHeaders:
+      X-Authentik-Username: ronaldlokers

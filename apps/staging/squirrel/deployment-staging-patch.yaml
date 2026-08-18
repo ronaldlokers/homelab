@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: squirrel
+  namespace: campfire
+spec:
+  template:
+    spec:
+      containers:
+        - name: squirrel
+          env:
+            # The whole list, replaced rather than merged. The base carries a
+            # Campfire bot key as a secretKeyRef, and a merge by name would
+            # leave an entry holding both a value and a valueFrom, which the
+            # API rejects. Replacing says what staging is in one place instead.
+            - $patch: replace
+            - name: SPOOL_DIR
+              value: /var/spool/squirrel
+            - name: OWNER_HANDLE
+              value: ronald
+            # No transports at all. Staging has no Campfire, and an empty list
+            # is how that is said: with none configured, the required Campfire
+            # settings stop being required and no webhook route is mounted.
+            # This pod is the screen and nothing else.
+            - name: TRANSPORTS
+              value: ""
+            # Late enough that nothing here ever fires an evening message,
+            # which would have nowhere to go anyway.
+            - name: EVENING_AT
+              value: "23:59"
+            - name: DIGEST_TZ
+              value: "Europe/Amsterdam"
+            - name: WEB_IDENTITY
+              value: ronaldlokers
+            - name: POSTGRES_SERVER
+              value: "postgres-cluster-rw.database.svc.cluster.local"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: "squirrel"
+            # Taken from the Secret so the role name and its password can never
+            # drift apart; reflector mirrors it into this namespace from
+            # `database`, the same as production.
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pg-role-squirrel
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pg-role-squirrel
+                  key: password

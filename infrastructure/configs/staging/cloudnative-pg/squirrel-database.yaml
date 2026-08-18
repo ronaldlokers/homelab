@@ -1,0 +1,17 @@
+# Staging's own pile, so an experiment stops running against every thought you
+# have ever had.
+#
+# Same shape as production's, and for the same reason: owned by its own role
+# rather than the shared `app` one, because a database's owner holds CONNECT
+# implicitly and squirrel creates its own schema at boot from migrations
+# embedded in the binary.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: squirrel
+  namespace: database
+spec:
+  cluster:
+    name: postgres-cluster
+  name: squirrel
+  owner: squirrel
