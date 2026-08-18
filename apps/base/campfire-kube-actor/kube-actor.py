@@ -85,7 +85,6 @@ RESTART_ALLOW = (
     "immich/immich-server",
     "immich/immich-valkey",
     "linkding/linkding",
-    "mealie/mealie",
     "nightscout/ferretdb",
     "nightscout/nightscout",
     "ntfy/ntfy",

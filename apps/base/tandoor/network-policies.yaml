@@ -100,8 +100,7 @@ spec:
           port: 5432
 ---
 # Allow tandoor to fetch recipes from external URLs (recipe import).
-# Tandoor's scraper takes a user-supplied URL, so the same SSRF guard mealie
-# needs applies here verbatim.
+# Tandoor's scraper takes a user-supplied URL, so it needs an SSRF guard.
 # Excludes internal/reserved IPv4 ranges so the scraper can't be pointed at
 # cluster, LAN, or link-local/metadata services (SSRF guard). The ipBlock
 # except filters on the resolved destination IP, so it also defeats DNS

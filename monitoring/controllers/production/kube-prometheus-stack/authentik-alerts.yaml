@@ -18,9 +18,9 @@ spec:
             summary: "authentik is not reachable"
             description: >-
               No authentik server has been scrapeable for 5 minutes. Every
-              application behind SSO — mealie, linkding, grafana, immich — will
-              fail to log anyone in. Grafana and mealie keep a local login form
-              for exactly this case.
+              application behind SSO — linkding, grafana, immich — will fail to
+              log anyone in. Grafana keeps a local login form for exactly this
+              case.
           expr: |
             absent(up{job="authentik-server-metrics"} == 1)
           for: 5m

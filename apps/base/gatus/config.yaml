@@ -18,13 +18,6 @@ endpoints:
       - "[STATUS] == 200"
       - "[CERTIFICATE_EXPIRATION] > 240h"
   # Immich is not deployed on staging; restore this check with the app.
-  - name: mealie
-    group: homelab
-    url: "https://mealie.staging.ronaldlokers.nl/api/app/about"
-    interval: 60s
-    conditions:
-      - "[STATUS] == 200"
-      - "[CERTIFICATE_EXPIRATION] > 240h"
   # Gatus stays outside SSO so this check is readable during an authentik
   # outage.
   - name: authentik

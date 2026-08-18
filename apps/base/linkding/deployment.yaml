@@ -7,8 +7,8 @@ spec:
   # Required by the ReadWriteOnce linkding-data volume. A RollingUpdate starts
   # the replacement pod before the old one releases the claim, so if the two land
   # on different nodes the new pod blocks on a multi-attach error and the rollout
-  # stalls. Every other PVC-backed workload here (commafeed, mealie, ntfy,
-  # pgadmin, speedtest) uses Recreate for the same reason.
+  # stalls. Every other PVC-backed workload here (commafeed, ntfy, pgadmin,
+  # speedtest) uses Recreate for the same reason.
   strategy:
     type: Recreate
   selector:

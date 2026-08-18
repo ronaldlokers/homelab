@@ -42,7 +42,7 @@ It is applied via a targeted patch in each app's overlay kustomization.
 | staging | `homepage`, `linkding`, `nightscout`, `ferretdb`, `pgadmin4` |
 | production | `cloudflared`, `gatus`, `homepage`, `linkding`, `ferretdb`, `nightscout`, `ntfy`, `pgadmin4`, `speedtest` |
 
-Not annotated, deliberately: `commafeed` and `mealie` reference no ConfigMap or Secret at all, and `gatus` on staging consumes only its hashed ConfigMap (production `gatus` additionally reads the `gatus-alerting` secret via `envFrom`, so it is annotated there).
+Not annotated, deliberately: `commafeed` references no ConfigMap or Secret at all, and `gatus` on staging consumes only its hashed ConfigMap (production `gatus` additionally reads the `gatus-alerting` secret via `envFrom`, so it is annotated there).
 
 ## Validation on staging
 

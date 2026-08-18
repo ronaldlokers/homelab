@@ -23,10 +23,6 @@ data:
             description: RSS feed reader
 
     - Food:
-        - Mealie:
-            icon: mealie.png
-            href: https://mealie.staging.ronaldlokers.nl
-            description: Recipe manager
         - Tandoor:
             icon: tandoor-recipes.png
             href: https://tandoor.staging.ronaldlokers.nl

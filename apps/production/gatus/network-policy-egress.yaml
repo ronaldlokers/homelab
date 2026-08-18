@@ -22,8 +22,6 @@ spec:
         - protocol: TCP
           port: 2283 # immich-server
         - protocol: TCP
-          port: 9000 # mealie
-        - protocol: TCP
           port: 80 # ntfy (health check + alert publishing)
     - to:
         - ipBlock:

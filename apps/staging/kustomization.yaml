@@ -4,7 +4,6 @@ resources:
   - campfire-morning-briefing
   - authentik/
   - linkding
-  - mealie
   - homepage
   - nightscout
   - pgadmin

@@ -61,7 +61,7 @@ spec:
   # Was 12. Held 108.9Gi of local snapshots — more than every other job
   # combined — to provide restore points that PostgreSQL's own B2 archive
   # already covers with PITR. Three months is ample for the app volumes where
-  # this IS the only backup (mealie, tandoor, linkding, ntfy, pgadmin).
+  # this IS the only backup (tandoor, linkding, ntfy, pgadmin).
   retain: 3
   concurrency: 1
   groups:
