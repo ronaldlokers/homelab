@@ -463,6 +463,26 @@ the login, which reads as authentik being broken.
   rewrites `Host`, every button on the screen breaks this way and the log says
   `refused a cross-site write`.
 
+### The keyboard, and the phone
+
+**New in v0.7.0.** `d` `k` `x` are the three ways out, `c` then `1`-`4` makes a
+chore (`ESC` withdraws the question), `/` is search and `ESC` clears it.
+
+`space` and the arrows move past a note without doing anything to it. That is
+skipping, and it is a cursor in the address bar (`?after=<id>`) rather than a
+state: a skipped note is untouched, still open, and still first the next time
+the pile is opened from the top. Reloading `/pile` is how you get back to the
+top. Running out of notes below the cursor is its own page — what you skipped
+is still in the pile, so it does not say the pile is empty.
+
+On a phone there is no space bar, so the same action is a `LATER` link in the
+card's titlebar. It is a plain link on purpose: it needs neither a key nor
+JavaScript, and the key presses it rather than knowing where it points.
+
+Search answers as you type, by fetching the same URL the form submits to. With
+JavaScript off the identical page arrives by pressing Enter — one renderer,
+one code path.
+
 ### After changing an asset
 
 `internal/web/static/` is embedded in the binary and served with a year-long
