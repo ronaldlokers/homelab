@@ -204,6 +204,119 @@ now arrives through the fork. Check `ronaldlokers/once-campfire` against upstrea
 rollback of its own — it degrades as described above. Taps simply stop arriving,
 so nothing resolves against a prompt whose buttons no longer render.
 
+## The presence webhook
+
+**New in v0.4.0, and the only path on this pod reachable from outside the
+namespace.** Home Assistant calls it when I get home. Squirrel answers 204
+immediately, then waits a couple of minutes before nudging — you have a coat
+on, and the same window debounces the several pings a phone flapping between
+wifi and cellular will produce.
+
+It is the one inbound route that **deliberately does not go through the
+spool**. Everything else inbound is written to disk and fsynced before it is
+acknowledged, because losing it means losing a thought. A presence ping is not
+a thought: losing one costs a nudge, and 19:00 catches the same day. Spooling
+it would also put "you came home" in the capture list.
+
+**Home Assistant runs off-cluster, on the LAN.** That is why this needs an
+Ingress at all, where the Campfire webhook needs none. Two things keep it
+narrow, and both have to hold:
+
+- `apps/production/squirrel/ingress.yaml` routes **exactly** `/hooks/home`,
+  `pathType: Exact`. The Campfire webhook and `/healthz` stay unreachable from
+  outside the namespace. Widening this to `/` would hand the Campfire webhook —
+  which has no authentication whatsoever — to every host on the LAN.
+- `kube-system-local-network-only@kubernetescrd`, the same ipAllowList
+  middleware that guards Longhorn, pgAdmin and the campfire-alert-bridge. It
+  works because `*.ronaldlokers.nl` resolves to the MetalLB VIP `10.0.40.100` —
+  a private address — and Traefik runs `externalTrafficPolicy: Local`, so the
+  client's real source IP survives the hop. Only `ntfy` is proxied through
+  Cloudflare; nothing else here is reachable from the internet.
+
+No NetworkPolicy was added for this. `allow-ingress-from-traefik` in
+`apps/base/campfire/network-policies.yaml` already selects every pod in the
+namespace with no port restriction, so it covers Squirrel today. Worth knowing
+before going to look for a rule that is not there.
+
+### The secret
+
+`apps/production/squirrel/squirrel-presence-secret.yaml`, generated at random
+and never typed anywhere. Read it back to configure Home Assistant:
+
+```bash
+sops -d apps/production/squirrel/squirrel-presence-secret.yaml
+```
+
+It is kept apart from `squirrel-campfire` on purpose. Different blast radii:
+the bot key posts as `@squirrel` into any room it can reach, this one can make
+the bot nudge me about a chore. Rotating one should not roll the other.
+
+**A missing secret is safe; an empty one would not be.**
+`subtle.ConstantTimeCompare("", "")` returns 1, so an unset secret would
+authenticate every caller, including one sending no header at all — which is
+why the binary refuses to mount the route rather than mounting it wide open,
+and logs a warning saying so. The Deployment reads `PRESENCE_SECRET` with
+`optional: true`, so losing the Secret costs the presence trigger and nothing
+else. Captures, the nudge that rides back on a message, and 19:00 all carry on.
+
+### The Home Assistant automation
+
+A REST call on arrival, with the secret in the header:
+
+```yaml
+rest_command:
+  squirrel_presence:
+    url: https://squirrel.ronaldlokers.nl/hooks/home
+    method: POST
+    headers:
+      X-Squirrel-Token: !secret squirrel_presence_token
+
+automation:
+  - alias: Tell Squirrel I am home
+    trigger:
+      - platform: state
+        entity_id: person.ronald
+        to: home
+    action:
+      - service: rest_command.squirrel_presence
+```
+
+**If this breaks, nothing tells you.** The trigger simply stops and everything
+still works, because 19:00 is the floor. Good degradation, bad observability —
+the answer is to surface "last presence ping" wherever liveness eventually
+lives, not to try to detect it here. Until then, an occasional manual check:
+
+```bash
+# 204 with the right token, 403 without it, 404 if the secret never mounted
+curl -si -X POST https://squirrel.ronaldlokers.nl/hooks/home \
+  -H "X-Squirrel-Token: $(sops -d apps/production/squirrel/squirrel-presence-secret.yaml \
+    | grep PRESENCE_SECRET | cut -d' ' -f2)" | head -1
+```
+
+That fires a real nudge if one is still owed today, so expect a message.
+
+## When the message arrives
+
+`EVENING_AT` is set explicitly to `19:00` in
+`apps/base/squirrel/deployment.yaml`, and it is load-bearing twice: it is the
+clock trigger that catches a day nothing else did, and it is the slot the
+capture list is sent in. On a quiet day the two share **one** message rather
+than arriving a second apart. Moving it moves both.
+
+The timezone beside it is still called `DIGEST_TZ`, from the phase 2 digest
+that no longer exists — v0.4.0 renamed `DIGEST_AT` to `EVENING_AT` and left its
+neighbour alone. Nothing outside the binary reads it, so the rename is free
+whenever that file is next opened.
+
+**Rolling back to v0.3.1** is repointing `newTag` and letting Flux apply it.
+The Ingress and the presence Secret can stay: v0.3.1 ignores `PRESENCE_*`
+entirely, so the route 404s and Home Assistant's call fails silently — the same
+failure mode as the automation being switched off. What you lose is the nudge
+and the "what you did" section. The digest returns at whatever `DIGEST_AT`
+says, which is **08:00 by default**: v0.3.1 does not know the name
+`EVENING_AT`, so the 19:00 set here stops applying. Set `DIGEST_AT` explicitly
+if a morning digest is not what you want.
+
 ## Step 5 — confirm it is working
 
 ```bash

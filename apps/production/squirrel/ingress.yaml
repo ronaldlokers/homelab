@@ -1,0 +1,49 @@
+# Squirrel's one externally reachable path, and the reason service.yaml no
+# longer says "deliberately no Ingress".
+#
+# Home Assistant runs off-cluster on the LAN, so the presence webhook cannot
+# be a cross-namespace hop the way the Campfire webhook is an in-namespace
+# one. It has to arrive through Traefik like any browser would.
+#
+# Two things keep that narrow:
+#
+# `path: /hooks/home` with pathType Exact routes the presence endpoint and
+# nothing else. The Campfire webhook (/transports/campfire) and /healthz stay
+# unreachable from outside the namespace — which matters, because the Campfire
+# webhook has no authentication at all and its NetworkPolicy is the entire
+# control. Widening this to `/` would quietly hand that endpoint to the LAN.
+#
+# `local-network-only` is the same ipAllowList middleware that guards the
+# Longhorn and pgAdmin UIs and the campfire-alert-bridge webhook. It works
+# here because *.ronaldlokers.nl resolves to the MetalLB VIP 10.0.40.100 — a
+# private address — and Traefik runs with externalTrafficPolicy: Local, so the
+# LAN client's own source IP survives the hop. Only ntfy is proxied through
+# Cloudflare; nothing else in this cluster is reachable from the internet at
+# all.
+#
+# So the shared secret in the X-Squirrel-Token header is the second layer
+# rather than the only one. The blast radius if it leaked is small — a LAN
+# host could make the bot nudge me — but small is not a reason for nothing.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: squirrel
+  namespace: campfire
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd,kube-system-local-network-only@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: squirrel.ronaldlokers.nl
+      http:
+        paths:
+          - path: /hooks/home
+            pathType: Exact
+            backend:
+              service:
+                name: squirrel
+                port:
+                  number: 8080
+  tls:
+    - hosts:
+        - squirrel.ronaldlokers.nl
