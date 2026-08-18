@@ -485,10 +485,15 @@ one code path.
 
 ### After changing an asset
 
-`internal/web/static/` is embedded in the binary and served with a year-long
-cache and no fingerprint in the filename, so a new image does not repaint a
-browser that already has the old stylesheet. One hard reload (**Ctrl-Shift-R**)
-fixes it.
+Nothing, since v0.7.1. Asset URLs carry `?v=<stamp>`, hashed from the embedded
+files at startup, so a changed file is a changed URL and the year-long cache
+repaints itself.
+
+Before that they did not, and v0.7.0 arrived broken in a browser that had seen
+v0.6.0: HTML is served `no-store`, so the new markup rendered against the old
+stylesheet and script — a link with no styling and a button with no handler. If
+a screen ever looks half-updated again, that is the shape of it, and a hard
+reload (**Ctrl-Shift-R**) is the test that proves it.
 
 ### Rolling back to v0.5.0
 
