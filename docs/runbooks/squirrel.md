@@ -425,6 +425,15 @@ authentik **username**, not the e-mail and not the display name.
 - **Redirect loop, or a 404 on /outpost.goauthentik.io/...** — the outpost
   Ingress is missing, or the blueprint did not apply. Check authentik's logs
   for a blueprint error, and that the embedded outpost lists the provider.
+- **The login redirect points at `http://localhost/`** — the embedded outpost's
+  `authentik_host` is empty. It has no way to learn its own public hostname
+  (the chart sets no `AUTHENTIK_HOST`, and the request it answers is Traefik's,
+  not the browser's), so the blueprint states it. Confirm with:
+
+  ```
+  curl -s -H "Authorization: Bearer $TOKEN" \
+    https://authentik.ronaldlokers.nl/api/v3/outposts/instances/ | jq '.results[].config'
+  ```
 - **403 on a form submission that worked a moment ago** — squirrel refuses a
   write whose `Origin` does not match its own host. If a middleware ever
   rewrites `Host`, every button on the screen breaks this way and the log says
