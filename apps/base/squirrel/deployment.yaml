@@ -106,6 +106,19 @@ spec:
                   name: squirrel-presence
                   key: PRESENCE_SECRET
                   optional: true
+            # The screen. Empty means the routes are never registered at
+            # all — not registered and refusing, which is why this is a plain
+            # value and not an optional secretKeyRef like PRESENCE_SECRET
+            # above: a mis-wired Secret would silently unmount the whole
+            # screen, and this is a username rather than a credential. What
+            # authenticates is authentik, in front.
+            #
+            # It is compared byte for byte against what the forward-auth
+            # middleware puts in X-Authentik-Username, so it has to match the
+            # authentik username exactly — not the e-mail, not the display
+            # name.
+            - name: WEB_IDENTITY
+              value: ronald
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
