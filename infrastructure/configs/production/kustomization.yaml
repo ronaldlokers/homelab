@@ -18,4 +18,5 @@ resources:
   - traefik-default-cert.yaml
   - traefik-helmchartconfig.yaml
   - traefik-https-redirect-middleware.yaml
+  - traefik-lan-or-tailnet-middleware.yaml
   - traefik-local-network-only-middleware.yaml

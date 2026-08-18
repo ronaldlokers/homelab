@@ -116,9 +116,13 @@ spec:
             # It is compared byte for byte against what the forward-auth
             # middleware puts in X-Authentik-Username, so it has to match the
             # authentik username exactly — not the e-mail, not the display
-            # name.
+            # name, and not OWNER_HANDLE above, which is the Campfire handle
+            # and happens to be a different word. Getting it wrong looks like a
+            # blank white page after a successful login: squirrel answers 403
+            # with no body, deliberately, and says `refused the pile` with the
+            # identity it saw in its log.
             - name: WEB_IDENTITY
-              value: ronald
+              value: ronaldlokers
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

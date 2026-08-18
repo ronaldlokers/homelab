@@ -13,16 +13,18 @@
 # this with it.
 #
 # No forward-auth middleware on this one, for the obvious reason: authenticating
-# the route that exists to authenticate is a loop. It keeps the LAN check and
-# the HTTPS redirect, so the login flow is reachable from exactly where the
-# screen is.
+# the route that exists to authenticate is a loop. It keeps the address check
+# and the HTTPS redirect, and it has to keep the *same* address check the
+# screen does — `lan-or-tailnet` on one and `local-network-only` on the other
+# would let a tailnet device reach the pile and then 403 on the way back from
+# the login.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: squirrel-outpost
   namespace: authentik
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd,kube-system-local-network-only@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd,kube-system-lan-or-tailnet@kubernetescrd
 spec:
   ingressClassName: traefik
   rules:
