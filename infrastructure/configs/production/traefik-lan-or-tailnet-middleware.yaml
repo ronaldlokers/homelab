@@ -1,0 +1,38 @@
+# local-network-only, plus whatever arrives through the tailnet.
+#
+# A tailnet device reaching a *.ronaldlokers.nl name resolves it to the private
+# VIP and gets there through the subnet router in the tailscale namespace. That
+# router SNATs — tailscaled's default for advertised subnet routes — so by the
+# time Traefik sees the request its source is the router's **pod** IP, not the
+# client's 100.64.0.0/10 tailnet address. Allowing the tailnet range would
+# therefore do nothing at all; the pod network is what actually shows up.
+#
+# Verified rather than assumed: a request from inside the router pod to
+# https://squirrel.ronaldlokers.nl/pile is refused by local-network-only, which
+# is exactly what a phone on the tailnet sees.
+#
+# Turning SNAT off (`--snat-subnet-routes=false`) would preserve the real
+# client IP and let this be a 100.64.0.0/10 rule instead. It is not worth it:
+# the return path would then need every replying pod to route 100.64.0.0/10
+# back through the subnet router, which nothing in this cluster does, so the
+# answer would leave by the default gateway and never arrive.
+#
+# What this widens, stated plainly: any pod in this cluster can reach a router
+# that carries this middleware. That is acceptable **only** because the two
+# routers using it — the pile and its login callback — have authentik in front
+# of them, so reaching the router is not the same as reaching the pile. It is
+# deliberately not attached to pgAdmin, Longhorn or the presence webhook, none
+# of which have a second layer behind the address check.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: lan-or-tailnet
+  namespace: kube-system
+spec:
+  ipAllowList:
+    sourceRange:
+      # The LAN, same as local-network-only.
+      - 10.0.0.0/16
+      # The cluster pod network: where a tailnet client's traffic comes from
+      # once the subnet router has SNATed it.
+      - 10.42.0.0/16

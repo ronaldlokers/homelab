@@ -395,8 +395,8 @@ to line up:
    `infrastructure/configs/production/`, which calls authentik's *embedded*
    outpost and copies `X-Authentik-Username` onto the request.
 3. `apps/production/squirrel/ingress-pile.yaml`, the screen's own router:
-   `https-redirect → local-network-only → authentik-forward-auth`, in that
-   order. The LAN check stays the outer layer.
+   `https-redirect → lan-or-tailnet → authentik-forward-auth`, in that order.
+   The address check stays the outer layer.
 4. `apps/production/squirrel/ingress-outpost.yaml`, which routes
    `/outpost.goauthentik.io/` **on squirrel's hostname** to `authentik-server`.
    Without it the login redirect has nowhere to come back to.
@@ -409,15 +409,39 @@ second proxy provider must be added to the same entry or it will remove this
 one.
 
 The identity comparison is exact: no trimming, no case folding. It matches the
-authentik **username**, not the e-mail and not the display name.
+authentik **username** — `ronaldlokers` — not the e-mail, not the display name,
+and not `OWNER_HANDLE`, which is the Campfire handle and is a different word.
+
+### Reaching it from the tailnet
+
+`lan-or-tailnet` is why the screen works from a phone that is not at home, and
+it is wider than the `local-network-only` everything else here uses. The reason
+it allows the *pod* network rather than 100.64.0.0/10 is that the subnet router
+SNATs: by the time Traefik sees a tailnet request its source is the router
+pod's IP. Reproduce the failure without a phone by asking from inside that pod:
+
+```
+kubectl --context=production -n tailscale exec ts-homelab-subnet-router-<id>-0 \
+  -- wget -q -S -O /dev/null https://squirrel.ronaldlokers.nl/pile
+```
+
+403 means the router carries `local-network-only`; a 302 to authentik is right.
+
+Both the screen and its outpost callback must carry the same rule. One on each
+would let a tailnet device reach the pile and then fail on the way back from
+the login, which reads as authentik being broken.
 
 ### When the screen is wrong
 
 - **404 on /pile** — `WEB_IDENTITY` is empty, or the pod predates v0.6.0. The
   routes are never registered, so there is nothing to authenticate.
-- **403 with an empty body** — the request reached squirrel with a username
-  that is not `WEB_IDENTITY`. `kubectl logs` shows `refused the pile` with the
-  identity it saw.
+- **A blank white page after logging in successfully** — this one. The request
+  reached squirrel with a username that is not `WEB_IDENTITY`, and squirrel
+  answers 403 with no body on purpose, so a browser renders nothing at all.
+  `kubectl logs` shows `refused the pile` with the identity it saw. That log
+  line is the fastest way to the right value.
+- **403 before any login page appears** — the address check, not the identity.
+  From the tailnet, see above; from anywhere else, that is the rule working.
 - **503 saying it cannot reach its memory** — Postgres is down, or the pod has
   not finished its first connection. The routes go live at `Listen`; the owner
   is only known once the database answers, and the screen says so rather than
