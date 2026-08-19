@@ -32,10 +32,23 @@
 # that and the pile. See the middleware's own comment for why the tailnet's
 # 100.64.0.0/10 does not appear in it.
 #
-# `pathType: Prefix` on /pile is deliberate and is as wide as this gets. It
-# covers /pile, /pile/act, /pile/chore and /pile/static/. It does not cover
-# /transports/campfire, which has no authentication of its own and whose
-# NetworkPolicy is its only control, and it does not cover /healthz.
+# `pathType: Prefix` on / is one broad rule rather than an enumeration. The
+# screen is at the root from v0.10.0 — home at /, the deck at /pile, the chores
+# at /chores — and enumerating them would mean a change here for every new
+# route, where forgetting one produces a 404 that looks like an application bug.
+# Traefik routes on the longest matching prefix, so the narrower rules (the
+# assets, the outpost, the presence hook) keep winning without this one having
+# to know about them.
+#
+# Two paths become reachable from outside that were not before:
+# /transports/campfire and /healthz. Both now sit behind authentik, so an
+# anonymous caller gets a login page rather than a webhook. Campfire delivers
+# in-cluster and never traverses this ingress, and the kubelet's probes are
+# in-cluster too, so nothing that depends on either changes.
+#
+# The object is still called squirrel-pile although it is now the whole screen.
+# Renaming it would mean Flux deleting one router and creating another, and the
+# name buys nothing worth a gap in the only route the screen has.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -49,7 +62,7 @@ spec:
     - host: squirrel.ronaldlokers.nl
       http:
         paths:
-          - path: /pile
+          - path: /
             pathType: Prefix
             backend:
               service:

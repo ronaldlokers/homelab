@@ -18,10 +18,14 @@
 # no user data at all, which is the whole reason this is acceptable rather than
 # a hole. Everything that can read a note still goes through authentik.
 #
+# The worker is here too. It carries no notes — only which files to keep and
+# what to say when the network is gone — and it is fetched by the browser
+# process rather than by the page.
+#
 # `lan-or-tailnet` and the HTTPS redirect stay: this is reachable from the same
 # places the screen is and nowhere else. Traefik routes on the longest matching
-# prefix, so /pile/static/ wins over /pile without either rule needing to know
-# about the other.
+# prefix, so /static/ wins over / without either rule needing to know about the
+# other.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -35,14 +39,21 @@ spec:
     - host: squirrel.ronaldlokers.nl
       http:
         paths:
-          - path: /pile/static/
+          - path: /static/
             pathType: Prefix
             backend:
               service:
                 name: squirrel
                 port:
                   number: 8080
-          - path: /pile/manifest.webmanifest
+          - path: /manifest.webmanifest
+            pathType: Exact
+            backend:
+              service:
+                name: squirrel
+                port:
+                  number: 8080
+          - path: /sw.js
             pathType: Exact
             backend:
               service:
