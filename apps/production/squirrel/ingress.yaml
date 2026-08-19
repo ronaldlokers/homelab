@@ -30,6 +30,12 @@ metadata:
   name: squirrel
   namespace: campfire
   annotations:
+    # Explicit, because Traefik ranks routers by the length of the rule string
+    # rather than by how specific it is, and the screen now claims `/`. This one
+    # wins on length today; a forward-auth login page in front of Home
+    # Assistant's POST is not a thing to leave depending on how many characters
+    # a path has. See ingress-assets.yaml, where the worker lost that race.
+    traefik.ingress.kubernetes.io/router.priority: "100"
     traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd,kube-system-local-network-only@kubernetescrd
 spec:
   ingressClassName: traefik
