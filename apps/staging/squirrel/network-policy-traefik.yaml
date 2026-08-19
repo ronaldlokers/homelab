@@ -1,0 +1,31 @@
+# Traefik has to be allowed in, or the screen is a 502.
+#
+# Production gets this from the campfire app's own base manifests, which admit
+# Traefik to every pod in that namespace. Staging does not run campfire — only
+# the morning briefing and now this — so the namespace default-denies ingress
+# and nothing had ever needed a rule.
+#
+# Narrower than production's, and no reason not to be: the only thing here that
+# should be reachable from outside the namespace is the screen.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-traefik-to-squirrel
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: squirrel
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 8080

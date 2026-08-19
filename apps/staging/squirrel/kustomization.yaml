@@ -9,6 +9,7 @@ kind: Kustomization
 resources:
   - ../../base/squirrel/
   - ingress.yaml
+  - network-policy-traefik.yaml
 
 patches:
   - path: deployment-staging-patch.yaml
