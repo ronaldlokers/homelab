@@ -470,6 +470,13 @@ how often, and when it was last done, with `DID IT`, `HOW OFTEN` and `STOP
 ASKING`. Before this a chore was invisible unless it nudged you — the one
 moment you are least able to decide you never want it again.
 
+**New in v0.9.0:** the screen was rebuilt from a comp. A chore is cream stock
+with no page tab and no orange — orange belongs to the moment a note *becomes*
+a chore — and the interval picker replaces the action row in place with no
+JavaScript at all. A chore that has never been done shows only its rhythm: its
+baseline is its own creation date, and reporting that as "last done" would be a
+sentence about the person.
+
 `STOP ASKING` and chat's `!retire` are the same write, and changing the
 interval is the same upsert-by-name the chat command makes, so the two surfaces
 cannot drift apart. `!undo` in chat reverses the last note triaged on either
