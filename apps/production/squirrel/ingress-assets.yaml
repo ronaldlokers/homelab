@@ -23,15 +23,23 @@
 # process rather than by the page.
 #
 # `lan-or-tailnet` and the HTTPS redirect stay: this is reachable from the same
-# places the screen is and nowhere else. Traefik routes on the longest matching
-# prefix, so /static/ wins over / without either rule needing to know about the
-# other.
+# places the screen is and nowhere else.
+#
+# `router.priority` is why these three win over the screen's `/`, and it is not
+# the belt-and-braces it looks like. Traefik does not rank routers by how
+# specific they are; it ranks them by the *length of the rule string*, and
+# `PathPrefix(`/`)` is fifteen characters while `Path(`/sw.js`)` is fourteen. So
+# the broad rule outranked the worker and Authentik answered it with a login
+# page — while /static/ and /manifest.webmanifest happened to win because their
+# names are long. A rule that is correct by the length of a path is a rule that
+# breaks the next time someone adds a short one.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: squirrel-assets
   namespace: campfire
   annotations:
+    traefik.ingress.kubernetes.io/router.priority: "100"
     traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd,kube-system-lan-or-tailnet@kubernetescrd
 spec:
   ingressClassName: traefik
