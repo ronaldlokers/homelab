@@ -1,0 +1,43 @@
+# The staging pile: somewhere to try a change to the screen that is not the
+# place every thought you have ever had is kept.
+#
+# It runs the same binary with no transports, so there is no Campfire webhook,
+# no bot key and no presence route — only the screen, over a database somebody
+# seeded on purpose.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base/squirrel/
+  - ingress.yaml
+
+patches:
+  - path: deployment-staging-patch.yaml
+
+  # Roll when the mirrored role secret rotates, the same as production: env is
+  # injected at pod creation, so without this a rotation applies cleanly and
+  # the pod keeps using the old password.
+  - target:
+      kind: Deployment
+      name: squirrel
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: squirrel
+        annotations:
+          reloader.stakater.com/auto: "true"
+
+  # Staging's single storage class, stated rather than defaulted.
+  - target:
+      kind: PersistentVolumeClaim
+      name: squirrel-spool
+    patch: |
+      - op: add
+        path: /spec/storageClassName
+        value: local-path
+
+# Staging follows main rather than a release tag: the point of this pile is to
+# see a change before it is tagged.
+images:
+  - name: ghcr.io/ronaldlokers/squirrel
+    newTag: v0.7.1

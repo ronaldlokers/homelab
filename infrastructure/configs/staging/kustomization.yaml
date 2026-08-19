@@ -7,6 +7,7 @@ resources:
   - flux-alerts
   - traefik-default-cert.yaml
   - traefik-https-redirect-middleware.yaml
+  - traefik-staging-identity-middleware.yaml
 patches:
   # Base network policies pin production control-plane IPs for API egress;
   # on staging (k3d) the API endpoint is the k3d server on the Docker network.

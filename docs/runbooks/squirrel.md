@@ -499,6 +499,27 @@ Search answers as you type, by fetching the same URL the form submits to. With
 JavaScript off the identical page arrives by pressing Enter — one renderer,
 one code path.
 
+### The staging pile
+
+`squirrel.staging.ronaldlokers.nl/pile` runs the same binary with **no
+transports**: no Campfire webhook, no bot key, no presence route — only the
+screen, over a database somebody seeded on purpose. It exists so a change to
+the screen can be looked at somewhere that is not the place every thought you
+have ever had is kept.
+
+It has **no authentication**. Staging has no Authentik outpost in front of it,
+and the pile refuses to render without an identity, so a Traefik middleware
+puts one there — `staging-identity` overwrites `X-Authentik-Username` with the
+owner's name. That is a deliberate lie and it is why nothing real should ever be
+seeded there.
+
+Seed it the way any other staging database is seeded:
+
+```
+kubectl --context=staging -n database exec -it postgres-cluster-1 -- \
+  psql -d squirrel -c "insert into items (transport, external_id, conversation_id, sender_id, person_id, raw_text, payload, received_at) select 'seed', 'x1', '7', '1', id, 'a note to look at', '{}', now() from people limit 1;"
+```
+
 ### After changing an asset
 
 Nothing, since v0.7.1. Asset URLs carry `?v=<stamp>`, hashed from the embedded

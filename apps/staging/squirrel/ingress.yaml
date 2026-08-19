@@ -1,0 +1,26 @@
+# The staging pile. Only the screen: the presence webhook and the Campfire
+# webhook have nothing to talk to here, and routing them would be inviting
+# traffic to a bot that cannot answer.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: squirrel
+  namespace: campfire
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd,kube-system-staging-identity@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: squirrel.staging.ronaldlokers.nl
+      http:
+        paths:
+          - path: /pile
+            pathType: Prefix
+            backend:
+              service:
+                name: squirrel
+                port:
+                  number: 8080
+  tls:
+    - hosts:
+        - squirrel.staging.ronaldlokers.nl

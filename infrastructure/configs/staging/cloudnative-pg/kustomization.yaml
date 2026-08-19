@@ -13,6 +13,8 @@ resources:
   - nightscout-documentdb-grants.yaml
   - scheduled-backup.yaml
   - authentik-database.yaml
+  - squirrel-database.yaml
+  - squirrel-role-secret.yaml
   - commafeed-database.yaml
   - linkding-database.yaml
   - tandoor-database.yaml
@@ -59,3 +61,16 @@ patches:
           reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "tandoor"
           reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
           reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "tandoor"
+  - target:
+      kind: Secret
+      name: pg-role-squirrel
+    patch: |-
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: pg-role-squirrel
+        annotations:
+          reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+          reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "campfire"
+          reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
+          reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "campfire"
