@@ -88,6 +88,29 @@ alerting:
 # 336h = 14 days. cert-manager renews at 30 days remaining, so crossing this
 # means renewal has been failing for a fortnight.
 endpoints:
+  # Squirrel is checked on its manifest rather than on its front door, and the
+  # difference matters. The screen sits behind authentik, so GET / answers 302
+  # from the outpost whether or not squirrel is running — a check that passes
+  # while the app is down is worse than no check. The manifest is served by
+  # squirrel itself, outside the identity guard (a browser fetches it without
+  # cookies), so a 200 with the app's own name in the body proves the whole
+  # path: ingress, service, pod, handler.
+  #
+  # What it does not prove is Postgres. /healthz moved behind authentik with
+  # the root move in v0.10.0, so there is no unauthenticated route that reads
+  # the database — and adding one to satisfy a monitor would be widening the
+  # surface for the monitor's convenience. A database that cannot be reached
+  # shows up on the screen, in words, which is where it is meant to.
+  - name: squirrel
+    group: homelab
+    url: "https://squirrel.ronaldlokers.nl/manifest.webmanifest"
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].name == Squirrel"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+    alerts:
+      - type: custom
   - name: commafeed
     group: homelab
     url: "https://commafeed.ronaldlokers.nl"
