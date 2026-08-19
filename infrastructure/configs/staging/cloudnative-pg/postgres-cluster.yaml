@@ -26,6 +26,15 @@ spec:
         login: true
         passwordSecret:
           name: pg-role-commafeed
+      # The staging pile. Squirrel creates its own schema — migrations are
+      # embedded in the binary and applied at boot — so it must own its
+      # database from the start, which means the role has to exist before the
+      # Database claim can name it as owner.
+      - name: squirrel
+        ensure: present
+        login: true
+        passwordSecret:
+          name: pg-role-squirrel
       - name: linkding
         ensure: present
         login: true
