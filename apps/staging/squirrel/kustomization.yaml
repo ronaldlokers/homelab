@@ -41,4 +41,4 @@ patches:
 # see a change before it is tagged.
 images:
   - name: ghcr.io/ronaldlokers/squirrel
-    newTag: v0.9.2
+    newTag: v0.9.3
