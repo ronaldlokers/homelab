@@ -9,6 +9,9 @@ resources:
   # The screen's own router, so the presence webhook keeps a chain without
   # authentik in it — see the comment at the top of the file.
   - ingress-pile.yaml
+  # The assets and the manifest, without the identity check — a browser fetches
+  # both without cookies, so behind it an installed app has no icon at all.
+  - ingress-assets.yaml
   # In the authentik namespace, because an Ingress backend is namespace-local.
   # It is the way back from the login redirect.
   - ingress-outpost.yaml
