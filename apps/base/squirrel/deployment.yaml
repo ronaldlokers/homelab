@@ -123,6 +123,40 @@ spec:
             # identity it saw in its log.
             - name: WEB_IDENTITY
               value: ronaldlokers
+            # Web Push, and the only thing squirrel will ever interrupt me
+            # for: "leave about 14:10" has one useful minute, and a Campfire
+            # notification noticed at 14:40 is worse than none because it
+            # teaches me not to trust the next one. Everything else it says —
+            # the nudge, the evening message — is a suggestion, and a
+            # suggestion that waits is doing its job.
+            #
+            # The public key is meant to be handed to every browser that
+            # subscribes, so it is a plain value like WEB_IDENTITY above rather
+            # than a secret. It has to match the private half in
+            # squirrel-push exactly: a mismatched pair is not a startup error,
+            # it is every push being refused by the push service weeks later.
+            - name: VAPID_PUBLIC_KEY
+              value: BPSmoA-FOxemmpG78Aq66XOze8b10jqxV5ik0ymm48QbEORt3ekQMmk2L_KP9hHNai3WYjjquCrRZkkl_huccxk
+            # An address the push service is entitled to complain to. Part of
+            # RFC 8292 rather than a courtesy — services reject a token without
+            # one — and it reaches Google and Mozilla by design, so it is not a
+            # secret either.
+            - name: PUSH_CONTACT
+              value: mailto:ronald@lokers.email
+            # optional: true for the same reason PRESENCE_SECRET has it, and
+            # with a better failure: the binary requires all three settings
+            # before it will push at all, and the screen requires all three
+            # before it will even offer to subscribe. A missing Secret
+            # therefore costs the leave-by push and nothing else — the same
+            # warning still reaches the Campfire room, which is the channel
+            # that always works — and the browser is never asked for a
+            # permission that would be spent on silence.
+            - name: VAPID_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: squirrel-push
+                  key: VAPID_PRIVATE_KEY
+                  optional: true
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

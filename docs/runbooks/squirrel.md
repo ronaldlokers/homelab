@@ -317,6 +317,76 @@ says, which is **08:00 by default**: v0.3.1 does not know the name
 `EVENING_AT`, so the 19:00 set here stops applying. Set `DIGEST_AT` explicitly
 if a morning digest is not what you want.
 
+## Telling me when to leave
+
+**New in the executive-function release.** Squirrel can hold a time the world
+imposed — `at 14:30 dentist, 20 minutes away` — and says one thing at the
+moment leaving matters. That message goes to the Campfire room **and** to the
+browser as a Web Push notification.
+
+It is the only thing this product ever pushes. Everything else it says is a
+suggestion, and a suggestion that waits is doing its job; a leave-by warning
+has one useful minute, and one noticed at 14:40 is worse than none because it
+teaches you not to trust the next one.
+
+### The three settings, and why only one is a secret
+
+| Setting | Where | Why |
+| --- | --- | --- |
+| `VAPID_PUBLIC_KEY` | plain value on the Deployment | It is handed to every browser that subscribes. Publishing it is what it is for. |
+| `PUSH_CONTACT` | plain value on the Deployment | An address the push service may complain to. It reaches Google and Mozilla by design. |
+| `VAPID_PRIVATE_KEY` | `apps/production/squirrel/squirrel-push-secret.yaml` | Signs the tokens. Anyone holding it can push to any browser subscribed to this key. |
+
+```bash
+sops -d apps/production/squirrel/squirrel-push-secret.yaml
+```
+
+The public and private halves must be one pair. A mismatch is not a startup
+error — the pod comes up perfectly and every push is refused by the push
+service, which is a failure you find weeks later, from a warning that never
+arrived.
+
+**All three or nothing.** The binary refuses to push unless all three are set,
+and the screen refuses to *offer* to subscribe unless all three are set. That
+second check is the one worth knowing about: a public key on its own would draw
+the button, spend a notification permission, and store a subscription nothing
+can ever send to. `VAPID_PRIVATE_KEY` is `optional: true`, so a missing Secret
+costs the push and nothing else — the same warning still reaches the room.
+
+### Minting a pair
+
+Any P-256 generator will do; the values are base64url without padding, the
+public one an uncompressed point (87 characters) and the private one the raw
+scalar (43 characters). Before committing, check they belong together —
+deriving the public point from the private scalar must reproduce the public key
+exactly.
+
+Rotating costs the subscriptions and nothing else. A browser whose server key
+has changed is refused, and every browser re-subscribes on its next visit to
+the screen; nothing about a subscription is worth keeping. Reloader restarts
+the pod on the change, which matters: the old key would otherwise keep signing.
+
+### When no notification arrives
+
+In order, because the cheap checks rule out most of it:
+
+1. **Was it ever offered?** The screen shows *tell me when to leave* under the
+   slot only while the browser has not answered the permission question. If the
+   line is absent and notifications are not granted, the permission was denied
+   once — that is a browser setting, not a Squirrel one, and it has to be
+   cleared there.
+2. **Did the room get the message?** If Campfire has it and the phone does not,
+   the fault is in push. If neither has it, the moment never came due — check
+   the window, which opens one "get ready" before leaving and closes when the
+   thing starts.
+3. **Is the Secret mounted?** `optional: true` means a missing one is silent.
+   `kubectl -n campfire describe pod -l app=squirrel | grep -i vapid` shows
+   whether it resolved.
+4. **Look for a refusal.** The pod logs `push` with the push service's host and
+   the status. A 403 is almost always a mismatched pair or a stale key after a
+   rotation without a restart; a 404 or 410 retires that browser's
+   subscription, which is normal and self-healing.
+
 ## The pile
 
 **New in v0.5.0.** Notes stopped being write-only: they have a lifecycle now,
