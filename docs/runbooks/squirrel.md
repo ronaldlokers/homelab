@@ -32,6 +32,33 @@ retry a failed webhook delivery**. A message dropped at the door is gone. So:
   `/healthz` answers 503 forever, and the pod never goes ready. It never
   receives a webhook and nothing in the room says so.
 
+### Two volumes, and only one of them is in flight
+
+`squirrel-spool` is empty in steady state. Files exist in it for under a second
+between arriving and being drained; what persists is `quarantine/`, holding
+captures Postgres refused for a reason retrying will not fix.
+
+`squirrel-photos` is the opposite. Added 20 August 2026, it holds every
+photograph ever taken on the screen, forever, and **Postgres holds only the
+filename**. It is the first thing in this deployment whose loss is not
+recoverable from the database.
+
+**So a Postgres restore alone no longer restores Squirrel.** Restore the
+database without the photo volume and the pile comes back with rows pointing at
+files that are not there — notes rendering a broken picture, which is a worse
+thing to find than a missing one, because it looks like corruption rather than
+absence.
+
+Both claims carry `recurring-job.longhorn.io/backup-daily` and
+`snapshot-daily`, so Longhorn covers them without anything further being set
+up. What this section exists to say is that **a restore has to take all three
+— the database, the spool, and the photographs** — and that the photo volume is
+the one where "we can rebuild it from Postgres" stops being true.
+
+Staging's photo volume is `local-path` and is *not* backed up. That is
+deliberate: a photograph taken on the staging pile is a test photograph, and
+somewhere to lose things is what staging is for.
+
 ## Step 1 — create the bot in Campfire
 
 In Campfire, as an administrator, create a bot user named `squirrel` and set

@@ -16,6 +16,12 @@ spec:
             - $patch: replace
             - name: SPOOL_DIR
               value: /var/spool/squirrel
+            # The camera, here too. The env list is replaced rather than
+            # merged, so anything the base adds has to be repeated — and a
+            # staging pile with no camera would be the one place you cannot try
+            # the feature before tagging it.
+            - name: PHOTO_DIR
+              value: /var/lib/squirrel/photos
             - name: OWNER_HANDLE
               value: ronald
             # No transports at all. Staging has no Campfire, and an empty list
