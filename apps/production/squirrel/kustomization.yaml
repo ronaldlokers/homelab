@@ -20,6 +20,7 @@ resources:
   # reads PRESENCE_SECRET with optional: true, so losing this Secret costs the
   # presence trigger and nothing else.
   - squirrel-presence-secret.yaml
+  - squirrel-push-secret.yaml
 
 patches:
   - path: deployment-postgres-patch.yaml
