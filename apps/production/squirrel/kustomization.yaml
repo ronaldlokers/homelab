@@ -21,6 +21,7 @@ resources:
   # presence trigger and nothing else.
   - squirrel-presence-secret.yaml
   - squirrel-push-secret.yaml
+  - squirrel-openai-secret.yaml
 
 patches:
   - path: deployment-postgres-patch.yaml
