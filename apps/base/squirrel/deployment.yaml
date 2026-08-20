@@ -157,6 +157,22 @@ spec:
                   name: squirrel-push
                   key: VAPID_PRIVATE_KEY
                   optional: true
+            # The coach. optional: true for the same reason every other
+            # credential here has it, and with the gentlest failure of the
+            # four: with no key the binary never builds a coach at all, so
+            # PickNow() and UnstuckFor() answer instead — the deterministic
+            # floor they were kept as. Nothing about the product stops
+            # working; it stops being clever.
+            #
+            # This is the only credential here that can spend money. Squirrel's
+            # own monthly counter guards against its own bugs; set a hard spend
+            # limit on the OpenAI project to guard against everything else.
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: squirrel-openai
+                  key: OPENAI_API_KEY
+                  optional: true
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
