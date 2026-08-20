@@ -54,6 +54,17 @@ patches:
         path: /spec/storageClassName
         value: longhorn
 
+  # The same, and for the same reason. Longhorn matters more here than for the
+  # spool: a photograph exists nowhere but this volume, and local-path is not
+  # backed up.
+  - target:
+      kind: PersistentVolumeClaim
+      name: squirrel-photos
+    patch: |
+      - op: add
+        path: /spec/storageClassName
+        value: longhorn
+
 # Squirrel is not a stringer workload and is versioned on its own cadence, so
 # it is pinned here rather than by the shared stringer image tag below in
 # apps/production/kustomization.yaml. Renovate reads this through its kustomize

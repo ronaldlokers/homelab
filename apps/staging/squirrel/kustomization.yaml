@@ -37,6 +37,17 @@ patches:
         path: /spec/storageClassName
         value: local-path
 
+  # local-path here too, and it is not backed up — which is right for staging.
+  # A photograph taken on the staging pile is a test photograph, and losing one
+  # is the point of having somewhere to lose things.
+  - target:
+      kind: PersistentVolumeClaim
+      name: squirrel-photos
+    patch: |
+      - op: add
+        path: /spec/storageClassName
+        value: local-path
+
 # Staging follows main rather than a release tag: the point of this pile is to
 # see a change before it is tagged.
 images:

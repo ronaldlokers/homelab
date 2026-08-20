@@ -43,6 +43,11 @@ spec:
           env:
             - name: SPOOL_DIR
               value: /var/spool/squirrel
+            # Where photographs are kept. Unset would be a supported state —
+            # the screen simply never offers a camera — so this is the whole of
+            # turning the feature on, alongside the volume below.
+            - name: PHOTO_DIR
+              value: /var/lib/squirrel/photos
             # Seeds the `people` row every boot. Identities bind to it, so that
             # a second transport later resolves to the same person rather than
             # to a second one.
@@ -208,7 +213,16 @@ spec:
           volumeMounts:
             - name: spool
               mountPath: /var/spool/squirrel
+            # Its own volume rather than a directory inside the spool's: the
+            # spool is empty in steady state and exists to be drained, and
+            # photographs are kept forever. Two lifetimes, two claims, and a
+            # backup policy that can differ later without moving files.
+            - name: photos
+              mountPath: /var/lib/squirrel/photos
       volumes:
         - name: spool
           persistentVolumeClaim:
             claimName: squirrel-spool
+        - name: photos
+          persistentVolumeClaim:
+            claimName: squirrel-photos
