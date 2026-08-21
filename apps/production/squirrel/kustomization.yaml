@@ -72,4 +72,4 @@ patches:
 # image is actually pushed, so a release whose build failed cannot be proposed.
 images:
   - name: ghcr.io/ronaldlokers/squirrel
-    newTag: v0.17.0
+    newTag: v0.16.2
