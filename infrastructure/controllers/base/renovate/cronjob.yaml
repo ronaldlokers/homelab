@@ -30,7 +30,7 @@ spec:
               # tag made one upstream image the whole cluster. The estate has
               # already seen a real upstream integrity failure — Longhorn's
               # published chart index digest not matching its artifact (#153).
-              image: renovate/renovate:44.14.9@sha256:bc72b76affc30d9ca529f5f126c596c851d5df74fbe22087147326432413af0c
+              image: renovate/renovate:44.39.2@sha256:e6b93e709ca64495ab9307350b260064276ee02d15c6886387fd2d42c926623b
               args:
                 - ronaldlokers/homelab
               envFrom:
