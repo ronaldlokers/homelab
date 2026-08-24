@@ -32,7 +32,7 @@ spec:
               app: cloudflared
       containers:
         - name: cloudflared
-          image: cloudflare/cloudflared:2026.7.3
+          image: cloudflare/cloudflared:2026.8.2
           args:
             - tunnel
             - --no-autoupdate
