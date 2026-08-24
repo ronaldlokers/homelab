@@ -107,9 +107,18 @@ spec:
           cpu: 100m
           memory: 512Mi
 
+    # 384Mi rather than the 512Mi both components started with, because the
+    # worker has never come close to it. Peak working set over seven days is
+    # 360Mi in production and it sits at 276Mi in staging, so the old request
+    # reserved ~150Mi on a node that nothing would ever use. Requests are a
+    # scheduling reservation, not a cap — a busier worker still grows past this
+    # number, it just has to be scheduled somewhere that has the room.
+    #
+    # The server moved the other way and is sized in the production overlay,
+    # since staging's server carries no load worth reserving for.
     worker:
       replicas: 1
       resources:
         requests:
           cpu: 100m
-          memory: 512Mi
+          memory: 384Mi
