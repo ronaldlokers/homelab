@@ -36,6 +36,12 @@ spec:
               value: "23:59"
             - name: DIGEST_TZ
               value: "Europe/Amsterdam"
+            # Repeated from the base because this list is replaced, not merged.
+            # Staging has no Campfire and so no `!at`, but the screen can still
+            # keep a fixed point through the coach, and `startOfDay` reads the
+            # process clock either way. See the base for what was wrong.
+            - name: TZ
+              value: "Europe/Amsterdam"
             - name: WEB_IDENTITY
               value: ronaldlokers
             - name: POSTGRES_SERVER
