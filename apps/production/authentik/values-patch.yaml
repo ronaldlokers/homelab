@@ -5,33 +5,9 @@ metadata:
 spec:
   values:
     # Nothing under `authentik:` — existingSecret makes the chart ignore it.
-    # Blueprints are mounted where authentik watches and re-applies hourly.
-    global:
-      # Via chart values: the Deployment is created by Helm, so a kustomize
-      # patch targeting Deployment matches nothing.
-      deploymentAnnotations:
-        reloader.stakater.com/auto: "true"
-      volumes:
-        - name: blueprints
-          secret:
-            # A Secret, not a ConfigMap: it carries the OIDC client secrets so
-            # that recreating authentik does not invalidate every client.
-            secretName: authentik-blueprints
-        # Session policy, which carries no secrets and so is not in the
-        # Secret above. authentik walks /blueprints with rglob("**/*.yaml") and
-        # watches it recursively, so a second directory is discovered exactly
-        # like the first.
-        - name: blueprint-session
-          configMap:
-            name: authentik-blueprint-session
-      volumeMounts:
-        - name: blueprints
-          mountPath: /blueprints/custom
-          readOnly: true
-        - name: blueprint-session
-          mountPath: /blueprints/session
-          readOnly: true
-
+    # Reloader and the blueprint mounts live in the base release, because both
+    # clusters want them identically.
+    #
     # The chart exposes no metrics by default, and the
     # `release: kube-prometheus-stack` label is what makes Prometheus select
     # the ServiceMonitor — without it the object exists and is ignored.
