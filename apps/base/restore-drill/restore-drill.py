@@ -221,7 +221,7 @@ def destroy(ctx, name):
             check=False, timeout=300)
 
 
-def why_stuck(ctx, name):
+def why_stuck(ctx, name, phase=""):
     """What the restore was complaining about, before the evidence is deleted.
 
     The first failure of this drill reported only "never reached a healthy
@@ -229,11 +229,24 @@ def why_stuck(ctx, name):
     answer was in the recovery pod's log — a FATAL two lines long — so the
     weekly record now carries it and nobody has to reproduce the failure to
     find out what it was.
+
+    Both drills of August 2026 then came back with the fallback text and
+    nothing else, on four separate restores. A log scan only answers when the
+    recovery *complained*: one that is merely slow logs nothing alarming, and
+    one whose pod has not been scheduled yet has no log to read at all. So the
+    scan is now the first answer rather than the only one. Everything below it
+    — the phase the operator was reporting when the clock ran out, the
+    Cluster's own unmet conditions, events on the Cluster, the pod's waiting
+    reason — was already there each week and thrown away.
+
+    Ordered most specific first: an accusation beats a location, and a
+    location beats silence.
     """
     pods = kubectl(ctx, "get", "pods", "-n", "database",
                    "-l", f"cnpg.io/cluster={name}",
-                   "-o", "jsonpath={.items[*].metadata.name}", check=False)
-    for pod in pods.split():
+                   "-o", "jsonpath={.items[*].metadata.name}", check=False).split()
+
+    for pod in pods:
         log = kubectl(ctx, "logs", "-n", "database", pod, "--all-containers",
                       "--tail=200", check=False, timeout=60)
         for line in reversed(log.splitlines()):
@@ -250,22 +263,73 @@ def why_stuck(ctx, name):
                 return message[:300]
             if error and "restore" in message.lower():
                 return f"{message}: {error}"[:300]
+
+    # Nothing accused anything. Say where it had got to, which for a WAL replay
+    # that simply needs longer than READY_TIMEOUT is the whole answer.
+    where = [f"operator phase {phase!r}"] if phase else []
+
+    conditions = kubectl(ctx, "get", "cluster", name, "-n", "database",
+                         "-o", "jsonpath={.status.conditions}", check=False)
+    try:
+        for condition in json.loads(conditions or "[]"):
+            # ContinuousArchiving is False on every scratch cluster by design —
+            # they carry no backup stanza, which is the one thing in this drill
+            # that must not change. Reporting it every week would train the
+            # reader to skip the line that matters.
+            if condition.get("status") == "True" or condition.get("type") == "ContinuousArchiving":
+                continue
+            where.append(f"{condition.get('type')} not met"
+                         f" ({condition.get('reason')}: {condition.get('message')})")
+    except json.JSONDecodeError:
+        pass
+
+    # Events catch what neither the log nor the conditions can: a pod that is
+    # unschedulable, an image that will not pull, a Longhorn volume that never
+    # binds. None of those produce a postgres log line, and the first two mean
+    # there is no pod to read one from.
+    events = kubectl(ctx, "get", "events", "-n", "database",
+                     "--field-selector", f"involvedObject.name={name}",
+                     "--sort-by=.lastTimestamp",
+                     "-o", "jsonpath={range .items[*]}{.reason}: {.message}\\n{end}",
+                     check=False, timeout=60)
+    recent = [line for line in events.splitlines() if line.strip()]
+    if recent:
+        where.append(f"last event {recent[-1].strip()}")
+
+    for pod in pods:
+        waiting = kubectl(ctx, "get", "pod", pod, "-n", "database", "-o",
+                          "jsonpath={.status.containerStatuses[*].state.waiting.reason}"
+                          "{.status.initContainerStatuses[*].state.waiting.reason}",
+                          check=False).strip()
+        if waiting:
+            where.append(f"{pod} waiting: {waiting}")
+
+    if where:
+        return "; ".join(where)[:300]
+    if not pods:
+        return "no recovery pod was ever created"
     return "nothing in the recovery pod's log said why"
 
 
 def wait_ready(ctx, name, deadline):
-    """Poll until the operator says the cluster is up, or give up."""
+    """Poll until the operator says the cluster is up, or give up.
+
+    Returns (ready, last_phase). The phase is half the diagnosis when the
+    deadline is what ended it — "Creating a new replica" and "Setting up
+    primary" are different failures — and the caller had no way to see it.
+    """
+    phase = ""
     while datetime.now(timezone.utc) < deadline:
         out = kubectl(ctx, "get", "cluster", name, "-n", "database",
                       "-o", "jsonpath={.status.phase}", check=False)
-        phase = out.strip()
+        phase = out.strip() or phase
         if phase == "Cluster in healthy state":
-            return True
+            return True, phase
         if "fail" in phase.lower():
             print(f"       operator reports: {phase}")
-            return False
+            return False, phase
         time.sleep(POLL_SECONDS)
-    return False
+    return False, phase
 
 
 def query(ctx, name, database, sql):
@@ -304,9 +368,11 @@ def drill(ctx, source, spec, origin, findings):
     destroy(ctx, name)
     started = datetime.now(timezone.utc)
     create(ctx, drill_manifest(spec, origin, name))
-    if not wait_ready(ctx, name, started + READY_TIMEOUT):
+    ready, phase = wait_ready(ctx, name, started + READY_TIMEOUT)
+    if not ready:
         findings.append(f"{source}: restore never reached a healthy state within "
-                        f"{int(READY_TIMEOUT.total_seconds() / 60)}m — {why_stuck(ctx, name)}")
+                        f"{int(READY_TIMEOUT.total_seconds() / 60)}m — "
+                        f"{why_stuck(ctx, name, phase)}")
         destroy(ctx, name)
         return False
 
@@ -340,9 +406,10 @@ def drill(ctx, source, spec, origin, findings):
     target = datetime.now(timezone.utc) - PITR_BACK
     started = datetime.now(timezone.utc)
     create(ctx, drill_manifest(spec, origin, name, target_time=target))
-    if not wait_ready(ctx, name, started + READY_TIMEOUT):
+    ready, phase = wait_ready(ctx, name, started + READY_TIMEOUT)
+    if not ready:
         findings.append(f"{source}: point-in-time restore to {target:%H:%M} never "
-                        f"reached a healthy state — {why_stuck(ctx, name)}")
+                        f"reached a healthy state — {why_stuck(ctx, name, phase)}")
         destroy(ctx, name)
         return False
 
