@@ -9,6 +9,8 @@ resources:
   - ../../base/authentik
   - authentik-secret.yaml
   - blueprints.yaml
+  # Session policy, in plaintext because it is policy and not a secret.
+  - blueprint-session.yaml
   - ingress.yaml
 patches:
   # Opt in to Reloader: roll this workload when a Secret it reads changes.
