@@ -115,3 +115,50 @@ spec:
           labels:
             severity: critical
             component: database
+
+    # max_connections is a hard wall, not a soft one: past it Postgres refuses
+    # new connections outright and every app on the shared cluster starts
+    # failing at once, which is a worse morning than any single app being down.
+    # Nothing watched the number until now.
+    #
+    # It is worth watching because the split changed. authentik dropped Redis in
+    # 2025.10 and moved sessions, caching and IPC into Postgres, and it now
+    # holds 18 of the 36 backends on the shared primary on its own — half the
+    # cluster's connections for one app, against max_connections of 100. The
+    # headroom is real today and the trend is the thing to see coming.
+    - name: postgres_connection_alerts
+      rules:
+        # Read from the server's own setting rather than a hardcoded 100, so a
+        # cluster that raises max_connections does not silently keep alerting
+        # at the old number. `on (pod)` because both metrics come from the same
+        # per-instance exporter and carry the same label set.
+        - alert: PostgreSQLConnectionsSaturating
+          annotations:
+            summary: "{{ $labels.pod }} is using more than 80% of max_connections"
+            description: "Instance {{ $labels.pod }} in cluster {{ $labels.cnpg_io_cluster }} holds more than 80% of its configured max_connections. Find the hungry database with: sum by (datname) (cnpg_backends_total{cnpg_io_cluster=\"{{ $labels.cnpg_io_cluster }}\"}). Either the app is leaking connections or the cluster needs a higher max_connections or a pooler."
+          expr: |
+            sum by (cnpg_io_cluster, pod) (cnpg_backends_total)
+              / on (pod) group_left()
+            max by (pod) (cnpg_pg_settings_setting{name="max_connections"})
+            > 0.8
+          for: 15m
+          labels:
+            severity: warning
+            component: database
+
+        # Separate from the warning rather than a second threshold on it: at
+        # this point connections are being refused, so the useful signal is
+        # "now", not "for the next quarter of an hour".
+        - alert: PostgreSQLConnectionsExhausted
+          annotations:
+            summary: "{{ $labels.pod }} is out of connection slots"
+            description: "Instance {{ $labels.pod }} in cluster {{ $labels.cnpg_io_cluster }} is above 95% of max_connections, so Postgres is refusing or about to refuse new connections and every app on this cluster is affected. Restarting the app holding the most backends frees them immediately; raising max_connections needs a rolling restart of the cluster."
+          expr: |
+            sum by (cnpg_io_cluster, pod) (cnpg_backends_total)
+              / on (pod) group_left()
+            max by (pod) (cnpg_pg_settings_setting{name="max_connections"})
+            > 0.95
+          for: 2m
+          labels:
+            severity: critical
+            component: database

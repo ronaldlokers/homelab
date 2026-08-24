@@ -88,6 +88,28 @@ alerting:
 # 336h = 14 days. cert-manager renews at 30 days remaining, so crossing this
 # means renewal has been failing for a fortnight.
 endpoints:
+  # First, because everything under it depends on it: authentik down means
+  # Grafana, Immich, Linkding, Homepage and Squirrel all refuse to log anyone
+  # in, and until now the dashboard stayed green through it. Staging has
+  # checked authentik since it was deployed; production never got the entry.
+  #
+  # /-/health/ready/ rather than the /-/health/live/ staging uses, and rather
+  # than /. Ready reads the database, so it fails when authentik is running but
+  # cannot reach Postgres — the state in which logins are broken and the
+  # process is perfectly happy. GET / would prove least of all: it answers 302
+  # to the login flow whether or not anything behind it works.
+  #
+  # Gatus deliberately sits outside SSO, so this check is readable during the
+  # outage it is reporting.
+  - name: authentik
+    group: homelab
+    url: "https://authentik.ronaldlokers.nl/-/health/ready/"
+    interval: 60s
+    conditions:
+      - "[STATUS] < 400"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+    alerts:
+      - type: custom
   # Squirrel is checked on its manifest rather than on its front door, and the
   # difference matters. The screen sits behind authentik, so GET / answers 302
   # from the outpost whether or not squirrel is running — a check that passes
