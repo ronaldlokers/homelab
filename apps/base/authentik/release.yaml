@@ -65,6 +65,41 @@ spec:
       existingSecret:
         secretName: authentik-secret
 
+    global:
+      # Reloader opt-in, and it has to be a chart value rather than a kustomize
+      # patch: the Deployments are created by Helm, so a patch targeting
+      # `kind: Deployment` in an overlay matches nothing at all. Without the
+      # annotation a SOPS secret rotation applies cleanly and the pods keep
+      # serving the old value, because env and envFrom are injected only at pod
+      # creation.
+      deploymentAnnotations:
+        reloader.stakater.com/auto: "true"
+
+      # Blueprints are mounted where authentik watches and re-applies hourly,
+      # so what is in git is what is running rather than something clicked once
+      # that exists only in the database. Both clusters mount both directories;
+      # each overlay supplies its own `authentik-blueprints`.
+      volumes:
+        - name: blueprints
+          secret:
+            # A Secret, not a ConfigMap: it carries the OIDC client secrets so
+            # that recreating authentik does not invalidate every client.
+            secretName: authentik-blueprints
+        # Session policy, which carries no secrets and so is not in the Secret
+        # above. authentik walks /blueprints with rglob("**/*.yaml") and
+        # watches it recursively, so a second directory is discovered exactly
+        # like the first.
+        - name: blueprint-session
+          configMap:
+            name: authentik-blueprint-session
+      volumeMounts:
+        - name: blueprints
+          mountPath: /blueprints/custom
+          readOnly: true
+        - name: blueprint-session
+          mountPath: /blueprints/session
+          readOnly: true
+
     server:
       replicas: 1
       resources:
@@ -72,9 +107,18 @@ spec:
           cpu: 100m
           memory: 512Mi
 
+    # 384Mi rather than the 512Mi both components started with, because the
+    # worker has never come close to it. Peak working set over seven days is
+    # 360Mi in production and it sits at 276Mi in staging, so the old request
+    # reserved ~150Mi on a node that nothing would ever use. Requests are a
+    # scheduling reservation, not a cap — a busier worker still grows past this
+    # number, it just has to be scheduled somewhere that has the room.
+    #
+    # The server moved the other way and is sized in the production overlay,
+    # since staging's server carries no load worth reserving for.
     worker:
       replicas: 1
       resources:
         requests:
           cpu: 100m
-          memory: 512Mi
+          memory: 384Mi

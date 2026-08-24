@@ -21,7 +21,9 @@
 #
 # This patches the shared stage, so it applies to every application behind
 # authentik: Grafana, Immich, Linkding, Homepage and Squirrel. One person, one
-# cluster, one session policy.
+# session policy — which is why it sits in the base rather than in an overlay.
+# Staging carries it too, so the next change to how long a session lasts can be
+# lived with somewhere before it reaches the login screen that matters.
 #
 # `state: present` rather than `created`: this stage already exists, and the
 # intent is to keep it matching what is written here even if something else
