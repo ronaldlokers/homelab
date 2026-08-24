@@ -65,7 +65,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install flate
-        uses: home-operations/flate/action@v0.4.14
+        uses: home-operations/flate/action@v0.6.0
         with:
           cache: true
           # The action defaults `base` to the repo's default branch, which
