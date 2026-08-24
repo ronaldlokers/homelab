@@ -1,0 +1,48 @@
+# How long a session lasts, and the tickbox that extends it.
+#
+# A ConfigMap rather than a member of `authentik-blueprints`, and the split is
+# the point: that Secret is SOPS-encrypted because it carries OIDC client
+# secrets, and this carries none. Session policy is a thing you want to be able
+# to read in a pull request without decrypting anything, and a thing worth
+# seeing change in a diff.
+#
+# `default-authentication-login` is created by authentik's own
+# `/blueprints/default/flow-default-authentication-flow.yaml` with no `attrs`
+# at all, so it runs on model defaults — and the model default for
+# `session_duration` is 0, which the schema defines as "the session lasts until
+# the browser is closed". On an installed web app that means until iOS decides
+# to evict it, which it does in the background and without warning. That is the
+# whole of why signing in felt constant.
+#
+# The session stays short deliberately. What changes is that there is now a way
+# to say "not on this device again for a while", chosen per login rather than
+# applied to every login by default — `remember_me_offset` of 0 does not merely
+# mean no extension, it means the tickbox is never drawn.
+#
+# This patches the shared stage, so it applies to every application behind
+# authentik: Grafana, Immich, Linkding, Homepage and Squirrel. One person, one
+# cluster, one session policy.
+#
+# `state: present` rather than `created`: this stage already exists, and the
+# intent is to keep it matching what is written here even if something else
+# edits it. authentik re-reads this directory hourly and on change.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authentik-blueprint-session
+  namespace: authentik
+data:
+  session.yaml: |
+    version: 1
+    metadata:
+      name: session policy
+      labels:
+        blueprints.goauthentik.io/instantiate: "true"
+    entries:
+      - model: authentik_stages_user_login.userloginstage
+        state: present
+        identifiers:
+          name: default-authentication-login
+        attrs:
+          # Thirty days if you tick the box, and nothing if you do not.
+          remember_me_offset: days=30
