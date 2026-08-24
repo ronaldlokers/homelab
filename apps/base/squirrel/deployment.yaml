@@ -85,6 +85,27 @@ spec:
             # opened. Until then the pairing reads odder than it is.
             - name: DIGEST_TZ
               value: "Europe/Amsterdam"
+            # The process's own clock, which is a different thing from DIGEST_TZ
+            # and was missing.
+            #
+            # DIGEST_TZ is threaded explicitly into the scheduler, so the 19:00
+            # message and quiet hours were always right. Everything that reads
+            # the process's local time was not: `ParseMoment` builds a fixed
+            # point in `now.Location()`, and with no TZ that is UTC. `!at 04:42`
+            # booked 04:42 UTC — two hours late in summer, one in winter — and
+            # the confirmation rendered in the same wrong zone, so it read back
+            # exactly as it was typed. A fixed point is the one thing this
+            # product holds that you can be late for.
+            #
+            # `startOfDay` has the same root: "not now means today" meant a UTC
+            # day, so a refusal after 02:00 local was forgotten almost at once.
+            #
+            # This is the immediate fix and not the real one. The real one is to
+            # thread the configured location through both, so the behaviour does
+            # not depend on an ambient variable a later manifest can drop. See
+            # ronaldlokers/squirrel#148.
+            - name: TZ
+              value: "Europe/Amsterdam"
             # The presence route, which Home Assistant calls when I get home.
             # It is the only path on this pod reachable from outside the
             # namespace, so it is stated rather than defaulted: the Ingress in
