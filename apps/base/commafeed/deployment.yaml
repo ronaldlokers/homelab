@@ -56,7 +56,7 @@ spec:
               memory: 32Mi
       containers:
         - name: commafeed
-          image: athou/commafeed:7.2.1-postgresql
+          image: athou/commafeed:7.3.2-postgresql
           ports:
             - name: http
               containerPort: 8082
