@@ -14,6 +14,9 @@ resources:
   # staging pile has real authentication rather than a middleware pretending
   # somebody logged in.
   - squirrel-oidc-secret.yaml
+  # The way out to staging's own authentik, which is not the same hop
+  # production makes. See the file.
+  - network-policy-authentik.yaml
 
 patches:
   - path: deployment-staging-patch.yaml

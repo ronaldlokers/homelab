@@ -81,6 +81,40 @@ spec:
       ports:
         - protocol: TCP
           port: 80
+    # authentik, through the real ingress.
+    #
+    # squirrel runs the OIDC flow itself from v0.39.0, which means it makes
+    # server-to-server calls it never made before: discovery, the token
+    # exchange and the JWKS. Forward auth needed none of them — Traefik called
+    # the outpost and squirrel spoke to nobody — so no rule for this has ever
+    # existed, and its absence was invisible until the day it took both
+    # clusters down.
+    #
+    # Through Traefik rather than to authentik's Service, and that is not a
+    # detail. authentik builds every URL in its discovery document from the
+    # host it was asked on: fetched over the cluster Service it answers
+    # `"issuer": "http://localhost:9000/..."` and hands the browser an
+    # authorization endpoint nobody outside can reach. The public hostname has
+    # to be the one asked, so the request goes out through the ingress and
+    # comes back — the same path the browser takes.
+    #
+    # **Port 8443, not 443.** Egress is evaluated against the post-DNAT
+    # destination and Traefik's Service maps 443 -> 8443, so a rule naming 443
+    # never matches and every connection is refused. That is also why the
+    # namespace's allow-internet-egress does not already cover this: it permits
+    # 0.0.0.0/0 on 80 and 443 while excluding 10.0.0.0/8, and the ingress VIP
+    # sits inside that exclusion. See apps/production/gatus, which learned the
+    # same thing on 3 August 2026.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 8443
 ---
 # Campfire's ingress half. The namespace default-denies both directions, so
 # the hop has to be said from both ends — and this is the end that is easy to
