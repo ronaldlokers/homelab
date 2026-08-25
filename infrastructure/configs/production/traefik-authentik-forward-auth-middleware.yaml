@@ -1,5 +1,16 @@
 # Authentik decides who someone is, in front of an app that holds no session.
 #
+# **Nothing uses this as of 25 August 2026, and it is kept on purpose.**
+# Squirrel was its only consumer and now speaks OIDC itself, like linkding,
+# immich, grafana and homepage below — so the paragraph after this one
+# describes a situation that no longer exists in this cluster.
+#
+# It stays because it is the rollback. Putting the middleware back on
+# squirrel-pile is a one-line change and the fastest way to a working screen if
+# the new way in turns out to be wrong; deleting the object would make that a
+# reconstruction instead. Delete it once the OIDC path has carried a few weeks,
+# or leave it as the worked example of a forward-auth in this cluster.
+#
 # The first forward-auth in this cluster. Everything else that uses authentik —
 # linkding, immich, grafana, homepage — speaks OIDC itself and keeps its own
 # session; this middleware is for a workload that deliberately does not. Traefik

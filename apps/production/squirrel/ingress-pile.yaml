@@ -8,22 +8,24 @@
 # So /hooks/home keeps its own object and its own chain, and the screen gets
 # this one.
 #
-# Order in the chain is the whole point:
+# Order in the chain:
 #
-#   https-redirect         — before anything reads a header off a plaintext hop
-#   lan-or-tailnet         — the address check stays the outer layer, so a
-#                            request from outside is refused before it can
-#                            reach a login flow at all
-#   authentik-forward-auth — then, and only then, who is this
+#   https-redirect — before anything travels over a plaintext hop
+#   lan-or-tailnet — the address check, which is now the whole chain
 #
-# The ipAllowList first is not belt-and-braces. The identity arrives as a plain
-# header that squirrel trusts completely, and what makes that safe is that
-# nothing but Traefik can open a socket to the pod (campfire's
-# allow-ingress-from-traefik is the entire ingress rule). Putting authentik in
-# front of the address check would widen the surface to the internet for the
-# sake of a login page that nobody outside can use anyway — and
-# *.ronaldlokers.nl resolves to a private address, so they could not reach it
-# regardless.
+# `authentik-forward-auth` was the third link until 25 August 2026. Squirrel
+# runs the OIDC flow itself from v0.39.0 — it holds a session, sets a cookie
+# and serves /auth — so a forward-auth in front of it would be a second login
+# in front of the first.
+#
+# **The address check stays, and it is doing a different job now.** It used to
+# be what made the identity header trustworthy: the header was a plain string
+# squirrel believed completely, and what made that safe was that nothing but
+# Traefik could open a socket to the pod. A session cookie needs no such
+# arrangement — it is proof on its own. What the rule still buys is that the
+# login page itself is not reachable from the internet, which is worth keeping
+# for the same reason it always was: *.ronaldlokers.nl resolves to a private
+# address, and widening this would be spending reachability on nothing.
 #
 # `lan-or-tailnet` rather than `local-network-only`, because the pile is the
 # one thing here worth reading from a phone that is not at home. It is the
@@ -40,11 +42,16 @@
 # assets, the outpost, the presence hook) keep winning without this one having
 # to know about them.
 #
-# Two paths become reachable from outside that were not before:
-# /transports/campfire and /healthz. Both now sit behind authentik, so an
-# anonymous caller gets a login page rather than a webhook. Campfire delivers
-# in-cluster and never traverses this ingress, and the kubelet's probes are
-# in-cluster too, so nothing that depends on either changes.
+# /transports/campfire and /healthz are reachable through this rule and are no
+# longer behind a forward-auth. Both are inside squirrel's own guard: an
+# unauthenticated GET for a page redirects to /auth and everything else gets a
+# 401 with no body. Campfire delivers in-cluster and never traverses this
+# ingress, and the kubelet's probes are in-cluster too.
+#
+# /auth, /auth/in, /auth/callback and /auth/out are the four routes squirrel
+# leaves outside its own guard, necessarily: somebody with no session has to be
+# able to get one. They match this rule's prefix and need no object of their
+# own.
 #
 # The object is still called squirrel-pile although it is now the whole screen.
 # Renaming it would mean Flux deleting one router and creating another, and the
@@ -55,7 +62,7 @@ metadata:
   name: squirrel-pile
   namespace: campfire
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd,kube-system-lan-or-tailnet@kubernetescrd,kube-system-authentik-forward-auth@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd,kube-system-lan-or-tailnet@kubernetescrd
 spec:
   ingressClassName: traefik
   rules:
