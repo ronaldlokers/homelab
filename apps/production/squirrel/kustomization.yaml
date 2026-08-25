@@ -22,9 +22,15 @@ resources:
   - squirrel-presence-secret.yaml
   - squirrel-push-secret.yaml
   - squirrel-openai-secret.yaml
+  # The OIDC client secret. Not optional like the other three: without it the
+  # binary refuses to boot rather than mounting a screen nobody can sign into.
+  - squirrel-oidc-secret.yaml
 
 patches:
   - path: deployment-postgres-patch.yaml
+  # The way in. Separate from the postgres patch because the two answer
+  # different questions and rotate on different days.
+  - path: deployment-oidc-patch.yaml
 
   # Opt in to Reloader: roll this workload when a mounted Secret changes.
   # Without it a pg-role-squirrel rotation applies cleanly and the pod keeps
@@ -72,4 +78,4 @@ patches:
 # image is actually pushed, so a release whose build failed cannot be proposed.
 images:
   - name: ghcr.io/ronaldlokers/squirrel
-    newTag: v0.38.0
+    newTag: v0.39.1
