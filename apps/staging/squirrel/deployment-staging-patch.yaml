@@ -42,8 +42,74 @@ spec:
             # process clock either way. See the base for what was wrong.
             - name: TZ
               value: "Europe/Amsterdam"
+            # No longer an identity anybody authenticates with. From v0.39.0
+            # it is seeded as a `screen` identity so a capture already sitting
+            # in the spool at deploy time still resolves to its person when the
+            # drain picks it up, and it is still what decides whether the
+            # screen is mounted at all.
             - name: WEB_IDENTITY
               value: ronaldlokers
+            # The way in. Staging runs the flow against staging's own
+            # authentik, not production's: a staging pod holding a credential
+            # for the production identity provider would make the two clusters
+            # one blast radius for the sake of a login page.
+            #
+            # That means staging authentik needs its own squirrel application,
+            # its own group and an account in it. Before v0.39.0 it needed none
+            # of that — the staging pile had no authentication at all, only a
+            # middleware injecting the header the production forward-auth would
+            # have proved. That middleware is now useless and is removed.
+            #
+            # The account is `ronaldlokers`, the same name production uses,
+            # and it is a different account: staging authentik has its own user
+            # database. It was still called `akadmin` — staging's default admin,
+            # never renamed because until now nothing ever authenticated
+            # against staging authentik at all — and was renamed on 25 August
+            # 2026 when this went in.
+            #
+            # Membership in `squirrel-users` is not declared in the blueprint,
+            # only the group: admitting somebody is a click rather than a
+            # commit, and a member added by hand would otherwise be removed the
+            # next time the blueprint reapplies.
+            - name: WEB_OIDC_ISSUER
+              value: https://authentik.staging.ronaldlokers.nl/application/o/squirrel/
+            - name: WEB_OIDC_CLIENT_ID
+              value: squirrel
+            - name: WEB_OIDC_REDIRECT_URL
+              value: https://squirrel.staging.ronaldlokers.nl/auth/callback
+            - name: WEB_REQUIRED_GROUP
+              value: squirrel-users
+            # Staging needs this as much as production does, for a reason that
+            # is easy to miss: without it the first login would create a
+            # *second* person, while the seeded notes stayed on the first — the
+            # one WEB_IDENTITY and OWNER_HANDLE make at boot. The screen would
+            # come up empty and correct, which is the worst kind of wrong.
+            #
+            # This uuid survived the account being renamed from `akadmin`,
+            # which is the whole argument for the sub being a uuid rather than
+            # a username. It would not survive staging authentik being rebuilt
+            # from a blank database: the bootstrap would make a fresh `akadmin`
+            # with a fresh uuid, and this value would need reading again.
+            #
+            # The seeding recipe in docs/runbooks/squirrel.md inserts against
+            # `from people limit 1`. This is what keeps that recipe pointing at
+            # the pile you are looking at.
+            #
+            #   kubectl --context=staging -n authentik exec deploy/authentik-server -- \
+            #     ak shell -c "from authentik.core.models import User; \
+            #     print(User.objects.get(username='"'"'ronaldlokers'"'"').uuid)"
+            - name: WEB_OIDC_SUB
+              value: 16818c0f-26f0-4040-84a0-292f84e31e7f
+            - name: WEB_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: squirrel-oidc
+                  key: WEB_OIDC_CLIENT_SECRET
+            # A guest ceiling here too. Staging has no OPENAI_API_KEY, so
+            # nothing can spend either way — it is stated so the two clusters
+            # differ in one place rather than two.
+            - name: COACH_BUDGET_GUEST_EUR
+              value: "1"
             - name: POSTGRES_SERVER
               value: "postgres-cluster-rw.database.svc.cluster.local"
             - name: POSTGRES_PORT
