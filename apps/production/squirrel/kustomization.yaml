@@ -9,9 +9,13 @@ resources:
   # The screen's own router, so the presence webhook keeps a chain without
   # authentik in it — see the comment at the top of the file.
   - ingress-pile.yaml
-  # The assets and the manifest, without the identity check — a browser fetches
-  # both without cookies, so behind it an installed app has no icon at all.
-  - ingress-assets.yaml
+  # ingress-assets.yaml was here until 26 August 2026. It served /static/,
+  # /manifest.webmanifest and /sw.js around the forward-auth middleware,
+  # because a browser fetches a manifest and its icons without cookies and got
+  # a login page instead. squirrel leaves those three routes outside its own
+  # guard, so with the middleware gone the screen's own router answers them
+  # correctly. The router-priority lesson that object taught moved into
+  # ingress.yaml, which still needs it.
   # ingress-outpost.yaml was here until 25 August 2026. It routed
   # /outpost.goauthentik.io/ on squirrel's hostname to authentik-server,
   # because that is where authentik's forward-auth sent a browser back to. With
