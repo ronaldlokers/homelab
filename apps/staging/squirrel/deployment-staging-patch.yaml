@@ -71,8 +71,10 @@ spec:
             # only the group: admitting somebody is a click rather than a
             # commit, and a member added by hand would otherwise be removed the
             # next time the blueprint reapplies.
+            # The last path segment is the application slug from the
+            # blueprint, not the client id. See the production patch.
             - name: WEB_OIDC_ISSUER
-              value: https://authentik.staging.ronaldlokers.nl/application/o/squirrel/
+              value: https://authentik.staging.ronaldlokers.nl/application/o/squirrel-staging/
             - name: WEB_OIDC_CLIENT_ID
               value: squirrel
             - name: WEB_OIDC_REDIRECT_URL
