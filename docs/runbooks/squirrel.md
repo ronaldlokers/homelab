@@ -506,9 +506,33 @@ Four things have to line up:
 3. `WEB_REQUIRED_GROUP`. The only setting on this pod that refuses rather than
    defaults: every other missing value costs a feature, an empty group would
    cost the pile.
-4. `WEB_OIDC_SUB` — my authentik user UUID, seeded so the first login lands on
-   the person who already owns the pile. Getting it wrong is not an error. It
-   is a successful login onto an empty pile.
+4. `WEB_OIDC_SUB` — the authentik user's UUID, seeded so the first login lands
+   on the person who already owns the pile. Getting it wrong is not an error.
+   It is a successful login onto an empty pile.
+
+   It is the `uuid` field, not the integer primary key in the admin URL, and
+   the admin interface does not show it. The blueprint sets
+   `sub_mode: user_uuid` precisely so this value can be read back rather than
+   derived — authentik's default is `hashed_user_id`, which appears nowhere:
+
+   ```
+   kubectl --context=production -n authentik exec deploy/authentik-server -- \
+     ak shell -c "from authentik.core.models import User; \
+     print(User.objects.get(username='ronaldlokers').uuid)"
+   ```
+
+   Staging's is the same username on the staging context, and a different
+   account with a different uuid.
+
+Membership in `squirrel-users` is **not** declared in the blueprint, only the
+group itself. Admitting a second person or a demo account is a click in
+authentik with no commit and no redeploy, which is the point of the whole
+change — and a member added by hand would otherwise be removed within the hour,
+when the blueprint next reapplies.
+
+Both groups already exist and both owners are already in them, from before the
+blueprint declared either. `state: present` on a group that exists adopts it
+rather than replacing it, so nothing is lost by declaring it now.
 
 The client is declared in the `squirrel.yaml` key of the `authentik-blueprints`
 Secret, alongside the group binding. Both the client id and the client secret
@@ -660,9 +684,23 @@ blast radius for the sake of a login page. That means staging authentik needs
 its own squirrel application, its own `squirrel-users` group and an account in
 it, none of which it needed before.
 
-`WEB_OIDC_SUB` is deliberately unset here. Staging's notes are fake, so the
-first login simply creates the person it signs in as; production seeds it
-because there is a real pile already waiting for an owner.
+**The account is `ronaldlokers`, and it is not the production one.** Staging
+authentik has its own user database. The account there was still called
+`akadmin` — the default admin, never renamed, because until 25 August 2026
+nothing ever authenticated against staging authentik at all: a middleware
+asserted the name instead. It was renamed when this went in.
+
+`WEB_OIDC_SUB` is set here too, and for a reason easy to miss. Without it the
+first login would create a *second* person while the seeded notes stayed on the
+first — the one `WEB_IDENTITY` and `OWNER_HANDLE` make at boot — and the screen
+would come up empty and correct. The seeding recipe below inserts against `from
+people limit 1`, so this is what keeps it pointing at the pile you are looking
+at.
+
+The uuid survived the rename, which is the whole argument for the sub being a
+uuid rather than a username. It would **not** survive staging authentik being
+rebuilt from a blank database: the bootstrap creates a fresh `akadmin` with a
+fresh uuid, so a rebuild means renaming again and reading the value again.
 
 Nothing real should still ever be seeded there.
 
