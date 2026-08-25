@@ -12,9 +12,12 @@ resources:
   # The assets and the manifest, without the identity check — a browser fetches
   # both without cookies, so behind it an installed app has no icon at all.
   - ingress-assets.yaml
-  # In the authentik namespace, because an Ingress backend is namespace-local.
-  # It is the way back from the login redirect.
-  - ingress-outpost.yaml
+  # ingress-outpost.yaml was here until 25 August 2026. It routed
+  # /outpost.goauthentik.io/ on squirrel's hostname to authentik-server,
+  # because that is where authentik's forward-auth sent a browser back to. With
+  # the middleware gone there is no outpost redirect to come back from:
+  # squirrel's own /auth/callback is the way back now, and it is squirrel's
+  # route on squirrel's own backend.
   # The shared secret Home Assistant sends. Separate from squirrel-campfire so
   # the two rotate independently — see the comments in the file. The Deployment
   # reads PRESENCE_SECRET with optional: true, so losing this Secret costs the

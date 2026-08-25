@@ -1,6 +1,16 @@
 # The stylesheet, the script, the fonts, the mark, the icons and the manifest —
 # reachable without proving who you are.
 #
+# **This object is redundant as of 25 August 2026 and is kept deliberately.**
+# It existed to route around the forward-auth middleware, and that middleware
+# is gone: squirrel serves /static/, /manifest.webmanifest and /sw.js outside
+# its own guard, so the screen's own rule would answer them correctly. It is
+# still here because the `router.priority` note at the bottom is the only
+# written record of why Traefik ranked a bare `/` above `/sw.js`, and because
+# deleting an Ingress in the same commit that removes an authentication layer
+# is two changes to unpick if the login goes wrong. Remove it in its own
+# commit, once the way in has been used for a while.
+#
 # This exists because an installed app kept showing a letter tile instead of its
 # icon. A browser fetches a manifest with credentials omitted, and it fetches
 # the icons *named in that manifest* from the browser process rather than from

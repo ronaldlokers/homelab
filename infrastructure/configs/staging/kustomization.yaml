@@ -7,7 +7,10 @@ resources:
   - flux-alerts
   - traefik-default-cert.yaml
   - traefik-https-redirect-middleware.yaml
-  - traefik-staging-identity-middleware.yaml
+  # traefik-staging-identity-middleware.yaml was here until 25 August 2026. It
+  # injected the identity header the staging pile needed to render, which meant
+  # the staging pile had no authentication at all. Squirrel does its own OIDC
+  # from v0.39.0 and there is no header to inject; nothing else ever used it.
 patches:
   # Base network policies pin production control-plane IPs for API egress;
   # on staging (k3d) the API endpoint is the k3d server on the Docker network.
