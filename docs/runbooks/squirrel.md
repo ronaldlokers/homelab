@@ -501,8 +501,23 @@ Four things have to line up:
    client secret in `squirrel-oidc-secret.yaml`. All five together or none: a
    partially configured way in is a boot that half-works, and the half that
    works is the half that lets people in. With `WEB_IDENTITY` set and no way in
-   configured, **boot fails** rather than mounting a screen nobody can sign
+   *configured*, **boot fails** rather than mounting a screen nobody can sign
    into.
+
+   An authentik that is merely **unreachable** is a different thing and does
+   not stop the boot. Discovery happens on the first press and is retried every
+   thirty seconds; until it succeeds the gate says "I cannot reach the way in
+   just now" and the rest of the product — capture, the drain, the Campfire
+   webhook — carries on. This distinction is v0.39.1 and it was bought the
+   expensive way: v0.39.0 discovered at boot and refused to start, so a missing
+   NetworkPolicy took production down for half an hour. See #623.
+
+   The issuer's last path segment is the **application slug**, not the client
+   id. They are different words here — the client is `squirrel`, the slugs are
+   `squirrel-oidc-production` and `squirrel-staging` — because the forward-auth
+   application already owned `squirrel-production`. Getting it wrong answers
+   404 and the log names the URL it tried. The trailing slash matters too:
+   authentik publishes the issuer with one and go-oidc compares byte for byte.
 3. `WEB_REQUIRED_GROUP`. The only setting on this pod that refuses rather than
    defaults: every other missing value costs a feature, an empty group would
    cost the pile.
@@ -575,11 +590,25 @@ the login, which reads as authentik being broken.
 
 - **404 on /pile** — `WEB_IDENTITY` is empty, or the pod predates v0.6.0. The
   routes are never registered, so there is nothing to authenticate.
-- **The pod will not start, saying it cannot build the way in** — one of the
-  four `WEB_OIDC_*` values is missing or authentik is unreachable. Discovery is
-  a network call made once at boot, and a squirrel with no way in is not a
-  working squirrel, so it refuses rather than mounting one. `WEB_REQUIRED_GROUP`
-  empty fails the same way with `WEB_REQUIRED_GROUP is empty`.
+- **The pod will not start, saying it cannot build the way in** — a
+  *configuration* problem, which cannot come right on its own: one of the four
+  `WEB_OIDC_*` values is missing, or `WEB_REQUIRED_GROUP` is empty, which fails
+  with `WEB_REQUIRED_GROUP is empty`. An unreachable authentik does **not** land
+  here; see the next line.
+- **"I cannot reach the way in just now", and the log says `could not find the
+  way in`** — discovery failed. The log line names the issuer it tried, which is
+  usually enough:
+
+  - `404 Not Found` — the issuer path is wrong. Its last segment is the
+    application slug, not the client id.
+  - `connection refused` or a timeout — the pod cannot reach authentik. The
+    NetworkPolicy is `allow-squirrel-egress` in the base plus
+    `allow-squirrel-to-authentik` in staging; **production allows Traefik's
+    pods on 8443, not 443**, because egress is evaluated post-DNAT.
+  - `issuer did not match` — the trailing slash, or the wrong slug again.
+
+  In every case the pod stays up and the bot keeps working. It retries every
+  thirty seconds, so a fix applies without a restart.
 - **"that account cannot use Squirrel"** — authentik authenticated the account
   and it is not in `WEB_REQUIRED_GROUP`. The screen deliberately does not name
   the group: which group an account lacks is a fact about the authentik rather
