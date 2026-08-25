@@ -10,6 +10,10 @@ resources:
   - ../../base/squirrel/
   - ingress.yaml
   - network-policy-traefik.yaml
+  # The OIDC client secret for staging's own authentik. From v0.39.0 the
+  # staging pile has real authentication rather than a middleware pretending
+  # somebody logged in.
+  - squirrel-oidc-secret.yaml
 
 patches:
   - path: deployment-staging-patch.yaml
