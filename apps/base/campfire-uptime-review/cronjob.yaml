@@ -23,6 +23,11 @@ spec:
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
+      # A failed Job object is what keeps KubeJobFailed firing — the alert
+      # tracks the object, not the failure — so this is how long one bad run
+      # keeps alerting. A week, not a month: after seven days of the same
+      # warning nobody is going to act on the eighth.
+      ttlSecondsAfterFinished: 604800
       backoffLimit: 1
       template:
         metadata:
