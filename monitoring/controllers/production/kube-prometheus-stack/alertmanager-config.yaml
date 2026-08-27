@@ -68,6 +68,34 @@ spec:
           - name: alertname
             matchType: '='
             value: 'Watchdog'
+      # Warnings repeat every other day; criticals keep the parent's 12h.
+      #
+      # Measured over the fourteen days to 2026-08-27, this cluster produced ten
+      # distinct alerts. Two of them accounted for almost all of the traffic, and
+      # neither did so by firing often:
+      #
+      #   KubeJobFailed          11880 minutes  (8¼ days, continuous)
+      #   LonghornBackupFailed    2916 minutes  (~2 days, continuous)
+      #
+      # Both are warnings, and both were stuck rather than frequent —
+      # KubeJobFailed tracks the existence of a failed Job object, so it fired
+      # for over a week because nine dead Jobs sat in the cluster, not because
+      # anything was failing that week. At the parent's 12h that is one alert
+      # arriving sixteen times to say the same thing.
+      #
+      # The ttlSecondsAfterFinished added to every CronJob is the other half of
+      # this: it bounds how long a failed Job can hold its alert on. This bounds
+      # how often you hear about it in the meantime.
+      #
+      # Criticals are deliberately left alone. There are two of them in a
+      # fortnight — PostgreSQLWALArchivingFailing for 88 minutes — and something
+      # that rare has earned the right to repeat.
+      - receiver: 'campfire'
+        repeatInterval: 48h
+        matchers:
+          - name: severity
+            matchType: '='
+            value: 'warning'
   receivers:
     # No integrations, so Alertmanager drops anything routed here. Same shape as
     # the chart's own 'null' receiver, which is not reachable from this route.
