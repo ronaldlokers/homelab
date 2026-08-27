@@ -43,7 +43,33 @@ metadata:
 spec:
   name: backup-weekly
   task: backup
-  cron: "0 3 * * 0"
+  # Saturday 22:00, not Sunday 03:00, and the hour is the whole point.
+  #
+  # Longhorn takes a per-volume lock in the backup store, and a backup that is
+  # still running still holds it. Sunday was the only day both this and
+  # backup-daily ran, one hour apart, and on the two largest volumes — the
+  # Prometheus TSDB and a Postgres instance, 30Gi each — one hour is not
+  # enough. From the logs of 2026-08-23, in UTC:
+  #
+  #   00:06  Start creating backup   pvc-fb5c1591 (prometheus)   <- backup-daily
+  #   01:14  Start creating backup   pvc-fb5c1591 (prometheus)   <- this job
+  #   01:14  backupstore volume contains locks [{name: lock-3427..., type: 1}]
+  #   01:14  Failed to create backup: failed to acquire lock, please try again
+  #
+  # The daily was 68 minutes in and still holding the lock. This job lost the
+  # race and the week's backup was skipped. It happened on 2026-08-09, -16 and
+  # -23 — every Sunday in Loki's retained window, and no other day.
+  #
+  # Nothing was ever at risk: the daily chain kept its seven days throughout.
+  # What was lost was the weekly generation for those volumes, silently apart
+  # from an alert that pointed at the wrong runbook.
+  #
+  # Saturday 22:00 gives four hours of clearance to the next daily instead of
+  # minus-ten, and stays clear of backup-monthly (04:00 on the 1st) and of
+  # restore-drill at 05:00 on Sunday — which takes *restore* locks on the same
+  # store, so moving this later into Sunday would only have traded one
+  # collision for another.
+  cron: "0 22 * * 6"
   retain: 4
   concurrency: 1
   groups:
