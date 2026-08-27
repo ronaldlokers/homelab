@@ -21,6 +21,11 @@ spec:
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
+      # A failed Job object is what keeps KubeJobFailed firing — the alert
+      # tracks the object, not the failure — so this is how long one bad run
+      # keeps alerting. A full cycle for a weekly job: the failure is still
+      # here to investigate right up until the next run replaces it.
+      ttlSecondsAfterFinished: 604800
       # No retry. Six restores that half-ran are worse than one clean failure:
       # the scratch clusters are deleted on the way out of each drill, and a
       # second attempt racing the first would fight over the same names.

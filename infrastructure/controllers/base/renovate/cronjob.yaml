@@ -8,6 +8,11 @@ spec:
   concurrencyPolicy: Forbid
   jobTemplate:
     spec:
+      # A failed Job object is what keeps KubeJobFailed firing — the alert
+      # tracks the object, not the failure — so this is how long one bad run
+      # keeps alerting. Hourly, so a day: if it is still broken the next run
+      # says so on its own.
+      ttlSecondsAfterFinished: 86400
       template:
         spec:
           # Renovate talks to GitHub and to container registries. It has no
