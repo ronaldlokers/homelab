@@ -90,6 +90,13 @@ spec:
             component: storage
 
         # longhorn_backup_state: 3 = Completed, 4 = Error.
+        # The runbook link used to point at longhorn-s3-backup-connectivity, and
+        # every firing of this alert so far has been the other cause: the backup
+        # store was perfectly reachable and a per-volume lock was simply already
+        # held by a backup that had not finished. An hour spent testing NAS
+        # connectivity is an hour spent proving something that was never in
+        # doubt, so the description now names both causes and says which log
+        # line separates them.
         - alert: LonghornBackupFailed
           annotations:
             runbook_url: https://github.com/ronaldlokers/homelab/blob/main/docs/runbooks/longhorn-s3-backup-connectivity-minio.md
@@ -97,7 +104,13 @@ spec:
             description: >-
               Backup {{ $labels.backup }} for volume {{ $labels.volume }}
               (recurring job {{ $labels.recurring_job }}) is in the Error state.
-              Check backup-target connectivity to the NAS.
+              Read the instance-manager log for this volume before assuming the
+              backup target is unreachable: "failed to acquire lock ... when
+              performing backup create/restore" means two recurring jobs
+              overlapped on one volume and the store is fine, while a connection
+              or credential error means it is not. Longhorn clears the failed
+              Backup after failed-backup-ttl (1440m), so this resolves itself in
+              a day either way — what it costs is that generation of the backup.
           expr: |
             longhorn_backup_state == 4
           for: 15m
