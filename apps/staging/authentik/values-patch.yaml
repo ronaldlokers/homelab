@@ -1,0 +1,51 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: authentik
+spec:
+  # Everything here exists because staging is two vCPUs of an i3-7100U and the
+  # chart's defaults assume a machine that is not. The 2026.5.6 -> 2026.8.0
+  # upgrade took the server 9 minutes 56 seconds to reach Ready, and each of
+  # the three numbers below was within a minute of ending the upgrade badly.
+  #
+  # Nothing here is set on production, where the same upgrade rolled two
+  # replicas one at a time without incident.
+
+  # Helm waits five minutes and then calls the release failed. The upgrade
+  # above therefore "failed" while succeeding: the pods came up, and the
+  # HelmRelease sat in a failed state that nothing retries — no
+  # remediation.retries is configured — until it was forced by hand. Because
+  # apps is a `wait: true` Kustomization, that stalled release also failed the
+  # whole Kustomization, which reads as staging being broken when it is not.
+  #
+  # Same reasoning, and same 20m, as the kube-prometheus-stack release.
+  timeout: 20m
+  values:
+    server:
+      startupProbe:
+        # The chart allows 60 failures at 10s apart, so ~10 minutes to start.
+        # The server took 9m56s: it passed with four seconds to spare, and only
+        # because the worker happened to win the migration lock first. Doubling
+        # the budget costs nothing — a probe that has not succeeded yet is not
+        # consuming anything — and buys the difference between a slow start and
+        # a CrashLoopBackOff.
+        failureThreshold: 120
+        # The Rust entrypoint answers /-/health/live/ by asking the Python core
+        # over a unix socket, and while the core is still booting that request
+        # 500s rather than answering quickly. Three seconds is optimistic here.
+        timeoutSeconds: 10
+
+    worker:
+      startupProbe:
+        failureThreshold: 120
+        # `ak healthcheck` is a Django management command: it starts a Python
+        # interpreter, loads settings and talks to Postgres. On this box that
+        # does not finish in three seconds, which is not a health problem —
+        # it is a stopwatch problem:
+        #
+        #   Startup probe failed: command timed out: "ak healthcheck" timed
+        #   out after 3s
+        #
+        # Restarting a worker mid-migration because a health check was slow is
+        # how a slow upgrade becomes a failed one.
+        timeoutSeconds: 15
