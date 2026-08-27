@@ -32,9 +32,18 @@ metadata:
   annotations:
     # Explicit, because Traefik ranks routers by the length of the rule string
     # rather than by how specific it is, and the screen now claims `/`. This one
-    # wins on length today; a forward-auth login page in front of Home
-    # Assistant's POST is not a thing to leave depending on how many characters
-    # a path has. See ingress-assets.yaml, where the worker lost that race.
+    # wins on length today; a login page in front of Home Assistant's POST is
+    # not a thing to leave depending on how many characters a path has.
+    #
+    # That is not hypothetical. squirrel-assets carried this same annotation
+    # for the same reason: `PathPrefix(`/`)` is fifteen characters and
+    # `Path(`/sw.js`)` is fourteen, so the broad rule outranked the service
+    # worker and authentik answered it with a login page — while `/static/` and
+    # `/manifest.webmanifest` happened to win because their names are long. The
+    # symptom was an installed app with no icon and nothing in any log. That
+    # Ingress was retired on 26 August 2026 once squirrel began serving those
+    # paths outside its own guard; the lesson moved here because this is where
+    # it still applies.
     traefik.ingress.kubernetes.io/router.priority: "100"
     traefik.ingress.kubernetes.io/router.middlewares: kube-system-https-redirect@kubernetescrd,kube-system-local-network-only@kubernetescrd
 spec:

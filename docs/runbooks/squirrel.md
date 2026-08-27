@@ -482,32 +482,90 @@ layered on top of that.
 
 ### What authenticates it
 
-Squirrel writes no authentication code and holds no session. Four things have
-to line up:
+**Squirrel does its own OIDC from v0.39.0.** It holds a session, sets a cookie
+and serves its own way in at `/auth`. Before that Traefik called an authentik
+forward-auth outpost and squirrel compared `X-Authentik-Username` to
+`WEB_IDENTITY` — which was the right size for one person, and could only ever
+say "somebody authentik likes" rather than *which* somebody. A second person
+meant a redeploy.
 
-1. `WEB_IDENTITY: ronald` in `apps/base/squirrel/deployment.yaml`. Empty leaves
-   the screen **unmounted** — `/pile` is a plain 404, not an open route — and
+Four things have to line up:
+
+1. `WEB_IDENTITY` in `apps/base/squirrel/deployment.yaml`. **It no longer
+   authenticates anybody.** It is seeded as a `screen` identity so a capture
+   already sitting in the spool at deploy time still resolves to its person
+   when the drain picks it up, and it is still what decides whether the screen
+   is mounted at all. Empty leaves it **unmounted** — `/` is a plain 404 — and
    logs `no web identity configured; the pile screen is not mounted`.
-2. The `authentik-forward-auth` Middleware in
-   `infrastructure/configs/production/`, which calls authentik's *embedded*
-   outpost and copies `X-Authentik-Username` onto the request.
-3. `apps/production/squirrel/ingress-pile.yaml`, the screen's own router:
-   `https-redirect → lan-or-tailnet → authentik-forward-auth`, in that order.
-   The address check stays the outer layer.
-4. `apps/production/squirrel/ingress-outpost.yaml`, which routes
-   `/outpost.goauthentik.io/` **on squirrel's hostname** to `authentik-server`.
-   Without it the login redirect has nowhere to come back to.
+2. The four `WEB_OIDC_*` settings in `deployment-oidc-patch.yaml`, plus the
+   client secret in `squirrel-oidc-secret.yaml`. All five together or none: a
+   partially configured way in is a boot that half-works, and the half that
+   works is the half that lets people in. With `WEB_IDENTITY` set and no way in
+   *configured*, **boot fails** rather than mounting a screen nobody can sign
+   into.
 
-The provider itself is declared in the `squirrel.yaml` key of the
-`authentik-blueprints` Secret: a proxy provider in `forward_single` mode, plus
-the application, plus the embedded outpost being told to serve it. That last
-entry replaces the outpost's provider list rather than appending to it — a
-second proxy provider must be added to the same entry or it will remove this
-one.
+   An authentik that is merely **unreachable** is a different thing and does
+   not stop the boot. Discovery happens on the first press and is retried every
+   thirty seconds; until it succeeds the gate says "I cannot reach the way in
+   just now" and the rest of the product — capture, the drain, the Campfire
+   webhook — carries on. This distinction is v0.39.1 and it was bought the
+   expensive way: v0.39.0 discovered at boot and refused to start, so a missing
+   NetworkPolicy took production down for half an hour. See #623.
 
-The identity comparison is exact: no trimming, no case folding. It matches the
-authentik **username** — `ronaldlokers` — not the e-mail, not the display name,
-and not `OWNER_HANDLE`, which is the Campfire handle and is a different word.
+   The issuer's last path segment is the **application slug**, not the client
+   id. They are different words here — the client is `squirrel`, the slugs are
+   `squirrel-oidc-production` and `squirrel-staging` — because the forward-auth
+   application already owned `squirrel-production`. Getting it wrong answers
+   404 and the log names the URL it tried. The trailing slash matters too:
+   authentik publishes the issuer with one and go-oidc compares byte for byte.
+3. `WEB_REQUIRED_GROUP`. The only setting on this pod that refuses rather than
+   defaults: every other missing value costs a feature, an empty group would
+   cost the pile.
+4. `WEB_OIDC_SUB` — the authentik user's UUID, seeded so the first login lands
+   on the person who already owns the pile. Getting it wrong is not an error.
+   It is a successful login onto an empty pile.
+
+   It is the `uuid` field, not the integer primary key in the admin URL, and
+   the admin interface does not show it. The blueprint sets
+   `sub_mode: user_uuid` precisely so this value can be read back rather than
+   derived — authentik's default is `hashed_user_id`, which appears nowhere:
+
+   ```
+   kubectl --context=production -n authentik exec deploy/authentik-server -- \
+     ak shell -c "from authentik.core.models import User; \
+     print(User.objects.get(username='ronaldlokers').uuid)"
+   ```
+
+   Staging's is the same username on the staging context, and a different
+   account with a different uuid.
+
+Membership in `squirrel-users` is **not** declared in the blueprint, only the
+group itself. Admitting a second person or a demo account is a click in
+authentik with no commit and no redeploy, which is the point of the whole
+change — and a member added by hand would otherwise be removed within the hour,
+when the blueprint next reapplies.
+
+Both groups already exist and both owners are already in them, from before the
+blueprint declared either. `state: present` on a group that exists adopts it
+rather than replacing it, so nothing is lost by declaring it now.
+
+The client is declared in the `squirrel.yaml` key of the `authentik-blueprints`
+Secret, alongside the group binding. Both the client id and the client secret
+are declared rather than generated, the same as every other client here, so
+authentik can be rebuilt from nothing — which also means the secret is written
+in two places and can drift. A mismatch is not a startup error: it is every
+login failing at the token exchange.
+
+**The group is checked twice**, bound on the application and checked again by
+squirrel against the id token's `groups` claim. Not two gates for the sake of
+two: a misconfigured binding would otherwise hand out piles silently. An absent
+claim is refused rather than treated as unrestricted.
+
+**A session lasts thirty days of disuse** and every request pushes that out, so
+it is a gap after which you have stopped using squirrel rather than a timer on
+using it. It is remembered in-process for a minute, which is what is left of
+"the request path does not touch Postgres" — so signing out elsewhere takes up
+to a minute to bite.
 
 ### Reaching it from the tailnet
 
@@ -532,11 +590,41 @@ the login, which reads as authentik being broken.
 
 - **404 on /pile** — `WEB_IDENTITY` is empty, or the pod predates v0.6.0. The
   routes are never registered, so there is nothing to authenticate.
-- **A blank white page after logging in successfully** — this one. The request
-  reached squirrel with a username that is not `WEB_IDENTITY`, and squirrel
-  answers 403 with no body on purpose, so a browser renders nothing at all.
-  `kubectl logs` shows `refused the pile` with the identity it saw. That log
-  line is the fastest way to the right value.
+- **The pod will not start, saying it cannot build the way in** — a
+  *configuration* problem, which cannot come right on its own: one of the four
+  `WEB_OIDC_*` values is missing, or `WEB_REQUIRED_GROUP` is empty, which fails
+  with `WEB_REQUIRED_GROUP is empty`. An unreachable authentik does **not** land
+  here; see the next line.
+- **"I cannot reach the way in just now", and the log says `could not find the
+  way in`** — discovery failed. The log line names the issuer it tried, which is
+  usually enough:
+
+  - `404 Not Found` — the issuer path is wrong. Its last segment is the
+    application slug, not the client id.
+  - `connection refused` or a timeout — the pod cannot reach authentik. The
+    NetworkPolicy is `allow-squirrel-egress` in the base plus
+    `allow-squirrel-to-authentik` in staging; **production allows Traefik's
+    pods on 8443, not 443**, because egress is evaluated post-DNAT.
+  - `issuer did not match` — the trailing slash, or the wrong slug again.
+
+  In every case the pod stays up and the bot keeps working. It retries every
+  thirty seconds, so a fix applies without a restart.
+- **"that account cannot use Squirrel"** — authentik authenticated the account
+  and it is not in `WEB_REQUIRED_GROUP`. The screen deliberately does not name
+  the group: which group an account lacks is a fact about the authentik rather
+  than about the person reading it. `kubectl logs` says `an account was
+  refused`.
+- **"I cannot reach the way in just now"** — everything else: the token
+  exchange failed, the id token did not verify, or the session could not be
+  written. The log line is `a login did not land` with a `why`. A client secret
+  that does not match the blueprint lands here.
+- **Signing in works and the pile is empty** — `WEB_OIDC_SUB` is wrong or
+  unset, so the login created a new person instead of resolving to the one who
+  owns the notes. Nothing is lost; correct the value and the next login lands
+  on the right person. The stray person can be left alone or deleted.
+- **A blank white page after logging in successfully** — pre-v0.39.0 only. The
+  request reached squirrel with a username that was not `WEB_IDENTITY` and it
+  answered 403 with no body. There is no identity header any more.
 - **403 before any login page appears** — the address check, not the identity.
   From the tailnet, see above; from anywhere else, that is the rule working.
 - **503 saying it cannot reach its memory** — Postgres is down, or the pod has
@@ -611,11 +699,39 @@ screen, over a database somebody seeded on purpose. It exists so a change to
 the screen can be looked at somewhere that is not the place every thought you
 have ever had is kept.
 
-It has **no authentication**. Staging has no Authentik outpost in front of it,
-and the pile refuses to render without an identity, so a Traefik middleware
-puts one there — `staging-identity` overwrites `X-Authentik-Username` with the
-owner's name. That is a deliberate lie and it is why nothing real should ever be
-seeded there.
+**It has real authentication from v0.39.0, and it did not before.** Until then
+there was no outpost in front of it and the pile refused to render without an
+identity, so a Traefik middleware put one there: `staging-identity` overwrote
+`X-Authentik-Username` with the owner's name. That was a deliberate lie, stated
+as one in the middleware's own comment, and acceptable because everything in
+that database is seeded on purpose.
+
+There is no header to inject now. Staging runs the OIDC flow against
+**staging's own authentik**, not production's — a staging pod holding a
+credential for the production identity provider would make the two clusters one
+blast radius for the sake of a login page. That means staging authentik needs
+its own squirrel application, its own `squirrel-users` group and an account in
+it, none of which it needed before.
+
+**The account is `ronaldlokers`, and it is not the production one.** Staging
+authentik has its own user database. The account there was still called
+`akadmin` — the default admin, never renamed, because until 25 August 2026
+nothing ever authenticated against staging authentik at all: a middleware
+asserted the name instead. It was renamed when this went in.
+
+`WEB_OIDC_SUB` is set here too, and for a reason easy to miss. Without it the
+first login would create a *second* person while the seeded notes stayed on the
+first — the one `WEB_IDENTITY` and `OWNER_HANDLE` make at boot — and the screen
+would come up empty and correct. The seeding recipe below inserts against `from
+people limit 1`, so this is what keeps it pointing at the pile you are looking
+at.
+
+The uuid survived the rename, which is the whole argument for the sub being a
+uuid rather than a username. It would **not** survive staging authentik being
+rebuilt from a blank database: the bootstrap creates a fresh `akadmin` with a
+fresh uuid, so a rebuild means renaming again and reading the value again.
+
+Nothing real should still ever be seeded there.
 
 Seed it the way any other staging database is seeded:
 

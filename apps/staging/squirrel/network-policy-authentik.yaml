@@ -1,0 +1,42 @@
+# Staging reaches its authentik the long way round, and it has to.
+#
+# The base policy admits Traefik's *pods* on 8443, which is right for
+# production: `authentik.ronaldlokers.nl` resolves to a MetalLB VIP, the packet
+# is DNATed to a Traefik pod, and NetworkPolicy egress is evaluated against
+# that post-DNAT destination.
+#
+# Staging is k3d. `authentik.staging.ronaldlokers.nl` resolves to 10.0.40.52 —
+# the Docker *host*, which publishes a port into the k3d network. There is no
+# DNAT to a Traefik pod, so the base rule never matches and the destination is
+# an address outside the cluster on the ordinary 443. The namespace's
+# allow-internet-egress does not cover it either: that rule permits 0.0.0.0/0
+# while excluding 10.0.0.0/8, and this address sits inside the exclusion.
+#
+# Why the public hostname at all, rather than the Service next door: authentik
+# builds every URL in its discovery document from the host it was asked on.
+# Fetched over the cluster Service it answers `"issuer":
+# "http://localhost:9000/..."` and hands the browser an authorization endpoint
+# nobody outside can reach. The name in the token has to be the name the
+# browser uses, so the name squirrel asks on has to be it too.
+#
+# This is a hairpin: out of the k3d network to the Docker host and back in
+# through the published port. It works, and it is the reason staging is
+# deployed and watched before production on this change rather than beside it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-squirrel-to-authentik
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: squirrel
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.40.52/32
+      ports:
+        - protocol: TCP
+          port: 443

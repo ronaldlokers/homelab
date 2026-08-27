@@ -14,7 +14,12 @@ resources:
   - flux-alerts
   - metallb
   - tailscale
-  - traefik-authentik-forward-auth-middleware.yaml
+  # traefik-authentik-forward-auth-middleware.yaml was here until 26 August
+  # 2026. squirrel was the only forward-auth consumer this cluster ever had and
+  # it speaks OIDC itself now, like linkding, immich, grafana and homepage. The
+  # object is deleted rather than left unused: a middleware nothing references
+  # is one the next person has to prove is dead before touching anything near
+  # it. Restoring it means restoring the file, which git still has.
   - traefik-default-cert.yaml
   - traefik-helmchartconfig.yaml
   - traefik-https-redirect-middleware.yaml

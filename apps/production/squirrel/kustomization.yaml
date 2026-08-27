@@ -9,12 +9,19 @@ resources:
   # The screen's own router, so the presence webhook keeps a chain without
   # authentik in it — see the comment at the top of the file.
   - ingress-pile.yaml
-  # The assets and the manifest, without the identity check — a browser fetches
-  # both without cookies, so behind it an installed app has no icon at all.
-  - ingress-assets.yaml
-  # In the authentik namespace, because an Ingress backend is namespace-local.
-  # It is the way back from the login redirect.
-  - ingress-outpost.yaml
+  # ingress-assets.yaml was here until 26 August 2026. It served /static/,
+  # /manifest.webmanifest and /sw.js around the forward-auth middleware,
+  # because a browser fetches a manifest and its icons without cookies and got
+  # a login page instead. squirrel leaves those three routes outside its own
+  # guard, so with the middleware gone the screen's own router answers them
+  # correctly. The router-priority lesson that object taught moved into
+  # ingress.yaml, which still needs it.
+  # ingress-outpost.yaml was here until 25 August 2026. It routed
+  # /outpost.goauthentik.io/ on squirrel's hostname to authentik-server,
+  # because that is where authentik's forward-auth sent a browser back to. With
+  # the middleware gone there is no outpost redirect to come back from:
+  # squirrel's own /auth/callback is the way back now, and it is squirrel's
+  # route on squirrel's own backend.
   # The shared secret Home Assistant sends. Separate from squirrel-campfire so
   # the two rotate independently — see the comments in the file. The Deployment
   # reads PRESENCE_SECRET with optional: true, so losing this Secret costs the
@@ -22,9 +29,15 @@ resources:
   - squirrel-presence-secret.yaml
   - squirrel-push-secret.yaml
   - squirrel-openai-secret.yaml
+  # The OIDC client secret. Not optional like the other three: without it the
+  # binary refuses to boot rather than mounting a screen nobody can sign into.
+  - squirrel-oidc-secret.yaml
 
 patches:
   - path: deployment-postgres-patch.yaml
+  # The way in. Separate from the postgres patch because the two answer
+  # different questions and rotate on different days.
+  - path: deployment-oidc-patch.yaml
 
   # Opt in to Reloader: roll this workload when a mounted Secret changes.
   # Without it a pg-role-squirrel rotation applies cleanly and the pod keeps
@@ -72,4 +85,4 @@ patches:
 # image is actually pushed, so a release whose build failed cannot be proposed.
 images:
   - name: ghcr.io/ronaldlokers/squirrel
-    newTag: v0.33.3
+    newTag: v0.42.0
