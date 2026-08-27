@@ -14,6 +14,33 @@ spec:
         name: kube-prometheus-stack
         namespace: monitoring
       interval: 12h
+  # Helm waits five minutes for a release to become ready and then calls it a
+  # failure. On this box that is not enough, and the 88.2.0 -> 88.5.4 upgrade
+  # proved it: Helm gave up on
+  #
+  #   timeout waiting for: [Deployment/monitoring/kube-prometheus-stack-grafana
+  #   status: 'InProgress']
+  #
+  # while the Deployment was in fact still coming up. It reached 1/1 at 21:42
+  # and stayed healthy — Grafana 13.2.0 plus two sidecars, pulled and started on
+  # two vCPUs of an i3-7100U, simply takes longer than the default allows.
+  #
+  # The upgrade had therefore *succeeded* on the cluster while the HelmRelease
+  # said it had failed, and nothing repaired that: no remediation.retries is
+  # configured, so Flux marked the release stalled and stopped. Because
+  # monitoring-controllers is a `wait: true` Kustomization, the stalled release
+  # failed the whole Kustomization, which is what shows up as Flux errors on
+  # every reconcile for as long as nobody forces it. That state lasted nine
+  # hours.
+  #
+  # Twenty minutes rather than retries on purpose. Upgrade remediation rolls the
+  # release back before retrying, and rolling kube-prometheus-stack backwards on
+  # a slow node to fix a release that already applied cleanly is more churn than
+  # the problem. The cost of a long timeout is only a slower signal on an
+  # upgrade that is genuinely broken.
+  #
+  # Staging only. Production has the CPU and came up well inside the default.
+  timeout: 20m
   install:
     crds: Create
   upgrade:
