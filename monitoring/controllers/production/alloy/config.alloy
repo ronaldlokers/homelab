@@ -281,6 +281,45 @@ loki.process "pod_logs" {
       }
   }
 
+  // Drop what Loki is going to refuse anyway.
+  //
+  // loki.source.kubernetes keeps its read position in memory, so a
+  // re-established tail restarts at the beginning of the container's log. For
+  // a pod that started weeks ago and has logged almost nothing since — the
+  // barman-cloud sidecar, csi-provisioner, a kube-system load balancer — that
+  // replays the same handful of startup lines over and over. Once those lines
+  // are older than Loki's reject_old_samples_max_age (7 days by default, which
+  // neither cluster overrides) every replay comes back as:
+  //
+  //   400: entry for stream '{container="barman-cloud", ...}' has timestamp
+  //   too old: 2026-08-18T17:36:01Z, oldest acceptable timestamp is:
+  //   2026-08-20T17:36:06Z
+  //
+  // Nothing is lost: Loki ingests the valid entries in the same push and
+  // refuses only these, and these are duplicates of lines it stored a week
+  // ago. What it costs is AlloyLogWriteFailures, which alerts on
+  // loki_write_dropped_entries_total > 0 and is therefore permanently firing
+  // on a condition that is neither new nor actionable.
+  //
+  // 160h rather than 168h so the margin belongs to us: an entry that squeaks
+  // under the wire here and spends the next hour in a batch queue would arrive
+  // on the far side of Loki's cutoff and be refused again.
+  //
+  // Raising reject_old_samples_max_age instead would "fix" it by admitting
+  // week-old duplicates into storage, which is worse than the noise.
+  //
+  // Deliberately counted, not silent: loki_process_dropped_lines_total carries
+  // the reason, so if this ever starts dropping something real the number is
+  // there to see.
+  //
+  // Soaked on staging first (see the staging config.alloy): zero HTTP 400s and
+  // zero dropped entries in the 90 minutes after it landed, against ~20 an
+  // hour before.
+  stage.drop {
+    older_than          = "160h"
+    drop_counter_reason = "older_than_loki_accepts"
+  }
+
   forward_to = [loki.process.scrub.receiver]
 }
 
