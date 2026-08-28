@@ -5,6 +5,7 @@ resources:
   - campfire
   - campfire-almanac
   - campfire-bots-secret
+  - campfire-backups-watch
   - campfire-reading-digest
   - campfire-alert-bridge
   - campfire-kube-actor
@@ -55,4 +56,4 @@ resources:
 # cannot be proposed.
 images:
   - name: ghcr.io/ronaldlokers/stringer
-    newTag: v0.17.0
+    newTag: v0.18.0

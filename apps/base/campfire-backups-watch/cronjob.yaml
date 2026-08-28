@@ -1,0 +1,73 @@
+# What Longhorn did not do last night, at 07:30.
+#
+# After the 02:00 backup window and its stragglers, and half an hour after the
+# briefing, so a morning where both have something to say reads in the order
+# they happened rather than in the order the schedules fired.
+#
+# Silent on a good day. Every live volume backed up overnight and a reachable
+# target means no post at all, which is the same contract the briefing keeps —
+# a bot that files "all is well" every morning is one nobody reads on the
+# morning it does not.
+#
+# Sunday carries more: volumes whose claim is gone, backup sets whose volume is
+# gone, volumes in no recurring job. Those are true every day until someone
+# acts, and saying so daily is how a room learns to mute a bot. The beat picks
+# the day itself from DIGEST_TIMEZONE; there is no second CronJob.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: campfire-backups-watch
+  namespace: campfire
+spec:
+  schedule: "30 7 * * *"
+  timeZone: "Europe/Amsterdam"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # A failed Job object is what keeps KubeJobFailed firing — the alert
+      # tracks the object, not the failure — so this is how long one bad run
+      # keeps alerting. A day, for a job that runs daily: the next run replaces
+      # it, and a failure nobody looked at in 24 hours is not one the 25th hour
+      # will fix.
+      ttlSecondsAfterFinished: 86400
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: campfire-backups-watch
+        spec:
+          restartPolicy: Never
+          serviceAccountName: campfire-backups-watch
+          securityContext:
+            runAsNonRoot: true
+            # The image runs as `node` (uid 1000); 65534 has no home in it.
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: watch
+              # Untagged on purpose: the tag every stringer workload runs lives
+              # once, in the cluster overlay's `images:` block.
+              image: ghcr.io/ronaldlokers/stringer
+              args: ["backups"]
+              envFrom:
+                # Almanac's room: this is a sheet of numbers by another name,
+                # and it belongs where the other statistics land.
+                - secretRef:
+                    name: campfire-almanac
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  # Five list reads and some arithmetic; nothing is drawn.
+                  cpu: 200m
+                  memory: 128Mi

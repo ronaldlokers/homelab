@@ -1,0 +1,16 @@
+# The backups beat: its identity, its schedule, and the two hops it needs.
+#
+# The Kubernetes API hop is not here. It lives in the production overlay's
+# allow-campfire-status-bot-to-k8s-api, which names every pod in this namespace
+# permitted to reach the API server — campfire itself is deliberately not one of
+# them, and a policy that says so by name is worth more than four copies of the
+# same control-plane CIDRs.
+#
+# No `namespace:` — each resource declares its own, matching the sibling
+# campfire-* directories.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - rbac.yaml
+  - cronjob.yaml
+  - network-policies.yaml

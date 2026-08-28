@@ -1,0 +1,6 @@
+# Production only: Longhorn's backup target is this cluster's MinIO on TrueNAS,
+# and staging has neither the target nor a room to file to.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base/campfire-backups-watch
