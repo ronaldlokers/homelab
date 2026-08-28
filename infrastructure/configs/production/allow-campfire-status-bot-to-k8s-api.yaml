@@ -1,4 +1,4 @@
-# Two workloads in this namespace read the Kubernetes API:
+# The workloads in this namespace that read the Kubernetes API:
 #
 #   campfire-status-bot   Kustomizations, HelmReleases, pods, CNPG Clusters,
 #                         Certificates and Longhorn Volumes, to answer
@@ -6,6 +6,12 @@
 #   campfire-notify-check exec into the Campfire pod, because Campfire has no
 #                         API and its involvement settings are readable only
 #                         from Rails.
+#   campfire-kube-actor   the two cluster actions the responder is allowed to
+#                         ask for, held apart from the process that reads logs.
+#   campfire-backups-watch
+#                         Longhorn volumes, backup volumes, backups and backup
+#                         targets, plus the PersistentVolumeClaims that say
+#                         which of those volumes anything still owns.
 #
 # Selected by name rather than by namespace: Campfire itself has no business
 # talking to the API server, and it is the pod that renders attacker-supplied
@@ -34,7 +40,11 @@ spec:
     matchExpressions:
       - key: app
         operator: In
-        values: [campfire-status-bot, campfire-notify-check, campfire-kube-actor]
+        values:
+          - campfire-status-bot
+          - campfire-notify-check
+          - campfire-kube-actor
+          - campfire-backups-watch
   policyTypes:
     - Egress
   egress:

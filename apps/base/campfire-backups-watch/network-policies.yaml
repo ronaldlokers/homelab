@@ -1,0 +1,67 @@
+---
+# The room, both halves. Campfire denies egress and ingress, so a job that
+# gathers perfectly and cannot deliver is what writing only one half buys —
+# three beats have been broken that way.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backups-watch-egress-to-campfire
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-backups-watch
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: campfire
+      ports:
+        - protocol: TCP
+          port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backups-watch-ingress-to-campfire
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: campfire-backups-watch
+      ports:
+        - protocol: TCP
+          port: 80
+---
+# DNS, so the in-cluster Campfire name resolves. The API server is reached by
+# address rather than name, but the room is not.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backups-watch-dns
+  namespace: campfire
+spec:
+  podSelector:
+    matchLabels:
+      app: campfire-backups-watch
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

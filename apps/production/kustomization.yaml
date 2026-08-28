@@ -5,6 +5,7 @@ resources:
   - campfire
   - campfire-almanac
   - campfire-bots-secret
+  - campfire-backups-watch
   - campfire-reading-digest
   - campfire-alert-bridge
   - campfire-kube-actor

@@ -1,0 +1,49 @@
+# What the backups beat is allowed to read.
+#
+# Five lists and nothing else. The beat exists because a volume with no backup
+# and a volume whose claim was deleted look identical from inside Longhorn, and
+# telling them apart needs the claims — so `persistentvolumeclaims` is the one
+# grant here that is not about backups at all, and the one without which the
+# beat would report every abandoned scratch volume as unprotected data.
+#
+# `list` only. Nothing is fetched by name, nothing is watched, and nothing is
+# written: the beat reports what it found and the deleting is a person's job.
+#
+# Its own ServiceAccount rather than the briefing's, for the reason the briefing
+# has its own rather than the responder's — a grant one workload needs should
+# not arrive in another workload's token. The briefing reads Secrets; this one
+# must never need to.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: campfire-backups-watch
+  namespace: campfire
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: campfire-backups-watch
+rules:
+  # The inventory: which volumes exist, when each was last backed up, and which
+  # recurring-job group covers it.
+  - apiGroups: ["longhorn.io"]
+    resources: [volumes, backupvolumes, backups, backuptargets]
+    verbs: [list]
+  # Which of those volumes still belongs to something. Cluster-wide, because a
+  # backed-up volume can be claimed from any namespace.
+  - apiGroups: [""]
+    resources: [persistentvolumeclaims]
+    verbs: [list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: campfire-backups-watch
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: campfire-backups-watch
+subjects:
+  - kind: ServiceAccount
+    name: campfire-backups-watch
+    namespace: campfire
