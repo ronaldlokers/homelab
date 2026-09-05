@@ -23,4 +23,4 @@ patches:
 
 images:
   - name: ghcr.io/gethomepage/homepage
-    newTag: v1.13.2
+    newTag: v2.2.0
