@@ -57,3 +57,37 @@ subjects:
   - kind: ServiceAccount
     name: restore-drill
     namespace: database
+---
+# PersistentVolumes are cluster-scoped, so this is the one piece of the drill
+# that cannot be a namespaced Role no matter how it is written — and RBAC has
+# no way to restrict it by name the way `delete clusters` above is restricted,
+# because the PV names are Longhorn-generated at provision time.
+#
+# The scope this can't declare, the code supplies instead: destroy() only
+# ever learns a PV name by reading .spec.volumeName off a PVC it already found
+# through the drill-postgres/drill-immich/drill-nightscout label selector, so
+# in practice this can only ever touch a PV bound to one of this drill's own
+# scratch PVCs. `patch`, not `delete` — it only ever flips
+# persistentVolumeReclaimPolicy to Delete; the PVC delete that the namespaced
+# Role above already permits is what actually triggers the reclaim.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: restore-drill
+rules:
+  - apiGroups: [""]
+    resources: [persistentvolumes]
+    verbs: [get, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: restore-drill
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: restore-drill
+subjects:
+  - kind: ServiceAccount
+    name: restore-drill
+    namespace: database
