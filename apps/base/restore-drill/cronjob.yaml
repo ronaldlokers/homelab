@@ -1,8 +1,18 @@
 # Restore every backup into a throwaway cluster, weekly, and see what comes back.
 #
-# 05:00 on Sunday: three hours before Almanac files the week's sheets, so a
-# failed drill is already in the room by the time anyone reads them, and far
-# enough from the 02:00-03:30 backup window that the two never overlap.
+# 05:00 on Sunday, Europe/Amsterdam: three hours before Almanac files the
+# week's sheets, so a failed drill is already in the room by the time anyone
+# reads them.
+#
+# This used to also claim to sit clear of the 02:45-03:30 UTC backup window —
+# true in winter, when 05:00 CET is 04:00 UTC, and false in summer, when
+# 05:00 CEST is 03:00 UTC, squarely inside it. The ScheduledBackups run on a
+# plain UTC cron with no timezone; this job's local-time schedule does not
+# track them, and never has. That stopped mattering for correctness once the
+# point-in-time restore started anchoring on each cluster's own
+# ScheduledBackup instead of assuming it had already run (see
+# restore-drill.py's backup_anchor()) — the schedule below is now free to sit
+# wherever the Almanac timing wants it, DST included.
 #
 # The runbook claims an RTO of 20-30 minutes and an RPO of near-zero, and
 # nothing has ever tested either. recovery-source-check proves the *pointer*
