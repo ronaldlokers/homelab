@@ -12,16 +12,14 @@
 # were not there — a note rendering a broken picture, which is a worse thing to
 # find than a missing one.
 #
-# So this claim is backed up, and for a stronger reason than the spool's
-# quarantine is. A spooled capture is in flight for under a second in steady
-# state; a photograph is kept forever and exists nowhere else. Postgres holds
-# only the name of the file.
+# So this claim carries the same backup labels the spool's quarantine does, and
+# for the stronger reason. A spooled capture is in flight for under a second in
+# steady state; a photograph is kept forever and exists nowhere else. Postgres
+# holds only the name of the file.
 #
-# It does not take backup-daily, though, and that is deliberate. The file is
-# written before its row, so a backup taken before the database dump restores a
-# row pointing at a file nothing holds — the broken direction named above.
-# backup-after-the-dump runs an hour clear of the dump instead; the reasoning is
-# in infrastructure/controllers/production/longhorn/recurring-jobs.yaml.
+# The order the pair is captured in matters, and it is set by backup-daily's
+# hour rather than by anything here — see
+# infrastructure/controllers/production/longhorn/recurring-jobs.yaml.
 #
 # storageClassName is omitted and set per overlay, the same as the spool:
 # production annotates both local-path and longhorn as default, so an
@@ -32,7 +30,7 @@ metadata:
   name: squirrel-photos
   namespace: campfire
   labels:
-    recurring-job.longhorn.io/backup-after-the-dump: enabled
+    recurring-job.longhorn.io/backup-daily: enabled
     recurring-job.longhorn.io/snapshot-daily: enabled
 spec:
   accessModes:
