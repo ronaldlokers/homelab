@@ -49,13 +49,22 @@ from datetime import datetime, timedelta, timezone
 READY_TIMEOUT = timedelta(minutes=10)
 POLL_SECONDS = 10
 
-# How far back the point-in-time restore aims. Far enough that WAL replay has to
-# stop somewhere real, recent enough that the segments are certainly present.
+# How far past today's backup the point-in-time target sits, once backup_anchor()
+# has found when that backup actually fired. Far enough that some real write
+# almost certainly happened in between, so the restore has something to prove it
+# stopped before; recent enough that the WAL between the backup and the target is
+# minutes, not a whole day's worth.
+PITR_MARGIN = timedelta(minutes=15)
+
+# Fallback only, for a cluster whose ScheduledBackup backup_anchor() can't find —
+# see its docstring for why "now" alone used to be the target, and why that was
+# wrong often enough to matter.
 PITR_BACK = timedelta(hours=1)
 
 # What proves a database is populated rather than merely running, per cluster:
-# the database to connect to, a query that counts something real, and a query
-# that finds the newest thing in it.
+# the database to connect to, a query that counts something real, a query that
+# finds the newest thing in it, and whether that newest-thing query is one
+# this drill should trust to fail the run when it comes back stale.
 #
 # Every one of these was wrong when first written, and each was wrong in a way
 # that would have passed review:
@@ -69,6 +78,14 @@ PITR_BACK = timedelta(hours=1)
 #   * the shared cluster's busiest table belongs to authentik's task log, which
 #     churns; gatus writes a row every check, which makes its newest row a
 #     genuine RPO signal rather than a number that happens to be large.
+#   * immich's `asset.createdAt` looked like the same kind of signal and is
+#     not: it is the newest *photo*, not the newest write, and this library
+#     goes days between uploads — nine of them, the week this was found. The
+#     drill read that gap as WAL replay stalling 66 hours behind and failed a
+#     restore that had in fact reached the true end of the archive. The count
+#     query still proves the restore is real; the freshness query is left in
+#     for what it shows in the room's weekly post, but the fourth field below
+#     keeps it from failing the drill on a photo library's silence.
 #
 # A count of zero is a failure: an empty restore reports Ready exactly as
 # happily as a full one, and that is the failure this drill exists to catch.
@@ -80,11 +97,13 @@ TARGETS = {
         "gatus",
         "SELECT count(*) FROM endpoint_results",
         "SELECT max(timestamp) FROM endpoint_results",
+        True,
     ),
     "immich-cluster": (
         "immich",
         'SELECT count(*) FROM asset',
         'SELECT max("createdAt") FROM asset',
+        False,
     ),
     "nightscout-cluster": (
         "postgres",
@@ -96,6 +115,7 @@ TARGETS = {
            FROM pg_tables
            WHERE schemaname = 'documentdb_data' AND tablename LIKE 'documents\\_%'""",
         None,
+        False,
     ),
 }
 
@@ -133,6 +153,40 @@ def clusters(ctx):
             print(f"  skip {name}: no barmanObjectStore on its recovery source")
             continue
         yield name, spec, source
+
+
+def backup_anchor(ctx, source):
+    """When today's backup for this cluster actually fired, per the
+    ScheduledBackup that owns it — `<source>-daily-backup`, the naming every
+    ScheduledBackup in this repo follows.
+
+    The point-in-time target used to be `datetime.now() - PITR_BACK`: an hour
+    before whenever the drill happened to reach this cluster. That is wrong
+    exactly as often as this CronJob's own schedule lands inside the backup
+    window it was written to sit clear of. It was written to sit clear of it
+    in Europe/Amsterdam local time, but the ScheduledBackups fire on a plain
+    UTC cron with no timezone — so the hour of daylight saving that Amsterdam
+    carries and UTC does not is a gap that opens and closes twice a year.
+    In CEST this job's 05:00 local start is 03:00 UTC, which is *inside*
+    02:45-03:30 UTC, not an hour clear of it. Whichever cluster the drill
+    reaches while its target still lands before that day's backup gets no
+    backup to restore from but yesterday's — 24 hours of WAL where the code
+    below expects a quarter of an hour, and the ten-minute READY_TIMEOUT was
+    never sized for that. nightscout-cluster and postgres-cluster hit exactly
+    this on 2026-08-30: both PITR restores were still replaying WAL, making
+    steady progress, when the timeout gave up on them.
+
+    Anchoring on the ScheduledBackup's own record of when it last fired is
+    right regardless of what wall-clock time the drill itself happens to run,
+    which a fix to this job's own schedule would not be: the three clusters
+    back up at three different times, and nothing keeps them a fixed distance
+    from whatever time this CronJob is given next.
+    """
+    out = kubectl(ctx, "get", "scheduledbackup", f"{source}-daily-backup", "-n", "database",
+                 "-o", "jsonpath={.status.lastScheduleTime}", check=False).strip()
+    if not out:
+        return None
+    return datetime.fromisoformat(out.replace("Z", "+00:00"))
 
 
 def drill_manifest(source_spec, source_name, name, target_time=None):
@@ -208,12 +262,34 @@ def create(ctx, manifest):
 
 
 def destroy(ctx, name):
-    """Delete the cluster and the PVC it leaves behind.
+    """Delete the cluster, and the PVC it leaves behind, all the way to the disk.
 
     CloudNativePG keeps PVCs after a Cluster is deleted, by design — a scratch
     cluster that left 5Gi of Longhorn behind every week would quietly fill a
-    node in a couple of months.
+    node in a couple of months. That comment used to be the whole story, and
+    it was wrong: the `longhorn` StorageClass carries `reclaimPolicy: Retain`,
+    on purpose, so a stray `kubectl delete pvc` on someone's real data can't
+    take the backing volume with it. Deleting the PVC above never freed
+    anything — it turned the PV `Released` and stopped there, because nothing
+    reclaims a Retain volume automatically. This drill ran that way for three
+    weeks before anyone read `kubectl get pv`: twenty-nine of them, going back
+    21 days, one or two per cluster per run, every run, pass or fail.
+    Retain is the right default for the cluster; it is the wrong default for
+    a volume that exists for ten minutes and never holds anything but a
+    restore rehearsal.
+    So each PVC's PV is flipped to `Delete` right before the PVC goes — the
+    only moment that is safe, since the PVC delete below is what triggers the
+    reclaim, and by then the volume's one remaining purpose was to be
+    destroyed by this call.
     """
+    volumes = kubectl(ctx, "get", "pvc", "-n", "database",
+                      "-l", f"cnpg.io/cluster={name}",
+                      "-o", "jsonpath={.items[*].spec.volumeName}", check=False).split()
+    for volume in volumes:
+        kubectl(ctx, "patch", "pv", volume, "--type=merge",
+                "-p", '{"spec":{"persistentVolumeReclaimPolicy":"Delete"}}',
+                check=False)
+
     kubectl(ctx, "delete", "cluster", name, "-n", "database",
             "--ignore-not-found", "--wait=true", check=False, timeout=300)
     kubectl(ctx, "delete", "pvc", "-n", "database",
@@ -355,7 +431,7 @@ def newest_row(ctx, name, database, sql):
 
 def drill(ctx, source, spec, origin, findings):
     """Both restores for one cluster. Returns True if everything held."""
-    database, count_sql, newest_sql = TARGETS.get(source, (None, None, None))
+    database, count_sql, newest_sql, rpo_reliable = TARGETS.get(source, (None, None, None, False))
     if not database:
         findings.append(f"{source}: no row-count target configured, so a restore "
                         f"could come back empty and pass")
@@ -392,8 +468,11 @@ def drill(ctx, source, spec, origin, findings):
         rpo = f", newest row {int(behind.total_seconds() / 60)}m old"
         # A restore whose freshest row predates the last scheduled backup means
         # WAL replay is not reaching the end, which is an RPO of hours rather
-        # than the "near-zero" the runbook claims.
-        if behind > timedelta(hours=26):
+        # than the "near-zero" the runbook claims — for a table that is written
+        # often enough for its silence to mean anything. rpo_reliable is what
+        # keeps this from failing immich's restore over a quiet photo library;
+        # see the comment on TARGETS.
+        if rpo_reliable and behind > timedelta(hours=26):
             ok = False
             findings.append(f"{source}: restored to {int(behind.total_seconds() / 3600)}h "
                             f"ago, so WAL replay is not reaching the present")
@@ -403,7 +482,20 @@ def drill(ctx, source, spec, origin, findings):
     destroy(ctx, name)
 
     # --- 2. and a point in time we choose ----------------------------------
-    target = datetime.now(timezone.utc) - PITR_BACK
+    anchor = backup_anchor(ctx, source)
+    if anchor:
+        # min() against "now" is the guard for the one case anchoring doesn't
+        # cover on its own: a drill run close enough behind the backup that
+        # anchor + PITR_MARGIN hasn't happened yet, which would hand CNPG a
+        # recovery target in the future.
+        target = min(anchor + PITR_MARGIN, datetime.now(timezone.utc) - timedelta(minutes=1))
+    else:
+        # No ScheduledBackup by the name this drill expects — fall back to the
+        # old arithmetic rather than skip the check, but this is exactly the
+        # situation backup_anchor() exists to avoid, so say so.
+        print(f"  no {source}-daily-backup ScheduledBackup found; "
+              f"aiming {PITR_BACK} back from now instead of from the backup")
+        target = datetime.now(timezone.utc) - PITR_BACK
     started = datetime.now(timezone.utc)
     create(ctx, drill_manifest(spec, origin, name, target_time=target))
     ready, phase = wait_ready(ctx, name, started + READY_TIMEOUT)
