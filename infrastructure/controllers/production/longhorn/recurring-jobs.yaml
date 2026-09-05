@@ -35,6 +35,40 @@ spec:
   groups:
     - default
 ---
+# The photographs volume is backed up AFTER the database, and that order is the
+# whole point of it having its own job.
+#
+# Squirrel writes a photograph to disk first and its row second. So whichever of
+# the two is captured last decides which way a restored pair can be wrong:
+#
+#   volume, then database  ->  a row pointing at a file no backup holds
+#   database, then volume  ->  a file nothing points at
+#
+# The second is invisible and harmless. The first is a note rendering a broken
+# picture, which apps/base/squirrel/photos-pvc.yaml already names as the worse
+# thing to find, and squirrel's own docs/running.md calls "the broken
+# direction".
+#
+# On backup-daily this volume was taking the wrong one every night. That job
+# runs 02:00 local, which is 00:00 UTC; postgres-cluster-daily-backup runs
+# 03:00 UTC. Three hours of every night in which a photograph captured after
+# midnight UTC had its row in the dump and its file in no backup at all.
+#
+# 06:00 local is 04:00 UTC, an hour clear of the dump. The two schedules are
+# read in different zones — Longhorn's cron is local, CNPG's is UTC — so the
+# gap is deliberately wide rather than tight.
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: backup-after-the-dump
+  namespace: longhorn-system
+spec:
+  name: backup-after-the-dump
+  task: backup
+  cron: "0 6 * * *"
+  retain: 7
+  concurrency: 1
+---
 apiVersion: longhorn.io/v1beta2
 kind: RecurringJob
 metadata:
