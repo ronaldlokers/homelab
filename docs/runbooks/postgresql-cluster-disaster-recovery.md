@@ -75,10 +75,17 @@ logical / 12GB on disk, downloaded from B2 and WAL-replayed on ARM64. The
 
 ### Not yet verified
 
-Only `postgres-cluster` has been restore-tested. `immich-cluster` backs up to a
-separate prefix (`production-2026-07-immich/`) and uses the same mechanism, so it
-is likely fine — but "likely fine" is precisely the claim this exercise existed
-to stop us making.
+`postgres-cluster` has been restore-tested, and `nightscout-cluster` on
+2026-08-04 (22,306 entries, `create_collection` and `drop_collection` both
+functional). `immich-cluster` backs up to a separate prefix
+(`production-2026-09-immich/`) and uses the same mechanism, so it is likely
+fine — but "likely fine" is precisely the claim this exercise existed to stop
+us making.
+
+None of those restores went through the Barman Cloud Plugin: every one of them
+read a catalogue written by the in-tree path. The plugin writes the same barman
+layout, which is why the migration keeps the existing prefixes, but the first
+plugin-era restore is still unverified.
 
 ## When to Use This Runbook
 
@@ -130,18 +137,37 @@ the **archive destination** on distinct paths. This repo does that with dated
 
 | Path role | Example |
 |-----------|---------|
-| Recover **from** (`externalClusters[].barmanObjectStore`) | `s3://…/production-2026-03/` |
-| Archive **to** (`backup.barmanObjectStore`) | `s3://…/production-2026-07/` |
+| Recover **from** (the `ObjectStore` named by `externalClusters[].plugin`) | `s3://…/production-2026-03/` |
+| Archive **to** (the `ObjectStore` named by `spec.plugins[]`) | `s3://…/production-2026-07/` |
+
+Since the migration to the Barman Cloud Plugin (#377), both are
+`ObjectStore.spec.configuration.destinationPath`. Day to day the two entries
+name the *same* store, which is what keeps them equal without review; a DR is
+the one time they must differ, and that means a second `ObjectStore`, not a
+second copy of the path.
 
 **On every real DR / cluster rebuild:**
-1. Point `externalClusters[].destinationPath` at the **current** live archive
-   prefix (the one the cluster was most recently backing up to). A committed
-   recovery source goes stale the moment the live cluster keeps archiving — do
-   not assume the value in git is still the latest.
-2. Set `backup.barmanObjectStore.destinationPath` to a **new** dated prefix
-   (bump the month/date). This becomes the recovered cluster's fresh timeline.
+1. Point the recovery source at the **current** live archive prefix (the one the
+   cluster was most recently backing up to). A committed recovery source goes
+   stale the moment the live cluster keeps archiving — do not assume the value
+   in git is still the latest.
+2. Create a **new** `ObjectStore` with a new dated prefix (bump the month/date)
+   and point `spec.plugins[].parameters.barmanObjectName` at it. This becomes
+   the recovered cluster's fresh timeline. Leave `externalClusters[].plugin`
+   naming the old store until step 3 has run.
 3. After recovery, trigger a `Backup` so a base backup exists on the new prefix
-   before relying on it for PITR.
+   before relying on it for PITR. An on-demand backup has to name the plugin
+   explicitly — the default method is still `barmanObjectStore`, which a
+   migrated cluster no longer has:
+
+   ```bash
+   kubectl cnpg backup <cluster> -n database \
+     --method plugin --plugin-name barman-cloud.cloudnative-pg.io
+   ```
+
+   Only once that reports `completed` may `externalClusters[].plugin` be
+   repointed at the new store. Recovery aimed at an empty prefix fails, and a
+   rebuild is exactly when nobody is watching (#394).
 4. **Delete the prefix you rotated away from, in the same change.** This step is
    new because skipping it is what produced #167: four dead prefixes holding
    51.9 GB, 90% of the bucket. Cost was never the issue — at B2 pricing that is
@@ -167,9 +193,10 @@ the **archive destination** on distinct paths. This repo does that with dated
    — `AccessDenied: not entitled` — so an automated age-out rule has to be set
    in the Backblaze console with a more privileged key.
 
-> The `serverName` under `externalClusters` identifies the source server inside
-> that prefix; keep it matching the cluster name of the generation you are
-> restoring.
+> `serverName` identifies the source server inside that prefix; keep it matching
+> the cluster name of the generation you are restoring. On the plugin it is a
+> parameter under `externalClusters[].plugin`, **not** a field on the
+> `ObjectStore` — the store's own `serverName` is required to stay empty.
 
 ## Immediate Actions
 
@@ -223,21 +250,26 @@ bootstrap:
   recovery:
     source: clusterBackup
 
-# Recover FROM the current live archive prefix...
+# Recover FROM the store holding the current live archive...
 externalClusters:
   - name: clusterBackup
-    barmanObjectStore:
-      destinationPath: "s3://homelab-postgres-backups/production-2026-03/"
-      serverName: postgres-cluster
-      endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-      # ... credentials
+    plugin:
+      name: barman-cloud.cloudnative-pg.io
+      parameters:
+        barmanObjectName: postgres-store          # destinationPath: …/production-2026-03/
+        serverName: postgres-cluster
 
-# ...and archive TO a new, distinct prefix (see "recover-from ≠ archive-to" above).
-backup:
-  barmanObjectStore:
-    destinationPath: "s3://homelab-postgres-backups/production-2026-07/"
-    # ... credentials
+# ...and archive TO a different store on a new prefix
+# (see "recover-from ≠ archive-to" above).
+plugins:
+  - name: barman-cloud.cloudnative-pg.io
+    isWALArchiver: true
+    parameters:
+      barmanObjectName: postgres-store-2026-07    # destinationPath: …/production-2026-07/
 ```
+
+Both names must resolve to an `ObjectStore` in the same namespace. Outside a DR
+they are the same store, named twice.
 
 > ⚠️ Do **not** set both `destinationPath`s to the same prefix — recovery will
 > fail with "Expected empty archive". The old single-`production/` examples in
@@ -293,22 +325,15 @@ bootstrap:
   recovery:
     source: clusterBackup
 
-# ADD THIS at same level as 'bootstrap':
+# ADD THIS at same level as 'bootstrap'. The destination, endpoint and
+# credentials live on the ObjectStore this names, not here.
 externalClusters:
   - name: clusterBackup
-    barmanObjectStore:
-      destinationPath: "s3://homelab-postgres-backups/production/"
-      serverName: postgres-cluster
-      endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-      s3Credentials:
-        accessKeyId:
-          name: b2-credentials
-          key: ACCESS_KEY_ID
-        secretAccessKey:
-          name: b2-credentials
-          key: ACCESS_SECRET_KEY
-      wal:
-        maxParallel: 8
+    plugin:
+      name: barman-cloud.cloudnative-pg.io
+      parameters:
+        barmanObjectName: postgres-store
+        serverName: postgres-cluster
 ```
 
 **Important**: Any `postInitSQL` commands need to be moved to a PostSync job, as they won't run in recovery mode.
@@ -480,8 +505,11 @@ bootstrap:
        source: clusterBackup
    externalClusters:
      - name: clusterBackup
-       barmanObjectStore:
-         # ... backup config
+       plugin:
+         name: barman-cloud.cloudnative-pg.io
+         parameters:
+           barmanObjectName: <the cluster's ObjectStore>
+           serverName: <cluster name>
    ```
 
 3. Move initialization SQL to PostSync jobs:
