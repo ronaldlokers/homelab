@@ -10,6 +10,7 @@ resources:
   - nightscout-cluster.yaml
   - nightscout-documentdb-grants.yaml
   - immich-cluster.yaml
+  - immich-objectstore.yaml
   - postgres-alerts.yaml
   - scheduled-backup.yaml
   - authentik-database.yaml
