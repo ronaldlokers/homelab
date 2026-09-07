@@ -1,0 +1,44 @@
+# The plugin's replacement for spec.backup.barmanObjectStore, which
+# CloudNativePG removes in 1.31 (#377). Same bucket, same prefix, same
+# credentials — the plugin writes the barman layout the existing catalogue
+# already uses, so the backup history carries over rather than restarting.
+#
+# serverName is left unset. The plugin keeps the field only for API
+# compatibility with the in-tree configuration and requires it to stay empty;
+# where a name is needed it is given as a plugin parameter, as
+# postgres-cluster.yaml does on its recovery source.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: postgres-store
+  namespace: database
+spec:
+  # Was spec.backup.retentionPolicy on the Cluster. Retention is enforced by
+  # the plugin now, so leaving it behind would have meant no retention at all.
+  #
+  # It is also what makes #395 worth finishing: this bucket is versioned with no
+  # lifecycle rule, so each retention delete leaves a version and a marker
+  # behind, and that is what turned production-2026-03/ into a prefix that took
+  # 71s to list.
+  retentionPolicy: "7d"
+  configuration:
+    # Own prefix, as every other cluster already has. production-2026-03/ had
+    # accumulated 3,312 live objects behind 12,276 versions and 9,008 delete
+    # markers, and listing it took 71s against 3.6s for a per-cluster prefix.
+    # The metrics collector reads that catalogue, could not finish, and reported
+    # last_available_backup_timestamp as 0, firing PostgreSQLBackupNeverTaken on
+    # a cluster whose backups were fine (#391).
+    destinationPath: "s3://homelab-postgres-backups/production-2026-08-postgres/"
+    endpointURL: "https://s3.eu-central-003.backblazeb2.com"
+    s3Credentials:
+      accessKeyId:
+        name: b2-credentials
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: b2-credentials
+        key: ACCESS_SECRET_KEY
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+      jobs: 2
