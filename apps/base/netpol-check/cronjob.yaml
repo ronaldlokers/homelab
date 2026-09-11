@@ -34,7 +34,7 @@ spec:
           containers:
             - name: check
               # kubectl and python3 in one image, so the script runs unchanged.
-              image: alpine/k8s:1.36.2
+              image: alpine/k8s:1.37.0
               command: ["/bin/sh", "-c"]
               args:
                 - |
