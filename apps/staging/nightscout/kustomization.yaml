@@ -9,7 +9,7 @@ resources:
 
 images:
 - name: nightscout/cgm-remote-monitor
-  newTag: 15.0.7
+  newTag: 15.0.8
 - name: ghcr.io/ferretdb/ferretdb
   newTag: 2.7.0
 patches:
