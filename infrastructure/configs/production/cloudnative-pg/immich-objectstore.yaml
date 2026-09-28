@@ -1,0 +1,37 @@
+# The plugin's replacement for spec.backup.barmanObjectStore, which
+# CloudNativePG removes in 1.31 (#377). Same bucket, same prefix, same
+# credentials — the plugin writes the barman layout the existing catalogue
+# already uses, so the backup history carries over rather than restarting.
+#
+# serverName is left unset. The plugin keeps the field only for API
+# compatibility with the in-tree configuration and requires it to stay empty;
+# where a name is needed it is given as a plugin parameter, as immich-cluster.yaml
+# does on its recovery source.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: immich-store
+  namespace: database
+spec:
+  # Was spec.backup.retentionPolicy on the Cluster. Retention is enforced by
+  # the plugin now, so leaving it behind would have meant no retention at all —
+  # on a bucket that already keeps every deleted version (#395).
+  retentionPolicy: "7d"
+  configuration:
+    # Archive to a NEW timeline on each disaster recovery, so a recovered
+    # cluster starts a clean WAL history (avoids the "Expected empty archive"
+    # collision). Bump this suffix as step 2 of the runbook.
+    destinationPath: "s3://homelab-postgres-backups/production-2026-09-immich/"
+    endpointURL: "https://s3.eu-central-003.backblazeb2.com"
+    s3Credentials:
+      accessKeyId:
+        name: b2-credentials
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: b2-credentials
+        key: ACCESS_SECRET_KEY
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+      jobs: 2

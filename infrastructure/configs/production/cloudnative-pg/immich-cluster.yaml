@@ -77,21 +77,19 @@ spec:
     recovery:
       source: clusterBackup
 
+  # Names the same object store the cluster archives to rather than
+  # respecifying it, so the two cannot drift apart the way #257 and #260 did.
+  #
+  # serverName is explicit even though it equals the cluster name: it is what
+  # the in-tree configuration recorded, and on the plugin it belongs here
+  # rather than on the ObjectStore, whose own serverName must stay empty.
   externalClusters:
     - name: clusterBackup
-      barmanObjectStore:
-        destinationPath: "s3://homelab-postgres-backups/production-2026-09-immich/"
-        serverName: immich-cluster
-        endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-        s3Credentials:
-          accessKeyId:
-            name: b2-credentials
-            key: ACCESS_KEY_ID
-          secretAccessKey:
-            name: b2-credentials
-            key: ACCESS_SECRET_KEY
-        wal:
-          maxParallel: 8
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: immich-store
+          serverName: immich-cluster
 
   # 20Gi, down from 50Gi. CNPG refuses to shrink storage in place, so this only
   # takes effect by deleting the cluster and letting it restore — which is why
@@ -100,23 +98,17 @@ spec:
     size: 20Gi
     storageClass: longhorn
 
-  backup:
-    retentionPolicy: "7d"
-    barmanObjectStore:
-      # Archive to a NEW timeline, distinct from the recovery source above, so
-      # a recovered cluster starts a clean WAL history (avoids the
-      # "Expected empty archive" collision). Bump this suffix on each DR.
-      destinationPath: "s3://homelab-postgres-backups/production-2026-09-immich/"
-      endpointURL: "https://s3.eu-central-003.backblazeb2.com"
-      s3Credentials:
-        accessKeyId:
-          name: b2-credentials
-          key: ACCESS_KEY_ID
-        secretAccessKey:
-          name: b2-credentials
-          key: ACCESS_SECRET_KEY
-      wal:
-        compression: gzip
-      data:
-        compression: gzip
-        jobs: 2
+  # Backups go through the Barman Cloud Plugin rather than the in-tree
+  # barmanObjectStore, which CloudNativePG removes in 1.31 (#377). The
+  # destination, prefix, credentials and retention move to
+  # immich-objectstore.yaml unchanged, so the existing catalogue continues
+  # rather than restarting.
+  #
+  # isWALArchiver: true hands WAL archiving to the plugin. Only one component
+  # may archive, so this is a cutover, not a parallel run — the two cannot be
+  # configured at once.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: immich-store
