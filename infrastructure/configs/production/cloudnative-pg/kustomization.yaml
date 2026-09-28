@@ -6,6 +6,7 @@ resources:
   - namespace.yaml
   - b2-credentials-secret.yaml
   - postgres-cluster.yaml
+  - postgres-objectstore.yaml
   - postgres-metrics-exporter-grants.yaml
   - nightscout-cluster.yaml
   - nightscout-documentdb-grants.yaml
