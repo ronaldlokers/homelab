@@ -30,6 +30,8 @@ These stories document actual problems, debugging processes, and solutions. They
 
 - **[The Role I Was Migrating *From* Was the One That Broke](postgres-ownership-transfer-revokes-the-old-role.md)** - `ALTER ... OWNER TO` is a grant and a revoke in one statement; six apps lost database access at the same instant and only one had a health check that noticed
 
+- **[A Manager That Left Two Years Ago Still Owned Half the Field](ssa-orphaned-field-manager-blocks-removal.md)** - Deleting a config block from git removed every part of it except the one a retired field manager still owned, leaving an object the CRD rejected
+
 - **[The App That Started Perfectly and Served Nothing](tandoor-service-env-var-collision.md)** - Kubernetes injects an environment variable per Service, which silently overwrote the port nginx was told to listen on
 - **[47 Restarts in 19 Hours, Every One Exiting Zero](liveness-without-startup-probe.md)** - A livenessProbe with no startupProbe is a startup timeout, and a clean SIGTERM shutdown is indistinguishable from success in the exit code
 
@@ -88,6 +90,7 @@ These stories document actual problems, debugging processes, and solutions. They
 44. **Staging (k3d) can't surface MetalLB/LB-hairpin behaviour** - A monitor that passes in staging can still fail every check in production because the load-balancer implementation is fundamentally different
 45. **A one-shot curl succeeding doesn't prove sustained connectivity** - Same-node/same-namespace curl reaching a VIP while a long-lived pod can't is the contradiction that rules out node/ETP/policy as the cause
 46. **Label-gated namespaces bite promotions, not first deploys** - Production's `database` namespace admits only `homelab.io/needs-database` namespaces; Postgres storage silently fails without the label
+47. **Removing a field from git only removes it if one manager owns it** - Server-side apply drops a field when *its* owner stops sending it; a retired field manager keeps the rest, and `--show-managed-fields` is the only way to know beforehand
 
 ## Contributing Your Own War Stories
 
