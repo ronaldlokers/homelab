@@ -8,6 +8,7 @@ resources:
   - postgres-cluster.yaml
   - postgres-metrics-exporter-grants.yaml
   - nightscout-cluster.yaml
+  - nightscout-objectstore.yaml
   - nightscout-documentdb-grants.yaml
   - immich-cluster.yaml
   - postgres-alerts.yaml
