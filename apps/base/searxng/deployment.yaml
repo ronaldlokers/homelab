@@ -22,7 +22,7 @@ spec:
         fsGroup: 977
       containers:
         - name: searxng
-          image: docker.io/searxng/searxng:2026.9.6-eaf1fcb34
+          image: docker.io/searxng/searxng:2026.10.9-f4822b3fc
           ports:
             - name: http
               containerPort: 8080
